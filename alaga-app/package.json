@@ -1,0 +1,37 @@
+{
+  "name": "alaga-app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@expo/vector-icons": "^15.1.1",
+    "@react-navigation/bottom-tabs": "^7.18.17",
+    "@react-navigation/native": "^7.3.17",
+    "@react-navigation/native-stack": "^7.18.9",
+    "@react-navigation/stack": "^7.10.23",
+    "expo": "^57.0.16",
+    "expo-font": "^57.0.1",
+    "expo-image-picker": "^57.0.13",
+    "expo-location": "^57.0.13",
+    "expo-splash-screen": "^57.0.8",
+    "expo-status-bar": "^57.0.1",
+    "react": "^19.2.3",
+    "react-native": "^0.86.2",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-maps": "^1.27.2",
+    "react-native-reanimated": "^4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-vector-icons": "^10.3.0",
+    "react-native-worklets": "^0.10.1"
+  }
+}

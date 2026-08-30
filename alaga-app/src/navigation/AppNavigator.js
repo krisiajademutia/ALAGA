@@ -1,0 +1,170 @@
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+import { useApp } from '../context/AppContext';
+import { COLORS, SHADOWS, SIZES } from '../constants/theme';
+
+// ── Auth / Onboarding ─────────────────────────────────────────────────────────
+import SplashScreen     from '../screens/onboarding/SplashScreen';
+import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
+import LoginScreen      from '../screens/auth/LoginScreen';
+import RegisterScreen   from '../screens/auth/RegisterScreen';
+
+// ── Community screens ─────────────────────────────────────────────────────────
+import CommunityHomeScreen from '../screens/community/HomeScreen';
+import ReportRescueScreen  from '../screens/community/ReportRescueScreen';
+import ReportDetailScreen  from '../screens/community/ReportDetailScreen';
+import AllReportsScreen    from '../screens/community/AllReportsScreen';
+
+// ── Advocate screens ──────────────────────────────────────────────────────────
+import AdvocateHomeScreen      from '../screens/advocate/AdvocateHomeScreen';
+import RescueAlertsScreen      from '../screens/advocate/RescueAlertsScreen';
+import RescueAlertDetailScreen from '../screens/advocate/RescueAlertDetailScreen';
+import MyAnimalsScreen         from '../screens/advocate/MyAnimalsScreen';
+import AddAnimalScreen         from '../screens/advocate/AddAnimalScreen';
+import AdvocateRequestsScreen  from '../screens/advocate/AdvocateRequestsScreen';
+
+// ── Shared screens ────────────────────────────────────────────────────────────
+import ListingsScreen     from '../screens/shared/ListingsScreen';
+import AnimalDetailScreen from '../screens/shared/AnimalDetailScreen';
+import MessagesScreen     from '../screens/shared/MessagesScreen';
+import ChatScreen         from '../screens/shared/ChatScreen';
+import ActivityScreen     from '../screens/shared/ActivityScreen';
+import DonateScreen       from '../screens/shared/DonateScreen';
+import ProfileScreen      from '../screens/shared/ProfileScreen';
+import PublicProfileScreen from '../screens/shared/PublicProfileScreen';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles — MUST be defined before navigator components that reference them
+// ─────────────────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.divider,
+    height: 62,
+    paddingBottom: 8,
+    paddingTop: 6,
+    ...SHADOWS.sm,
+  },
+  tabLabel: {
+    fontSize: SIZES.xs,
+    fontWeight: '700',
+  },
+});
+
+// Tab screen options — defined after styles so styles.tabBar is available
+const tabScreenOptions = {
+  headerShown: false,
+  tabBarStyle: styles.tabBar,
+  tabBarActiveTintColor: COLORS.primaryDeep,
+  tabBarInactiveTintColor: COLORS.textMuted,
+  tabBarLabelStyle: styles.tabLabel,
+};
+
+function tabOptions(label, activeIcon, inactiveIcon) {
+  return {
+    title: label,
+    tabBarIcon: ({ focused, color }) => (
+      <Ionicons name={focused ? activeIcon : inactiveIcon} size={22} color={color} />
+    ),
+  };
+}
+
+const Stack = createNativeStackNavigator();
+const Tab   = createBottomTabNavigator();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Community Tab Navigator
+// ─────────────────────────────────────────────────────────────────────────────
+function CommunityTabs() {
+  return (
+    <Tab.Navigator screenOptions={tabScreenOptions}>
+      <Tab.Screen name="Home"     component={CommunityHomeScreen} options={tabOptions('Home',     'home',         'home-outline')} />
+      <Tab.Screen name="Listings" component={ListingsScreen}      options={tabOptions('Adopt',    'heart',        'heart-outline')} />
+      <Tab.Screen name="Messages" component={MessagesScreen}      options={tabOptions('Messages', 'chatbubbles',  'chatbubbles-outline')} />
+      <Tab.Screen name="Activity" component={ActivityScreen}      options={tabOptions('Activity', 'time',         'time-outline')} />
+      <Tab.Screen name="Profile"  component={ProfileScreen}       options={tabOptions('Profile',  'person',       'person-outline')} />
+    </Tab.Navigator>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Advocate Tab Navigator
+// ─────────────────────────────────────────────────────────────────────────────
+function AdvocateTabs() {
+  return (
+    <Tab.Navigator screenOptions={tabScreenOptions}>
+      <Tab.Screen name="Home"         component={AdvocateHomeScreen}  options={tabOptions('Home',     'home',          'home-outline')} />
+      <Tab.Screen name="RescueAlerts" component={RescueAlertsScreen}  options={tabOptions('Alerts',   'notifications', 'notifications-outline')} />
+      <Tab.Screen name="MyAnimals"    component={MyAnimalsScreen}     options={tabOptions('Animals',  'paw',           'paw-outline')} />
+      <Tab.Screen name="Messages"     component={MessagesScreen}      options={tabOptions('Messages', 'chatbubbles',   'chatbubbles-outline')} />
+      <Tab.Screen name="Profile"      component={ProfileScreen}       options={tabOptions('Profile',  'person',        'person-outline')} />
+    </Tab.Navigator>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Root Stack — wraps tabs + all push / modal screens
+// ─────────────────────────────────────────────────────────────────────────────
+function RootStack() {
+  const { currentUser } = useApp();
+  const isAdvocate = currentUser?.role === 'advocate';
+
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="MainTabs" component={isAdvocate ? AdvocateTabs : CommunityTabs} />
+
+      {/* Community */}
+      <Stack.Screen name="ReportRescue" component={ReportRescueScreen} />
+      <Stack.Screen name="ReportDetail" component={ReportDetailScreen} />
+      <Stack.Screen name="AllReports"   component={AllReportsScreen} />
+
+      {/* Advocate */}
+      <Stack.Screen name="RescueAlertDetail"  component={RescueAlertDetailScreen} />
+      <Stack.Screen name="AddAnimal"          component={AddAnimalScreen} />
+      <Stack.Screen name="AdvocateRequests"   component={AdvocateRequestsScreen} />
+
+      {/* Shared */}
+      <Stack.Screen name="AnimalDetail"   component={AnimalDetailScreen} />
+      <Stack.Screen name="Chat"           component={ChatScreen} />
+      <Stack.Screen name="Activity"       component={ActivityScreen} />
+      <Stack.Screen name="Donate"         component={DonateScreen} />
+      <Stack.Screen name="Profile"        component={ProfileScreen} />
+      <Stack.Screen name="PublicProfile"  component={PublicProfileScreen} />
+      <Stack.Screen name="Listings"       component={ListingsScreen} />
+      <Stack.Screen name="RescueAlerts"   component={RescueAlertsScreen} />
+      <Stack.Screen name="MyAnimals"      component={MyAnimalsScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auth Stack
+// ─────────────────────────────────────────────────────────────────────────────
+function AuthStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Splash"     component={SplashScreen} />
+      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+      <Stack.Screen name="Login"      component={LoginScreen} />
+      <Stack.Screen name="Register"   component={RegisterScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Root Navigator — switches between Auth and App based on login state
+// ─────────────────────────────────────────────────────────────────────────────
+export default function AppNavigator() {
+  const { currentUser } = useApp();
+  return (
+    <NavigationContainer>
+      {currentUser ? <RootStack /> : <AuthStack />}
+    </NavigationContainer>
+  );
+}

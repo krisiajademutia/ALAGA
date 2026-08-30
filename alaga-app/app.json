@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "ALAGA",
+    "slug": "alaga-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#E8622A"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.alaga.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "ALAGA needs camera access to take photos of animals for rescue reports and profiles.",
+        "NSPhotoLibraryUsageDescription": "ALAGA needs photo library access to attach images to rescue reports.",
+        "NSLocationWhenInUseUsageDescription": "ALAGA uses your location to pinpoint the animal's rescue location."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#E8622A"
+      },
+      "package": "com.alaga.app",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ALAGA needs access to your photos to attach images to rescue reports.",
+          "cameraPermission": "ALAGA needs camera access to take photos for rescue reports."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "ALAGA uses your location to tag the rescue location."
+        }
+      ]
+    ]
+  }
+}
