@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
   SafeAreaView, StatusBar as RNStatusBar, Platform,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { Marker, UrlTile, PROVIDER_DEFAULT } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS } from '../constants/theme';
 
@@ -39,6 +39,105 @@ export default function MapCard({ location, title, style }) {
     longitudeDelta: 0.04,
   };
 
+  // Web fallback using OpenStreetMap iframe embed (since react-native-maps renders a black box on Web)
+  if (Platform.OS === 'web') {
+    const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${location.longitude - 0.008}%2C${location.latitude - 0.008}%2C${location.longitude + 0.008}%2C${location.latitude + 0.008}&layer=mapnik&marker=${location.latitude}%2C${location.longitude}`;
+    const fullMapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${location.longitude - 0.03}%2C${location.latitude - 0.03}%2C${location.longitude + 0.03}%2C${location.latitude + 0.03}&layer=mapnik&marker=${location.latitude}%2C${location.longitude}`;
+
+    return (
+      <>
+        {/* ── Web Thumbnail ──────────────────────────────────── */}
+        <TouchableOpacity
+          style={[styles.thumb, style]}
+          onPress={() => setFullscreen(true)}
+          activeOpacity={0.92}
+        >
+          <View style={styles.webMapWrap}>
+            <iframe
+              title={title || location.address}
+              width="100%"
+              height="160"
+              frameBorder="0"
+              scrolling="no"
+              marginHeight="0"
+              marginWidth="0"
+              src={mapUrl}
+              style={{ border: 0, width: '100%', height: 160, pointerEvents: 'none' }}
+            />
+          </View>
+
+          {/* Address overlay */}
+          <View style={styles.addressBar}>
+            <Ionicons name="location" size={14} color={COLORS.primaryDeep} />
+            <Text style={styles.addressText} numberOfLines={1}>
+              {location.address || 'See location'}
+            </Text>
+            <View style={styles.expandBtn}>
+              <Ionicons name="expand-outline" size={14} color={COLORS.primaryDeep} />
+              <Text style={styles.expandText}>Full Map</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {/* ── Web Fullscreen modal ───────────────────────────── */}
+        <Modal
+          visible={fullscreen}
+          animationType="slide"
+          onRequestClose={() => setFullscreen(false)}
+        >
+          <View style={styles.fullContainer}>
+            <SafeAreaView style={styles.fullHeader}>
+              <TouchableOpacity
+                style={styles.closeBtn}
+                onPress={() => setFullscreen(false)}
+              >
+                <Ionicons name="arrow-back" size={22} color={COLORS.brown} />
+              </TouchableOpacity>
+              <View style={styles.fullHeaderText}>
+                <Text style={styles.fullTitle} numberOfLines={1}>
+                  {title || 'Rescue Location'}
+                </Text>
+                <Text style={styles.fullAddr} numberOfLines={1}>
+                  {location.address}
+                </Text>
+              </View>
+            </SafeAreaView>
+
+            <View style={{ flex: 1, backgroundColor: '#e4ebf0' }}>
+              <iframe
+                title={title || location.address}
+                width="100%"
+                height="100%"
+                frameBorder="0"
+                scrolling="no"
+                marginHeight="0"
+                marginWidth="0"
+                src={fullMapUrl}
+                style={{ border: 0, width: '100%', height: '100%' }}
+              />
+            </View>
+
+            <View style={styles.fullFooter}>
+              <View style={styles.fullFooterIcon}>
+                <Ionicons name="location" size={20} color={COLORS.primaryDeep} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fullFooterTitle}>{title || 'Rescue Location'}</Text>
+                <Text style={styles.fullFooterAddr}>{location.address}</Text>
+                {location.latitude && (
+                  <Text style={styles.fullFooterCoords}>
+                    {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
+                  </Text>
+                )}
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </>
+    );
+  }
+
+  // Native (iOS / Android) MapView
   return (
     <>
       {/* ── Thumbnail ──────────────────────────────────────── */}
@@ -57,6 +156,11 @@ export default function MapCard({ location, title, style }) {
           pitchEnabled={false}
           pointerEvents="none"
         >
+          <UrlTile
+            urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+            maximumZ={19}
+            flipY={false}
+          />
           <Marker
             coordinate={{ latitude: location.latitude, longitude: location.longitude }}
             title={title || location.address}
@@ -115,6 +219,11 @@ export default function MapCard({ location, title, style }) {
             rotateEnabled
             pitchEnabled
           >
+            <UrlTile
+              urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maximumZ={19}
+              flipY={false}
+            />
             <Marker
               coordinate={{ latitude: location.latitude, longitude: location.longitude }}
               title={title || 'Animal Location'}
@@ -154,6 +263,13 @@ const styles = StyleSheet.create({
   thumbMap: {
     width: '100%',
     height: 160,
+    backgroundColor: '#e4ebf0',
+  },
+  webMapWrap: {
+    width: '100%',
+    height: 160,
+    backgroundColor: '#e4ebf0',
+    overflow: 'hidden',
   },
   addressBar: {
     flexDirection: 'row',
@@ -234,7 +350,10 @@ const styles = StyleSheet.create({
   fullTitle: { fontSize: SIZES.body, fontWeight: '800', color: COLORS.brown },
   fullAddr:  { fontSize: SIZES.small, color: COLORS.textSecondary, marginTop: 2 },
 
-  fullMap: { flex: 1 },
+  fullMap: {
+    flex: 1,
+    backgroundColor: '#e4ebf0',
+  },
 
   fullFooter: {
     flexDirection: 'row',
