@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Dimensions, Platform, Modal, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
@@ -23,16 +23,7 @@ const ADVOCATE_TABS = [
   { key: 'animals',   label: 'My Animals', icon: 'paw-outline',              iconActive: 'paw' },
 ];
 
-// ── Icon colors per tab ───────────────────────────────────────────────────────
-const TAB_COLORS = {
-  reports:   { icon: COLORS.danger,      bg: '#FCE8E8' },
-  responses: { icon: COLORS.success,     bg: '#D8F0E4' },
-  requests:  { icon: '#7C3AED',          bg: '#F3EEFF' },
-  donations: { icon: COLORS.secondaryDark, bg: COLORS.advocateBadge },
-  animals:   { icon: COLORS.primaryDeep, bg: COLORS.tagBg },
-};
-
-export default function ActivityScreen({ navigation }) {
+export default function ActivityScreen({ route, navigation }) {
   const {
     currentUser,
     getUserReports, getAdvocateResponses,
@@ -42,9 +33,18 @@ export default function ActivityScreen({ navigation }) {
 
   const isAdvocate = currentUser?.role === 'advocate';
   const TABS = isAdvocate ? ADVOCATE_TABS : COMMUNITY_TABS;
-  const [activeTab, setActiveTab] = useState(TABS[0].key);
+  const initialTab = route?.params?.tab || TABS[0].key;
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
-  const getData = () => {
+  React.useEffect(() => {
+    if (route?.params?.tab) {
+      setActiveTab(route.params.tab);
+    }
+  }, [route?.params?.tab]);
+
+  const getRawData = () => {
     if (!isAdvocate) {
       if (activeTab === 'reports')   return getUserReports();
       if (activeTab === 'requests')  return getUserRequests();
@@ -57,15 +57,28 @@ export default function ActivityScreen({ navigation }) {
     return [];
   };
 
-  const data     = getData();
-  const tabColor = TAB_COLORS[activeTab] || { icon: COLORS.primaryDeep, bg: COLORS.tagBg };
+  const rawData = getRawData();
+  const filteredData = statusFilter === 'All'
+    ? rawData
+    : rawData.filter((item) => item.status === statusFilter);
+
+  // Sub-status options based on active tab
+  const getStatusOptions = () => {
+    const statuses = new Set(['All']);
+    rawData.forEach((item) => {
+      if (item.status) statuses.add(item.status);
+    });
+    return Array.from(statuses);
+  };
+
+  const statusOptions = getStatusOptions();
 
   const renderItem = ({ item }) => {
     if (activeTab === 'reports' || activeTab === 'responses') {
       return <ReportCard item={item} isAdvocate={isAdvocate} navigation={navigation} />;
     }
     if (activeTab === 'requests') {
-      return <RequestCard item={item} isAdvocate={isAdvocate} />;
+      return <RequestCard item={item} isAdvocate={isAdvocate} onPress={() => setSelectedRequest(item)} />;
     }
     if (activeTab === 'donations') {
       return <DonationCard item={item} />;
@@ -82,95 +95,159 @@ export default function ActivityScreen({ navigation }) {
 
       {/* ── Header ──────────────────────────────────────────── */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Activity</Text>
-        <Text style={styles.headerSub}>
-          {isAdvocate ? 'Track your rescues and animals' : 'Track your reports and requests'}
-        </Text>
-      </View>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.headerTitle}>Activity Dashboard</Text>
+            <Text style={styles.headerSub}>
+              {isAdvocate ? 'Track & manage your rescue operations' : 'Track your reports, requests & contributions'}
+            </Text>
+          </View>
+          <View style={styles.headerBadge}>
+            <Ionicons name="time" size={16} color={COLORS.primaryDeep} />
+            <Text style={styles.headerBadgeText}>{rawData.length} total</Text>
+          </View>
+        </View>
 
-      {/* ── Fixed 3-tab row — always side by side ───────────── */}
-      <View style={styles.tabBar}>
-        {TABS.map((t) => {
-          const isActive = activeTab === t.key;
-          const count    = (() => {
-            if (!isAdvocate) {
-              if (t.key === 'reports')   return getUserReports().length;
-              if (t.key === 'requests')  return getUserRequests().length;
-              if (t.key === 'donations') return getUserDonations().length;
-            } else {
-              if (t.key === 'responses') return getAdvocateResponses().length;
-              if (t.key === 'requests')  return getAdvocateRequests().length;
-              if (t.key === 'animals')   return getAdvocateAnimals().length;
-            }
-            return 0;
-          })();
+        {/* Segmented Tab Navigation */}
+        <View style={styles.tabContainer}>
+          {TABS.map((t) => {
+            const isActive = activeTab === t.key;
+            const count = (() => {
+              if (!isAdvocate) {
+                if (t.key === 'reports')   return getUserReports().length;
+                if (t.key === 'requests')  return getUserRequests().length;
+                if (t.key === 'donations') return getUserDonations().length;
+              } else {
+                if (t.key === 'responses') return getAdvocateResponses().length;
+                if (t.key === 'requests')  return getAdvocateRequests().length;
+                if (t.key === 'animals')   return getAdvocateAnimals().length;
+              }
+              return 0;
+            })();
 
-          return (
-            <TouchableOpacity
-              key={t.key}
-              style={[styles.tab, isActive && styles.tabActive]}
-              onPress={() => setActiveTab(t.key)}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name={isActive ? t.iconActive : t.icon}
-                size={18}
-                color={isActive ? COLORS.primaryDeep : COLORS.textMuted}
-              />
-              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}
-                numberOfLines={1}
+            return (
+              <TouchableOpacity
+                key={t.key}
+                style={[styles.tabBtn, isActive && styles.tabBtnActive]}
+                onPress={() => {
+                  setActiveTab(t.key);
+                  setStatusFilter('All');
+                }}
+                activeOpacity={0.8}
               >
-                {t.label}
-              </Text>
-              {count > 0 && (
-                <View style={[styles.tabBadge, isActive && { backgroundColor: COLORS.primaryDeep }]}>
-                  <Text style={[styles.tabBadgeText, isActive && { color: '#fff' }]}>{count}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+                <Ionicons
+                  name={isActive ? t.iconActive : t.icon}
+                  size={15}
+                  color={isActive ? COLORS.primaryDeep : COLORS.textMuted}
+                />
+                <Text style={[styles.tabBtnText, isActive && styles.tabBtnTextActive]} numberOfLines={1}>
+                  {t.label}
+                </Text>
+                {count > 0 && (
+                  <View style={[styles.badge, isActive ? styles.badgeActive : styles.badgeInactive]}>
+                    <Text style={[styles.badgeText, isActive && styles.badgeTextActive]}>{count}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-      {/* ── Active indicator line ────────────────────────────── */}
-      <View style={styles.indicatorRow}>
-        {TABS.map((t) => (
-          <View
-            key={t.key}
-            style={[
-              styles.indicator,
-              activeTab === t.key && { backgroundColor: COLORS.primaryDeep },
-            ]}
-          />
-        ))}
+        {/* Sub-status Filter Carousel */}
+        {statusOptions.length > 1 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subFilterContent}>
+            {statusOptions.map((st) => (
+              <TouchableOpacity
+                key={st}
+                style={[styles.subFilterChip, statusFilter === st && styles.subFilterChipActive]}
+                onPress={() => setStatusFilter(st)}
+              >
+                <Text style={[styles.subFilterText, statusFilter === st && styles.subFilterTextActive]}>
+                  {st}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
       </View>
 
       {/* ── List ────────────────────────────────────────────── */}
       <FlatList
-        key={activeTab}
-        data={data}
+        key={activeTab + '_' + statusFilter}
+        data={filteredData}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          data.length > 0 ? (
-            <View style={styles.listHeader}>
-              <Text style={styles.listHeaderText}>
-                {data.length} item{data.length !== 1 ? 's' : ''}
-              </Text>
-            </View>
-          ) : null
-        }
         ListEmptyComponent={
           <EmptyState
             icon="time-outline"
-            title="Nothing here yet"
-            subtitle="Your activity will show up here once you get started."
+            title="No activity recorded"
+            subtitle="Your activity logs and updates will appear here."
             style={styles.empty}
           />
         }
         renderItem={renderItem}
       />
+
+      {/* ── Request Detail Modal ───────────────────────────── */}
+      {selectedRequest && (
+        <Modal visible transparent animationType="slide" onRequestClose={() => setSelectedRequest(null)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalSheet}>
+              <View style={styles.modalHandle} />
+              <View style={styles.modalHeader}>
+                <View style={styles.modalIconWrap}>
+                  <Ionicons
+                    name={selectedRequest.type === 'Adoption' ? 'home' : 'heart'}
+                    size={22}
+                    color={COLORS.primaryDeep}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle}>{selectedRequest.type} Request</Text>
+                  <Text style={styles.modalSub}>{selectedRequest.animalName}</Text>
+                </View>
+                <TouchableOpacity onPress={() => setSelectedRequest(null)} style={styles.modalClose}>
+                  <Ionicons name="close" size={20} color={COLORS.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalBody}>
+                <View style={styles.modalRow}>
+                  <Text style={styles.modalLabel}>Status:</Text>
+                  <StatusPill status={selectedRequest.status} />
+                </View>
+
+                {selectedRequest.commitDuration ? (
+                  <View style={styles.modalRow}>
+                    <Text style={styles.modalLabel}>Commitment:</Text>
+                    <Text style={styles.modalVal}>{selectedRequest.commitDuration}</Text>
+                  </View>
+                ) : null}
+
+                <View style={styles.modalRow}>
+                  <Text style={styles.modalLabel}>Date Submitted:</Text>
+                  <Text style={styles.modalVal}>{fmtDate(selectedRequest.createdAt)}</Text>
+                </View>
+
+                {selectedRequest.message ? (
+                  <View style={styles.messageBox}>
+                    <Text style={styles.messageBoxTitle}>Applicant Note:</Text>
+                    <Text style={styles.messageBoxText}>"{selectedRequest.message}"</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              <TouchableOpacity
+                style={styles.doneBtn}
+                onPress={() => setSelectedRequest(null)}
+              >
+                <Text style={styles.doneBtnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -217,13 +294,13 @@ function ReportCard({ item, isAdvocate, navigation }) {
 }
 
 // ── Request card ──────────────────────────────────────────────────────────────
-function RequestCard({ item, isAdvocate }) {
+function RequestCard({ item, isAdvocate, onPress }) {
   const isAdoption = item.type === 'Adoption';
   const typeColor  = isAdoption ? COLORS.primaryDeep : '#B45309';
   const typeBg     = isAdoption ? COLORS.tagBg : '#FEF3DC';
 
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.88}>
       <View style={styles.cardLeft}>
         <View style={[styles.cardIconWrap, { backgroundColor: '#F3EEFF' }]}>
           <Ionicons name={isAdoption ? 'home' : 'heart'} size={20} color={typeColor} />
@@ -251,7 +328,8 @@ function RequestCard({ item, isAdvocate }) {
         ) : null}
         <Text style={styles.cardDate}>{fmtDate(item.createdAt)}</Text>
       </View>
-    </View>
+      <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} style={styles.cardChevron} />
+    </TouchableOpacity>
   );
 }
 
@@ -329,71 +407,86 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: SIZES.lg24,
     paddingTop: Platform.OS === 'ios' ? 52 : 28,
-    paddingBottom: SIZES.md16,
+    paddingBottom: SIZES.sm8,
     backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.divider,
   },
-  headerTitle: { fontSize: SIZES.xxl, fontWeight: '800', color: COLORS.brown },
-  headerSub:   { fontSize: SIZES.sm, color: COLORS.textSecondary, marginTop: 3 },
-
-  // Tab bar — fixed 3 columns, never wraps
-  tabBar: {
+  headerTop: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: SIZES.md16,
-    paddingTop: SIZES.sm8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SIZES.md16,
   },
-  tab: {
-    flex: 1,                          // equal width always
+  headerTitle: { fontSize: SIZES.xxl, fontWeight: '800', color: COLORS.brown },
+  headerSub:   { fontSize: SIZES.xs, color: COLORS.textSecondary, marginTop: 2, maxWidth: 240 },
+  headerBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: COLORS.tagBg, paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: SIZES.radiusFull,
+  },
+  headerBadgeText: { fontSize: SIZES.xs, fontWeight: '800', color: COLORS.primaryDeep },
+
+  // Segmented Tab bar
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.inputBg,
+    borderRadius: SIZES.r12,
+    padding: 3,
+    marginBottom: SIZES.sm8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  tabBtn: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SIZES.xs4,
-    paddingVertical: SIZES.sm8,
-    borderRadius: SIZES.r8,
+    gap: 4,
+    paddingVertical: 8,
+    borderRadius: SIZES.radius,
   },
-  tabActive: { backgroundColor: COLORS.tagBg },
-  tabLabel: {
+  tabBtnActive: {
+    backgroundColor: COLORS.surface,
+    ...SHADOWS.card,
+  },
+  tabBtnText: {
     fontSize: SIZES.xs,
     fontWeight: '600',
     color: COLORS.textMuted,
-    textAlign: 'center',
   },
-  tabLabelActive: {
-    color: COLORS.primaryDeep,
+  tabBtnTextActive: {
     fontWeight: '800',
+    color: COLORS.brown,
   },
-  tabBadge: {
+  badge: {
     minWidth: 16, height: 16, borderRadius: 8,
-    backgroundColor: COLORS.inputBg,
+    paddingHorizontal: 4,
     alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 3,
   },
-  tabBadgeText: {
-    fontSize: 9, fontWeight: '800', color: COLORS.textMuted,
-  },
+  badgeInactive: { backgroundColor: COLORS.border },
+  badgeActive:   { backgroundColor: COLORS.primaryDeep },
+  badgeText:     { fontSize: 9, fontWeight: '800', color: COLORS.textMuted },
+  badgeTextActive: { color: '#fff' },
 
-  // Indicator line under active tab
-  indicatorRow: {
-    flexDirection: 'row',
-    paddingHorizontal: SIZES.md16,
-    backgroundColor: COLORS.surface,
-    paddingBottom: SIZES.xs4 + 2,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
+  // Sub-filter carousel
+  subFilterContent: {
+    gap: 6,
+    paddingVertical: 4,
   },
-  indicator: {
-    flex: 1,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: 'transparent',
-    marginHorizontal: SIZES.xs4 + 2,
+  subFilterChip: {
+    paddingHorizontal: 12, paddingVertical: 4,
+    borderRadius: SIZES.radiusFull, backgroundColor: COLORS.inputBg,
+    borderWidth: 1, borderColor: COLORS.border,
   },
+  subFilterChipActive: {
+    backgroundColor: COLORS.tagBg, borderColor: COLORS.primaryLight,
+  },
+  subFilterText: { fontSize: SIZES.xs, color: COLORS.textMuted, fontWeight: '600' },
+  subFilterTextActive: { color: COLORS.primaryDeep, fontWeight: '800' },
 
   // List
   list: { padding: SIZES.md16, paddingBottom: 110 },
-  listHeader: { marginBottom: SIZES.sm8 },
-  listHeaderText: { fontSize: SIZES.sm, color: COLORS.textMuted, fontWeight: '600' },
   empty: { marginTop: SIZES.xl32 },
 
   // Shared card shell
@@ -403,22 +496,23 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderRadius: SIZES.r16,
     padding: SIZES.md16,
-    marginBottom: SIZES.md16,
-    ...SHADOWS.card,
+    marginBottom: SIZES.sm8 + 4,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  cardLeft: { marginRight: SIZES.md16 },
+  cardLeft: { marginRight: 12 },
   cardIconWrap: {
-    width: 46, height: 46, borderRadius: 23,
+    width: 42, height: 42, borderRadius: 21,
     alignItems: 'center', justifyContent: 'center',
   },
   cardBody:    { flex: 1 },
-  cardChevron: { marginLeft: SIZES.xs4, marginTop: 2 },
+  cardChevron: { marginLeft: SIZES.xs4, marginTop: 4 },
 
   cardTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SIZES.xs4 + 2,
+    marginBottom: SIZES.xs4,
     gap: SIZES.sm8,
   },
   cardTitle: {
@@ -429,49 +523,89 @@ const styles = StyleSheet.create({
   },
   cardMetaRow: {
     flexDirection: 'row', alignItems: 'center', gap: SIZES.xs4,
-    marginBottom: SIZES.xs4 + 2,
+    marginBottom: 4,
   },
   cardMeta:    { fontSize: SIZES.xs, color: COLORS.textSecondary },
   cardMetaDot: { fontSize: SIZES.xs, color: COLORS.textMuted },
-  cardDate:    { fontSize: SIZES.xs, color: COLORS.textMuted, marginTop: SIZES.xs4 },
+  cardDate:    { fontSize: SIZES.xsmall, color: COLORS.textMuted, marginTop: 4 },
   cardQuote:   {
     fontSize: SIZES.xs, color: COLORS.textSecondary,
     fontStyle: 'italic', lineHeight: 17,
-    marginTop: SIZES.xs4 + 2, marginBottom: SIZES.xs4,
+    marginTop: 4, marginBottom: 2,
   },
   cardFooter: {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginTop: SIZES.xs4 + 2,
+    alignItems: 'center', marginTop: 4,
   },
 
   // Urgency
   urgencyPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: SIZES.xs4 + 4, paddingVertical: 2,
-    borderRadius: SIZES.r999,
+    paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: SIZES.radiusFull,
   },
   urgencyDot:  { width: 5, height: 5, borderRadius: 3 },
-  urgencyText: { fontSize: SIZES.xs, fontWeight: '700' },
+  urgencyText: { fontSize: SIZES.xsmall, fontWeight: '700' },
 
   // Request type pill
   typePill: {
-    paddingHorizontal: SIZES.xs4 + 4, paddingVertical: 2,
-    borderRadius: SIZES.r999,
+    paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: SIZES.radiusFull,
   },
-  typePillText: { fontSize: SIZES.xs, fontWeight: '700' },
+  typePillText: { fontSize: SIZES.xsmall, fontWeight: '700' },
 
   // Amount (donations)
   amountText: {
-    fontSize: SIZES.lg, fontWeight: '900', color: COLORS.brown,
+    fontSize: SIZES.medium, fontWeight: '900', color: COLORS.brown,
   },
 
   // Duration (foster)
   durationPill: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: '#FEF3DC',
-    paddingHorizontal: SIZES.xs4 + 4, paddingVertical: 2,
-    borderRadius: SIZES.r999, alignSelf: 'flex-start',
-    marginTop: SIZES.xs4 + 2,
+    paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: SIZES.radiusFull, alignSelf: 'flex-start',
+    marginTop: 4,
   },
-  durationText: { fontSize: SIZES.xs, color: '#B45309', fontWeight: '600' },
+  durationText: { fontSize: SIZES.xsmall, color: '#B45309', fontWeight: '600' },
+
+  // Modal
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: SIZES.lg24, paddingBottom: 36,
+  },
+  modalHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: COLORS.border, alignSelf: 'center', marginBottom: SIZES.md16,
+  },
+  modalHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: SIZES.md16,
+  },
+  modalIconWrap: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: COLORS.tagBg, alignItems: 'center', justifyContent: 'center',
+  },
+  modalTitle: { fontSize: SIZES.lg, fontWeight: '800', color: COLORS.brown },
+  modalSub: { fontSize: SIZES.sm, color: COLORS.textSecondary },
+  modalClose: { padding: 4 },
+  modalBody: { gap: 12, marginBottom: SIZES.lg24 },
+  modalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  modalLabel: { fontSize: SIZES.sm, color: COLORS.textMuted, fontWeight: '600' },
+  modalVal: { fontSize: SIZES.sm, color: COLORS.brown, fontWeight: '700' },
+  messageBox: {
+    backgroundColor: COLORS.inputBg, borderRadius: SIZES.r12, padding: 12,
+    marginTop: 4, borderWidth: 1, borderColor: COLORS.border,
+  },
+  messageBoxTitle: { fontSize: SIZES.xs, fontWeight: '700', color: COLORS.textMuted, marginBottom: 4 },
+  messageBoxText: { fontSize: SIZES.sm, color: COLORS.brown, fontStyle: 'italic', lineHeight: 20 },
+  doneBtn: {
+    backgroundColor: COLORS.primaryDeep, borderRadius: SIZES.r12, paddingVertical: 12,
+    alignItems: 'center',
+  },
+  doneBtnText: { fontSize: SIZES.body, fontWeight: '800', color: '#fff' },
 });

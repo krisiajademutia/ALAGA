@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, ActivityIndicator, Platform } from 'react-native';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image,
+  ActivityIndicator, Platform, Modal, TextInput, KeyboardAvoidingView
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -10,45 +13,51 @@ export default function ProfileScreen({ navigation }) {
   const {
     currentUser, logout, updateUser,
     getUserReports, getAdvocateResponses,
-    getAdvocateAnimals, getUserRequests, getAdvocateRequests,
+    getAdvocateAnimals, getUserRequests, getAdvocateRequests, getUserDonations,
   } = useApp();
 
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+
+  // Form states for profile modal
+  const [editName, setEditName] = useState(currentUser?.name || '');
+  const [editOrg, setEditOrg] = useState(currentUser?.organization || '');
+  const [editLocation, setEditLocation] = useState(currentUser?.location || '');
+
   const isAdvocate = currentUser?.role === 'advocate';
 
   const stats = isAdvocate
     ? [
-        { label: 'Responses', value: getAdvocateResponses().length, icon: 'shield-checkmark', color: COLORS.secondaryDark },
-        { label: 'Animals',   value: getAdvocateAnimals().length,   icon: 'paw',              color: COLORS.primaryDeep },
-        { label: 'Requests',  value: getAdvocateRequests().length,  icon: 'heart',            color: '#7C3AED' },
+        { label: 'Responses', value: getAdvocateResponses().length, icon: 'shield-checkmark', color: COLORS.secondaryDark, bg: '#D8F0E4', onPress: () => navigation.navigate('Activity', { tab: 'responses' }) },
+        { label: 'My Animals', value: getAdvocateAnimals().length,   icon: 'paw',              color: COLORS.primaryDeep, bg: COLORS.tagBg, onPress: () => navigation.navigate('MyAnimals') },
+        { label: 'Requests',  value: getAdvocateRequests().length,  icon: 'heart',            color: '#7C3AED',          bg: '#F3EEFF', onPress: () => navigation.navigate('Activity', { tab: 'requests' }) },
       ]
     : [
-        { label: 'Reports',  value: getUserReports().length,  icon: 'alert-circle', color: COLORS.danger },
-        { label: 'Requests', value: getUserRequests().length, icon: 'heart',        color: '#7C3AED' },
-        { label: 'Rescued',  value: 0,                        icon: 'paw',          color: COLORS.success },
+        { label: 'Reports',  value: getUserReports().length,  icon: 'alert-circle', color: COLORS.danger,      bg: '#FCE8E8', onPress: () => navigation.navigate('Activity', { tab: 'reports' }) },
+        { label: 'Requests', value: getUserRequests().length, icon: 'heart',        color: '#7C3AED',          bg: '#F3EEFF', onPress: () => navigation.navigate('Activity', { tab: 'requests' }) },
+        { label: 'Donations',value: getUserDonations().length,icon: 'gift',         color: COLORS.secondaryDark, bg: COLORS.advocateBadge, onPress: () => navigation.navigate('Activity', { tab: 'donations' }) },
       ];
 
-  const menuItems = [
-    { icon: 'time-outline',        label: 'Activity History',  screen: 'Activity',          color: COLORS.primaryDeep },
-    { icon: 'chatbubbles-outline', label: 'Messages',           screen: 'Messages',          color: COLORS.secondaryDark },
-    { icon: 'heart-outline',       label: isAdvocate ? 'Adoption & Foster Requests' : 'My Requests',
-                                                                screen: isAdvocate ? 'AdvocateRequests' : 'Activity', color: '#7C3AED' },
-    { icon: 'gift-outline',        label: 'Donate',             screen: 'Donate',            color: COLORS.warning },
-    ...(isAdvocate
-      ? [
-          { icon: 'paw-outline',           label: 'My Animals',    screen: 'MyAnimals',   color: COLORS.primaryDeep },
-          { icon: 'notifications-outline', label: 'Rescue Alerts', screen: 'RescueAlerts', color: COLORS.danger },
-        ]
-      : [
-          { icon: 'alert-circle-outline', label: 'Report an Animal', screen: 'ReportRescue', color: COLORS.danger },
-          { icon: 'search-outline',       label: 'Browse Listings',  screen: 'Listings',     color: COLORS.info },
-        ]),
+  const mainActions = [
+    { icon: 'time-outline',        label: 'Activity Dashboard', screen: 'Activity',      color: COLORS.primaryDeep, desc: 'View reports, responses & requests' },
+    { icon: 'chatbubbles-outline', label: 'Direct Messages',     screen: 'Messages',      color: COLORS.secondaryDark, desc: 'Chat with advocates & rescuers' },
+    { icon: 'gift-outline',        label: 'Donation History',   screen: 'Activity',      color: COLORS.warning,     desc: 'Track financial contributions' },
   ];
+
+  const roleActions = isAdvocate
+    ? [
+        { icon: 'paw-outline',           label: 'Manage Animals',  screen: 'MyAnimals',   color: COLORS.primaryDeep, desc: 'Post and manage adoption/foster animals' },
+        { icon: 'notifications-outline', label: 'Rescue Alerts',   screen: 'RescueAlerts', color: COLORS.danger,      desc: 'Active emergency alerts in your area' },
+      ]
+    : [
+        { icon: 'alert-circle-outline', label: 'Report Rescue',    screen: 'ReportRescue', color: COLORS.danger,      desc: 'Submit a new stray or injured animal report' },
+        { icon: 'search-outline',       label: 'Adopt or Foster',  screen: 'Listings',     color: COLORS.info,        desc: 'Browse animals waiting for a home' },
+      ];
 
   // ── Photo picker ────────────────────────────────────────────────────────
   const handleChangePhoto = () => {
     Alert.alert('Profile Photo', 'Choose an option', [
-      { text: 'Take Photo',        onPress: () => pickImage('camera') },
+      { text: 'Take Photo',          onPress: () => pickImage('camera') },
       { text: 'Choose from Gallery', onPress: () => pickImage('gallery') },
       ...(currentUser?.avatar ? [{ text: 'Remove Photo', style: 'destructive', onPress: () => updateUser({ avatar: null }) }] : []),
       { text: 'Cancel', style: 'cancel' },
@@ -75,8 +84,18 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
+  const handleSaveProfile = () => {
+    updateUser({
+      name: editName.trim() || currentUser?.name,
+      organization: editOrg.trim(),
+      location: editLocation.trim(),
+    });
+    setEditModalVisible(false);
+    Alert.alert('Success', 'Profile information updated!');
+  };
+
   const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+    Alert.alert('Log Out', 'Are you sure you want to log out of ALAGA?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Log Out', style: 'destructive', onPress: logout },
     ]);
@@ -87,255 +106,372 @@ export default function ProfileScreen({ navigation }) {
       <StatusBar style="dark" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
-        {/* ── Hero ──────────────────────────────────────────── */}
-        <View style={styles.heroBg}>
-          <View style={styles.heroBlob1} />
-          <View style={styles.heroBlob2} />
-
-          {/* Avatar with edit button */}
-          <TouchableOpacity style={styles.avatarWrap} onPress={handleChangePhoto} activeOpacity={0.85}>
-            {uploadingPhoto ? (
-              <View style={styles.avatarImg}>
-                <ActivityIndicator color={COLORS.primaryDeep} />
-              </View>
-            ) : currentUser?.avatar ? (
-              <Image source={{ uri: currentUser.avatar }} style={styles.avatarImg} />
-            ) : (
-              <View style={[styles.avatarImg, styles.avatarPlaceholder]}>
-                <Text style={styles.avatarInitials}>
-                  {currentUser?.name?.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
-                </Text>
-              </View>
-            )}
-            <View style={styles.editBadge}>
-              <Ionicons name="camera" size={13} color="#fff" />
-            </View>
-          </TouchableOpacity>
-
-          <Text style={styles.name}>{currentUser?.name}</Text>
-
-          {/* Role pill */}
-          <View style={[styles.rolePill, { backgroundColor: isAdvocate ? COLORS.advocateBadge : COLORS.tagBg }]}>
-            <Ionicons
-              name={isAdvocate ? 'shield-checkmark' : 'person'}
-              size={13}
-              color={isAdvocate ? COLORS.secondaryDark : COLORS.primaryDeep}
-            />
-            <Text style={[styles.roleText, { color: isAdvocate ? COLORS.secondaryDark : COLORS.primaryDeep }]}>
-              {isAdvocate ? 'Animal Advocate' : 'Community User'}
-            </Text>
+        {/* ── Hero Banner Card ──────────────────────────────── */}
+        <View style={styles.heroCard}>
+          <View style={styles.heroBannerBg}>
+            <View style={styles.decorCircle1} />
+            <View style={styles.decorCircle2} />
           </View>
 
-          {currentUser?.organization && (
-            <Text style={styles.org}>{currentUser.organization}</Text>
-          )}
-
-          <View style={styles.metaRow}>
-            {currentUser?.location && (
-              <View style={styles.metaChip}>
-                <Ionicons name="location-outline" size={13} color={COLORS.textMuted} />
-                <Text style={styles.metaText}>{currentUser.location}</Text>
+          {/* Profile Header Contents */}
+          <View style={styles.profileHeaderContent}>
+            {/* Avatar */}
+            <TouchableOpacity style={styles.avatarContainer} onPress={handleChangePhoto} activeOpacity={0.88}>
+              {uploadingPhoto ? (
+                <View style={styles.avatarImg}>
+                  <ActivityIndicator color={COLORS.primaryDeep} />
+                </View>
+              ) : currentUser?.avatar ? (
+                <Image source={{ uri: currentUser.avatar }} style={styles.avatarImg} />
+              ) : (
+                <View style={[styles.avatarImg, styles.avatarPlaceholder]}>
+                  <Text style={styles.avatarInitials}>
+                    {currentUser?.name?.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.cameraBadge}>
+                <Ionicons name="camera" size={12} color="#fff" />
               </View>
-            )}
-            <View style={styles.metaChip}>
-              <Ionicons name="calendar-outline" size={13} color={COLORS.textMuted} />
-              <Text style={styles.metaText}>
-                Joined {new Date(currentUser?.joinedAt).toLocaleDateString('en-PH', { month: 'short', year: 'numeric' })}
+            </TouchableOpacity>
+
+            {/* Name & Role */}
+            <Text style={styles.name}>{currentUser?.name}</Text>
+            
+            <View style={[styles.roleTag, { backgroundColor: isAdvocate ? COLORS.advocateBadge : COLORS.tagBg }]}>
+              <Ionicons
+                name={isAdvocate ? 'shield-checkmark' : 'heart'}
+                size={13}
+                color={isAdvocate ? COLORS.secondaryDark : COLORS.primaryDeep}
+              />
+              <Text style={[styles.roleText, { color: isAdvocate ? COLORS.secondaryDark : COLORS.primaryDeep }]}>
+                {isAdvocate ? 'Animal Advocate' : 'Community Guardian'}
               </Text>
             </View>
-          </View>
 
-          <View style={styles.metaChip} >
-            <Ionicons name="mail-outline" size={13} color={COLORS.textMuted} />
-            <Text style={styles.metaText}>{currentUser?.email}</Text>
-          </View>
-        </View>
+            {currentUser?.organization ? (
+              <Text style={styles.orgText}>{currentUser.organization}</Text>
+            ) : null}
 
-        {/* ── Stats ─────────────────────────────────────────── */}
-        <View style={styles.statsCard}>
-          {stats.map((s, i) => (
-            <React.Fragment key={s.label}>
-              {i > 0 && <View style={styles.statDivider} />}
-              <View style={styles.statItem}>
-                <View style={[styles.statIconWrap, { backgroundColor: s.color + '18' }]}>
-                  <Ionicons name={s.icon} size={17} color={s.color} />
+            {/* Info Chips */}
+            <View style={styles.infoChipsRow}>
+              {currentUser?.location ? (
+                <View style={styles.infoChip}>
+                  <Ionicons name="location-outline" size={12} color={COLORS.textMuted} />
+                  <Text style={styles.infoChipText}>{currentUser.location}</Text>
                 </View>
-                <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
-                <Text style={styles.statLabel}>{s.label}</Text>
-              </View>
-            </React.Fragment>
-          ))}
-        </View>
-
-        {/* ── Advocate animals shortcut ──────────────────────── */}
-        {isAdvocate && getAdvocateAnimals().length > 0 && (
-          <TouchableOpacity
-            style={styles.animalsTeaser}
-            onPress={() => navigation.navigate('MyAnimals')}
-            activeOpacity={0.88}
-          >
-            <View style={styles.animalsTeaserLeft}>
-              <Ionicons name="paw" size={20} color={COLORS.primaryDeep} />
-              <View>
-                <Text style={styles.animalsTeaserTitle}>My Animals</Text>
-                <Text style={styles.animalsTeaserSub}>{getAdvocateAnimals().length} listed for adoption / foster</Text>
+              ) : null}
+              <View style={styles.infoChip}>
+                <Ionicons name="mail-outline" size={12} color={COLORS.textMuted} />
+                <Text style={styles.infoChipText}>{currentUser?.email}</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
-          </TouchableOpacity>
-        )}
 
-        {/* ── Menu ──────────────────────────────────────────── */}
-        <View style={styles.menuCard}>
-          {menuItems.map((item, i) => (
-            <React.Fragment key={item.label}>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => navigation.navigate(item.screen)}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.menuIconWrap, { backgroundColor: item.color + '18' }]}>
-                  <Ionicons name={item.icon} size={18} color={item.color} />
-                </View>
-                <Text style={styles.menuLabel}>{item.label}</Text>
-                <Ionicons name="chevron-forward" size={15} color={COLORS.textMuted} />
-              </TouchableOpacity>
-              {i < menuItems.length - 1 && <View style={styles.menuDivider} />}
-            </React.Fragment>
+            {/* Edit Profile Button */}
+            <TouchableOpacity
+              style={styles.editProfileBtn}
+              onPress={() => {
+                setEditName(currentUser?.name || '');
+                setEditOrg(currentUser?.organization || '');
+                setEditLocation(currentUser?.location || '');
+                setEditModalVisible(true);
+              }}
+            >
+              <Ionicons name="create-outline" size={14} color={COLORS.brown} />
+              <Text style={styles.editProfileBtnText}>Edit Profile</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ── Metric Stats Cards ────────────────────────────── */}
+        <View style={styles.statsGrid}>
+          {stats.map((s) => (
+            <TouchableOpacity key={s.label} style={styles.statCard} onPress={s.onPress} activeOpacity={0.75}>
+              <View style={[styles.statIconCircle, { backgroundColor: s.bg }]}>
+                <Ionicons name={s.icon} size={16} color={s.color} />
+              </View>
+              <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
+              <Text style={styles.statLabel}>{s.label}</Text>
+            </TouchableOpacity>
           ))}
         </View>
 
-        {/* ── Logout ────────────────────────────────────────── */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={19} color={COLORS.danger} />
-          <Text style={styles.logoutText}>Log Out</Text>
+        {/* ── Main Activity Section ──────────────────────────── */}
+        <View style={styles.sectionHeaderWrap}>
+          <Text style={styles.sectionTitle}>Overview & Activity</Text>
+        </View>
+
+        <View style={styles.cardGroup}>
+          {mainActions.map((item, idx) => (
+            <TouchableOpacity
+              key={item.label}
+              style={[styles.groupItem, idx === mainActions.length - 1 && styles.groupItemLast]}
+              onPress={() => navigation.navigate(item.screen)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.itemIconWrap, { backgroundColor: item.color + '14' }]}>
+                <Ionicons name={item.icon} size={18} color={item.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itemTitle}>{item.label}</Text>
+                <Text style={styles.itemDesc}>{item.desc}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* ── Role Features Section ──────────────────────────── */}
+        <View style={styles.sectionHeaderWrap}>
+          <Text style={styles.sectionTitle}>
+            {isAdvocate ? 'Advocate Toolkit' : 'Community Services'}
+          </Text>
+        </View>
+
+        <View style={styles.cardGroup}>
+          {roleActions.map((item, idx) => (
+            <TouchableOpacity
+              key={item.label}
+              style={[styles.groupItem, idx === roleActions.length - 1 && styles.groupItemLast]}
+              onPress={() => navigation.navigate(item.screen)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.itemIconWrap, { backgroundColor: item.color + '14' }]}>
+                <Ionicons name={item.icon} size={18} color={item.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itemTitle}>{item.label}</Text>
+                <Text style={styles.itemDesc}>{item.desc}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* ── Account Options ────────────────────────────────── */}
+        <TouchableOpacity style={styles.logoutCard} onPress={handleLogout} activeOpacity={0.85}>
+          <Ionicons name="log-out-outline" size={18} color={COLORS.danger} />
+          <Text style={styles.logoutCardText}>Log Out Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>ALAGA · Alert. Respond. Alaga. · v1.0</Text>
+        <Text style={styles.appFooter}>ALAGA · Alert. Respond. Alaga. · v1.0</Text>
       </ScrollView>
+
+      {/* ── Edit Profile Modal ───────────────────────────────── */}
+      <Modal visible={editModalVisible} transparent animationType="slide" onRequestClose={() => setEditModalVisible(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Profile Info</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.modalClose}>
+                <Ionicons name="close" size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>FULL NAME</Text>
+              <TextInput
+                style={styles.formInput}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Your full name"
+                placeholderTextColor={COLORS.textMuted}
+              />
+            </View>
+
+            {isAdvocate && (
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>ORGANIZATION / SHELTER</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={editOrg}
+                  onChangeText={setEditOrg}
+                  placeholder="e.g. PAWS Advocates / Independent Shelter"
+                  placeholderTextColor={COLORS.textMuted}
+                />
+              </View>
+            )}
+
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>LOCATION</Text>
+              <TextInput
+                style={styles.formInput}
+                value={editLocation}
+                onChangeText={setEditLocation}
+                placeholder="e.g. Quezon City, Metro Manila"
+                placeholderTextColor={COLORS.textMuted}
+              />
+            </View>
+
+            <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProfile}>
+              <Text style={styles.saveBtnText}>Save Changes</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scroll: { paddingBottom: 60 },
+  scroll: { paddingBottom: 110 },
 
-  // Hero
-  heroBg: {
+  // Hero Card
+  heroCard: {
     backgroundColor: COLORS.surface,
-    alignItems: 'center',
-    paddingTop: Platform.OS === 'ios' ? 52 : 28,
-    paddingBottom: SIZES.paddingXL,
-    paddingHorizontal: SIZES.paddingL,
-    marginBottom: SIZES.paddingM,
-    overflow: 'hidden',
-    position: 'relative',
+    borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
+    overflow: 'hidden', marginBottom: 14,
+    borderWidth: 1, borderColor: COLORS.border,
     ...SHADOWS.card,
   },
-  heroBlob1: {
-    position: 'absolute', width: 200, height: 200, borderRadius: 100,
-    backgroundColor: COLORS.primaryLight, opacity: 0.35,
-    top: -60, right: -60,
+  heroBannerBg: {
+    height: 90, backgroundColor: COLORS.primaryDeep,
+    position: 'relative', overflow: 'hidden',
   },
-  heroBlob2: {
+  decorCircle1: {
     position: 'absolute', width: 140, height: 140, borderRadius: 70,
-    backgroundColor: COLORS.accent, opacity: 0.2,
-    bottom: -40, left: -40,
+    backgroundColor: 'rgba(255,255,255,0.1)', top: -40, right: -20,
+  },
+  decorCircle2: {
+    position: 'absolute', width: 90, height: 90, borderRadius: 45,
+    backgroundColor: 'rgba(255,255,255,0.08)', bottom: -20, left: 10,
   },
 
-  avatarWrap: { position: 'relative', marginBottom: 14, zIndex: 1 },
+  profileHeaderContent: {
+    alignItems: 'center', marginTop: -42, paddingBottom: SIZES.md16,
+    paddingHorizontal: SIZES.lg24,
+  },
+  avatarContainer: { position: 'relative', marginBottom: 10 },
   avatarImg: {
-    width: 96, height: 96, borderRadius: 48,
-    borderWidth: 3, borderColor: COLORS.primary,
+    width: 84, height: 84, borderRadius: 42,
+    borderWidth: 4, borderColor: COLORS.surface,
   },
   avatarPlaceholder: {
-    backgroundColor: COLORS.tagBg,
-    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: COLORS.tagBg, alignItems: 'center', justifyContent: 'center',
   },
-  avatarInitials: { fontSize: 34, fontWeight: '800', color: COLORS.primaryDeep },
-  editBadge: {
-    position: 'absolute', bottom: 0, right: 0,
-    width: 28, height: 28, borderRadius: 14,
+  avatarInitials: { fontSize: 30, fontWeight: '800', color: COLORS.primaryDeep },
+  cameraBadge: {
+    position: 'absolute', bottom: 2, right: 2,
+    width: 24, height: 24, borderRadius: 12,
     backgroundColor: COLORS.primaryDeep,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: COLORS.surface,
   },
 
-  name: {
-    fontSize: SIZES.xlarge, fontWeight: '800',
-    color: COLORS.brown, marginBottom: 8, zIndex: 1,
-  },
-  rolePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 12, paddingVertical: 5,
-    borderRadius: SIZES.radiusFull, marginBottom: 8, zIndex: 1,
-  },
-  roleText: { fontSize: SIZES.small, fontWeight: '700' },
-  org: { fontSize: SIZES.body, color: COLORS.secondaryDark, fontWeight: '700', marginBottom: 8, zIndex: 1 },
-
-  metaRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap', justifyContent: 'center', zIndex: 1 },
-  metaChip: {
+  name: { fontSize: 20, fontWeight: '800', color: COLORS.brown, marginBottom: 3 },
+  roleTag: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 10, paddingVertical: 5,
+    paddingHorizontal: 10, paddingVertical: 3,
+    borderRadius: SIZES.radiusFull, marginBottom: 6,
+  },
+  roleText: { fontSize: 11, fontWeight: '700' },
+  orgText: { fontSize: 13, color: COLORS.secondaryDark, fontWeight: '700', marginBottom: 6 },
+
+  infoChipsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 12 },
+  infoChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 4,
     borderRadius: SIZES.radiusFull, backgroundColor: COLORS.inputBg,
-    marginTop: 6, zIndex: 1,
+    borderWidth: 1, borderColor: COLORS.border,
   },
-  metaText: { fontSize: SIZES.small, color: COLORS.textSecondary, fontWeight: '500' },
+  infoChipText: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '500' },
 
-  // Stats
-  statsCard: {
-    flexDirection: 'row',
-    marginHorizontal: SIZES.paddingL,
-    backgroundColor: COLORS.surface,
-    borderRadius: SIZES.radiusLg,
-    padding: SIZES.paddingM,
-    marginBottom: SIZES.paddingM,
+  editProfileBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 14, paddingVertical: 6,
+    borderRadius: SIZES.radiusFull, backgroundColor: COLORS.inputBg,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  editProfileBtnText: { fontSize: 11, fontWeight: '700', color: COLORS.brown },
+
+  // Stats grid (Compact & Interactive)
+  statsGrid: {
+    flexDirection: 'row', gap: 10,
+    paddingHorizontal: SIZES.md16, marginBottom: 14,
+  },
+  statCard: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: COLORS.surface, borderRadius: 14,
+    paddingVertical: 10, paddingHorizontal: 6,
+    borderWidth: 1, borderColor: COLORS.border,
     ...SHADOWS.card,
   },
-  statItem: { flex: 1, alignItems: 'center', gap: 5 },
-  statDivider: { width: 1, backgroundColor: COLORS.divider, marginVertical: 4 },
-  statIconWrap: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  statValue: { fontSize: SIZES.xlarge, fontWeight: '800' },
-  statLabel: { fontSize: 10, color: COLORS.textMuted, fontWeight: '600' },
+  statIconCircle: {
+    width: 32, height: 32, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 4,
+  },
+  statValue: { fontSize: 18, fontWeight: '800' },
+  statLabel: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '700', marginTop: 1 },
 
-  // Animals teaser
-  animalsTeaser: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginHorizontal: SIZES.paddingL, marginBottom: SIZES.paddingM,
-    backgroundColor: COLORS.tagBg, borderRadius: SIZES.radius,
-    padding: SIZES.paddingM, borderWidth: 1.5, borderColor: COLORS.primaryLight,
+  // Grouped cards
+  sectionHeaderWrap: { paddingHorizontal: SIZES.md16, marginBottom: 6 },
+  sectionTitle: { fontSize: 11, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 0.8, textTransform: 'uppercase' },
+
+  cardGroup: {
+    marginHorizontal: SIZES.md16, backgroundColor: COLORS.surface,
+    borderRadius: 16, borderWidth: 1, borderColor: COLORS.border,
+    marginBottom: 14, overflow: 'hidden',
     ...SHADOWS.card,
   },
-  animalsTeaserLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  animalsTeaserTitle: { fontSize: SIZES.body, fontWeight: '800', color: COLORS.primaryDeep },
-  animalsTeaserSub: { fontSize: SIZES.small, color: COLORS.textSecondary, marginTop: 2 },
-
-  // Menu
-  menuCard: {
-    marginHorizontal: SIZES.paddingL,
-    backgroundColor: COLORS.surface,
-    borderRadius: SIZES.radiusLg,
-    marginBottom: SIZES.paddingM,
-    overflow: 'hidden',
-    ...SHADOWS.card,
-  },
-  menuItem: {
+  groupItem: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: SIZES.paddingM, paddingVertical: 15,
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: COLORS.divider,
   },
-  menuIconWrap: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  menuLabel: { flex: 1, fontSize: SIZES.body, fontWeight: '600', color: COLORS.textPrimary },
-  menuDivider: { height: 1, backgroundColor: COLORS.divider, marginLeft: 64 },
+  groupItemLast: { borderBottomWidth: 0 },
+  itemIconWrap: {
+    width: 34, height: 34, borderRadius: 17,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  itemTitle: { fontSize: 14, fontWeight: '700', color: COLORS.brown },
+  itemDesc: { fontSize: 11, color: COLORS.textMuted, marginTop: 1 },
 
-  // Logout
-  logoutBtn: {
+  // Logout card
+  logoutCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    marginHorizontal: SIZES.paddingL, paddingVertical: 14,
-    borderRadius: SIZES.radiusLg, borderWidth: 1.5, borderColor: COLORS.danger,
-    backgroundColor: '#FDE8E8', marginBottom: SIZES.paddingM,
+    marginHorizontal: SIZES.md16, paddingVertical: 12,
+    borderRadius: 14, borderWidth: 1, borderColor: '#FCA5A5',
+    backgroundColor: '#FEF2F2', marginBottom: 14,
   },
-  logoutText: { fontSize: SIZES.body, fontWeight: '700', color: COLORS.danger },
+  logoutCardText: { fontSize: 14, fontWeight: '800', color: COLORS.danger },
 
-  version: { textAlign: 'center', fontSize: SIZES.xsmall, color: COLORS.textMuted, marginBottom: 8 },
+  appFooter: { textAlign: 'center', fontSize: 11, color: COLORS.textMuted, marginBottom: 12 },
+
+  // Edit Modal
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: SIZES.lg24, paddingBottom: 36,
+  },
+  modalHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: COLORS.border, alignSelf: 'center', marginBottom: SIZES.md16,
+  },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: SIZES.lg24,
+  },
+  modalTitle: { fontSize: SIZES.lg, fontWeight: '800', color: COLORS.brown },
+  modalClose: { padding: 4 },
+  formGroup: { marginBottom: SIZES.md16 },
+  formLabel: { fontSize: 11, fontWeight: '800', color: COLORS.textMuted, marginBottom: 6, letterSpacing: 0.5 },
+  formInput: {
+    backgroundColor: COLORS.inputBg, borderWidth: 1, borderColor: COLORS.border,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
+    fontSize: 14, color: COLORS.brown, fontWeight: '600',
+  },
+  saveBtn: {
+    backgroundColor: COLORS.primaryDeep, borderRadius: 12,
+    paddingVertical: 14, alignItems: 'center', marginTop: 8,
+  },
+  saveBtnText: { fontSize: 14, fontWeight: '800', color: '#fff' },
 });

@@ -161,7 +161,7 @@ export default function ReportRescueScreen({ navigation }) {
 
         {/* Animal type */}
         <Text style={styles.sectionLabel}>ANIMAL TYPE {errors.animalType && <Text style={styles.errInline}> · {errors.animalType}</Text>}</Text>
-        <View style={styles.scrollRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScrollRow}>
           {ANIMAL_SPECIES.map((s) => (
             <TouchableOpacity
               key={s}
@@ -174,7 +174,7 @@ export default function ReportRescueScreen({ navigation }) {
               <Text style={[styles.chipText, animalType === s && styles.chipTextActive]}>{s}</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
         {animalType === 'Other' && (
           <Input
             placeholder="Please specify animal type..."
@@ -187,7 +187,7 @@ export default function ReportRescueScreen({ navigation }) {
 
         {/* Condition */}
         <Text style={styles.sectionLabel}>CONDITION {errors.condition && <Text style={styles.errInline}> · {errors.condition}</Text>}</Text>
-        <View style={styles.scrollRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScrollRow}>
           {ANIMAL_CONDITIONS.map((c) => (
             <TouchableOpacity
               key={c}
@@ -200,7 +200,7 @@ export default function ReportRescueScreen({ navigation }) {
               <Text style={[styles.chipText, condition === c && styles.chipTextActive]}>{c}</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
         {condition === 'Other' && (
           <Input
             placeholder="Please specify condition..."
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   photoCircleText: { fontSize: SIZES.small, fontWeight: '700', color: COLORS.textSecondary, marginTop: 8 },
   photoDivider: { width: 2, height: '60%', backgroundColor: COLORS.border },
 
-  scrollRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: SIZES.paddingM, marginTop: 4 },
+  horizontalScrollRow: { flexDirection: 'row', gap: 10, marginBottom: SIZES.paddingM, marginTop: 4, paddingRight: 16 },
   chip: {
     paddingHorizontal: 18, paddingVertical: 12, borderRadius: SIZES.r12,
     backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border,
