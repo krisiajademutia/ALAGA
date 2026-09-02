@@ -20,3 +20,5 @@ pnpm-debug.log*
 # local env files
 .env*.local
 .env
+
+fix_*.cjs
