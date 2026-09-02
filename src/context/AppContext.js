@@ -92,20 +92,33 @@ export function AppProvider({ children }) {
     );
   };
 
-  const addComment = (reportId, text) => {
+  const addComment = (reportId, text, parentCommentId = null) => {
     const newComment = {
-      id: `c${Date.now()}`,
+      id: `c${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       userId: currentUser.id,
       userName: currentUser.name,
       text,
       createdAt: new Date().toISOString(),
+      replies: [],
     };
     setRescueReports((prev) =>
-      prev.map((r) =>
-        r.id === reportId
-          ? { ...r, comments: [...r.comments, newComment] }
-          : r
-      )
+      prev.map((r) => {
+        if (r.id !== reportId) return r;
+        if (!parentCommentId) {
+          return { ...r, comments: [...(r.comments || []), newComment] };
+        }
+        const appendReply = (list) =>
+          (list || []).map((c) => {
+            if (c.id === parentCommentId) {
+              return { ...c, replies: [...(c.replies || []), newComment] };
+            }
+            if (c.replies && c.replies.length > 0) {
+              return { ...c, replies: appendReply(c.replies) };
+            }
+            return c;
+          });
+        return { ...r, comments: appendReply(r.comments) };
+      })
     );
   };
 

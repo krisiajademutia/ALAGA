@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, SafeAreaView, StatusBar as RNStatusBar, Platform } from 'react-native';
-import MapView, { Marker, UrlTile, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS } from '../constants/theme';
 
@@ -153,11 +153,6 @@ export default function MapCard({ location, title, style }) {
           pitchEnabled={false}
           pointerEvents="none"
         >
-          <UrlTile
-            urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-            maximumZ={19}
-            flipY={false}
-          />
           <Marker
             coordinate={{ latitude: location.latitude, longitude: location.longitude }}
             title={title || location.address}
@@ -216,11 +211,6 @@ export default function MapCard({ location, title, style }) {
             rotateEnabled
             pitchEnabled
           >
-            <UrlTile
-              urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-              maximumZ={19}
-              flipY={false}
-            />
             <Marker
               coordinate={{ latitude: location.latitude, longitude: location.longitude }}
               title={title || 'Animal Location'}

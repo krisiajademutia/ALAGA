@@ -76,38 +76,39 @@ export default function AddAnimalScreen({ route, navigation }) {
   const handleSave = () => {
     if (!validate()) return;
     setLoading(true);
-    const tags = tagsText.split(',').map((t) => t.trim()).filter(Boolean);
+    
     setTimeout(() => {
-      addAnimal({
-        name: name.trim(),
-        species:  species === 'Other' ? otherSpecies.trim() : species,
-        breed:    breed.trim()    || 'Unknown',
-        age:      age.trim()      || 'Unknown',
-        size,
-        gender,
-        color:    color.trim()    || 'Unknown',
-        condition:condition.trim()|| 'Healthy',
-        specialNeeds: specialNeeds.trim() || null,
-        description: description.trim(),
-        status: readiness,
-        listingType,
-        fosterDuration: needsFosterDuration ? fosterDuration || null : null,
-        vaccinated,
-        neutered,
-        photo,
-        tags,
-        rescueReportId,
-      });
-      setLoading(false);
-      Alert.alert(
-        'Animal Profile Created! 🐾',
-        `${name} has been added as "${readiness}" — ${
-          listingType === 'Adoption' ? 'open for adoption' :
-          listingType === 'Foster'   ? 'open for fostering' : 'open for adoption or fostering'
-        }.`,
-        [{ text: 'View My Animals', onPress: () => navigation.navigate('MyAnimals') }]
-      );
-    }, 800);
+      try {
+        const tags = tagsText.split(',').map((t) => t.trim()).filter(Boolean);
+        addAnimal({
+          name: name.trim(),
+          species:  species === 'Other' ? otherSpecies.trim() : species,
+          breed:    breed.trim()    || 'Unknown',
+          age:      age.trim()      || 'Unknown',
+          size,
+          gender,
+          color:    color.trim()    || 'Unknown',
+          condition:condition.trim()|| 'Healthy',
+          specialNeeds: specialNeeds.trim() || null,
+          description: description.trim(),
+          status: readiness,
+          listingType,
+          fosterDuration: needsFosterDuration ? fosterDuration || null : null,
+          vaccinated,
+          neutered,
+          photo,
+          tags,
+          rescueReportId,
+        });
+        
+        setLoading(false);
+        // Cleanly switch to Advocates' "My Animals" tab
+        navigation.navigate('MainTabs', { screen: 'MyAnimals' });
+      } catch (err) {
+        setLoading(false);
+        Alert.alert('Error', 'An error occurred while saving: ' + err.message);
+      }
+    }, 500);
   };
 
   return (
@@ -162,7 +163,7 @@ export default function AddAnimalScreen({ route, navigation }) {
         />
 
         <Label text="SPECIES" error={errors.species} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
+        <View style={styles.scrollRow}>
           {ANIMAL_SPECIES.map((s) => (
             <Chip key={s} label={s} active={species === s}
               onPress={() => {
@@ -170,7 +171,7 @@ export default function AddAnimalScreen({ route, navigation }) {
                 setErrors((e) => ({ ...e, species: null }));
               }} />
           ))}
-        </ScrollView>
+        </View>
         {species === 'Other' && (
           <Input placeholder="Please specify species..." value={otherSpecies}
             onChangeText={(t) => { setOtherSpecies(t); setErrors((e) => ({ ...e, species: null })); }}
@@ -181,20 +182,20 @@ export default function AddAnimalScreen({ route, navigation }) {
         <Input label="Estimated Age"   placeholder="e.g. ~2 years, 3 months" value={age} onChangeText={setAge} />
 
         <Label text="GENDER" error={errors.gender} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
+        <View style={styles.scrollRow}>
           {GENDERS.map((g) => (
             <Chip key={g} label={g} active={gender === g}
               onPress={() => { setGender(g); setErrors((e) => ({ ...e, gender: null })); }} />
           ))}
-        </ScrollView>
+        </View>
         
         <Label text="SIZE" error={errors.size} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
+        <View style={styles.scrollRow}>
           {['Small', 'Medium', 'Large'].map((sz) => (
             <Chip key={sz} label={sz} active={size === sz}
               onPress={() => { setSize(sz); setErrors((e) => ({ ...e, size: null })); }} />
           ))}
-        </ScrollView>
+        </View>
 
         <Input label="Color / Markings"  placeholder="e.g. Brown and white"  value={color}     onChangeText={setColor}     autoCapitalize="words" />
         <Input label="Current Condition" placeholder="e.g. Recovering, Healthy" value={condition} onChangeText={setCondition} autoCapitalize="words" />
@@ -237,7 +238,7 @@ export default function AddAnimalScreen({ route, navigation }) {
         {needsFosterDuration && (
           <>
             <Label text="SUGGESTED FOSTER DURATION" />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
+            <View style={styles.scrollRow}>
               {FOSTER_DURATIONS.map((d) => (
                 <Chip
                   key={d} label={d}
@@ -246,13 +247,13 @@ export default function AddAnimalScreen({ route, navigation }) {
                   activeColor="#D97706"
                 />
               ))}
-            </ScrollView>
+            </View>
           </>
         )}
 
         {/* ── Readiness ──────────────────────────────────────── */}
         <Label text="IS THIS ANIMAL READY NOW?" />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
+        <View style={styles.scrollRow}>
           {READINESS.map((r) => (
             <TouchableOpacity
               key={r.key}
@@ -265,7 +266,7 @@ export default function AddAnimalScreen({ route, navigation }) {
               </Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
 
         <Button
           title="Save Animal Profile"
@@ -360,7 +361,7 @@ const styles = StyleSheet.create({
   photoCircleText: { fontSize: SIZES.small, fontWeight: '700', color: COLORS.textSecondary, marginTop: 8 },
   photoDivider: { width: 2, height: '60%', backgroundColor: COLORS.border },
 
-  scrollRow: { flexDirection: 'row', gap: 10, paddingRight: SIZES.paddingL, marginBottom: SIZES.paddingM, marginTop: 4 },
+  scrollRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: SIZES.paddingM, marginTop: 4 },
 
   card: {
     backgroundColor: COLORS.surface, borderRadius: SIZES.r16,

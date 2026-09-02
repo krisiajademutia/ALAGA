@@ -8,7 +8,7 @@ import StatusPill from '../../components/StatusPill';
 import EmptyState from '../../components/EmptyState';
 
 const STATUS_FILTERS = ['All', 'Available', 'Being Fostered', 'Adopted', 'Under Care'];
-const STATUS_EMOJI   = { All: '🐾', Available: '✅', 'Being Fostered': '💛', Adopted: '🏠', 'Under Care': '🩺' };
+const STATUS_EMOJI   = { All: '🐾', Available: '', 'Being Fostered': '', Adopted: '', 'Under Care': '' };
 
 export default function MyAnimalsScreen({ navigation }) {
   const { getAdvocateAnimals, returnAnimalToListings, markAnimalAdopted, updateAnimal } = useApp();
@@ -74,7 +74,7 @@ export default function MyAnimalsScreen({ navigation }) {
 
       {/* Status filter */}
       <View style={styles.filterContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+        <View style={styles.filterRow}>
           {STATUS_FILTERS.map((s) => (
             <TouchableOpacity
               key={s}
@@ -87,7 +87,7 @@ export default function MyAnimalsScreen({ navigation }) {
               </Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
       </View>
 
       <FlatList
@@ -330,17 +330,18 @@ const styles = StyleSheet.create({
   },
 
   filterContainer: {
-    backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.divider,
+    paddingVertical: SIZES.sm8,
+    backgroundColor: COLORS.surface,
+    borderBottomWidth: 1, borderBottomColor: COLORS.divider,
   },
-  filterScroll: {
-    flexDirection: 'row', gap: 10,
-    paddingHorizontal: SIZES.lg24, paddingVertical: SIZES.sm8 + 4,
+  filterRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+    paddingHorizontal: SIZES.lg24,
   },
   filterTab: {
-    paddingHorizontal: 16, paddingVertical: 10,
-    borderRadius: SIZES.r12, backgroundColor: COLORS.surface,
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: SIZES.r999, backgroundColor: COLORS.inputBg,
     borderWidth: 1, borderColor: COLORS.border,
-    ...SHADOWS.card, shadowOpacity: 0.04, elevation: 1,
   },
   filterTabOn:  { backgroundColor: COLORS.primaryDeep, borderColor: COLORS.primaryDeep },
   filterText:   { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.textSecondary },

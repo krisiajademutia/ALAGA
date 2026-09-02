@@ -56,46 +56,67 @@ export default function ListingsScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Type filter */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
-          {TYPE_FILTERS.map(({ key, label, icon }) => (
-            <TouchableOpacity
-              key={key}
-              style={[styles.filterTab, typeFilter === key && styles.filterTabOn]}
-              onPress={() => setTypeFilter(key)}
-            >
-              <Ionicons name={icon} size={13} color={typeFilter === key ? '#fff' : COLORS.textSecondary} />
-              <Text style={[styles.filterText, typeFilter === key && styles.filterTextOn]}>{label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {/* Segmented Type Filter (Adopt vs Foster) */}
+        <View style={styles.segmentedContainer}>
+          {TYPE_FILTERS.map(({ key, label, icon }) => {
+            const isActive = typeFilter === key;
+            return (
+              <TouchableOpacity
+                key={key}
+                style={[styles.segmentBtn, isActive && styles.segmentBtnActive]}
+                onPress={() => setTypeFilter(key)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={icon}
+                  size={14}
+                  color={isActive ? COLORS.primaryDeep : COLORS.textMuted}
+                />
+                <Text style={[styles.segmentText, isActive && styles.segmentTextActive]}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-        {/* Species filter */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
-          {SPECIES.map((s) => (
-            <TouchableOpacity
-              key={s}
-              style={[styles.speciesTab, species === s && styles.speciesTabOn]}
-              onPress={() => setSpecies(s)}
-            >
-              <Text style={[styles.speciesText, species === s && styles.speciesTextOn]}>
-                {SPECIES_EMOJI[s]} {s}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {/* Species Filter Carousel */}
+        <View style={styles.speciesContainer}>
+          <Text style={styles.sectionLabel}>Species</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.speciesContent}
+          >
+            {SPECIES.map((s) => {
+              const isActive = species === s;
+              const speciesLabel = s === 'All' ? 'All Pets' : s;
+              return (
+                <TouchableOpacity
+                  key={s}
+                  style={[styles.speciesChip, isActive && styles.speciesChipActive]}
+                  onPress={() => setSpecies(s)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.speciesText, isActive && styles.speciesTextActive]}>
+                    {SPECIES_EMOJI[s]} {speciesLabel}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
 
-        {/* Legend */}
-        <View style={styles.legend}>
+        {/* Info Legend */}
+        <View style={styles.legendBar}>
           <View style={styles.legendItem}>
-            <Ionicons name="home-outline" size={12} color={COLORS.primaryDeep} />
-            <Text style={styles.legendText}>Adoption = permanent home</Text>
+            <Ionicons name="home" size={12} color={COLORS.primaryDeep} />
+            <Text style={styles.legendText}>Adopt = Permanent Home</Text>
           </View>
+          <Text style={styles.legendDot}>•</Text>
           <View style={styles.legendItem}>
-            <Ionicons name="heart-outline" size={12} color="#B45309" />
-            <Text style={styles.legendText}>Foster = temporary care</Text>
+            <Ionicons name="heart" size={12} color="#B45309" />
+            <Text style={styles.legendText}>Foster = Temporary Care</Text>
           </View>
         </View>
       </View>
@@ -161,32 +182,90 @@ const styles = StyleSheet.create({
   },
   countNum: { fontSize: SIZES.body, fontWeight: '800', color: COLORS.primaryDeep },
 
-  filterScroll:  { marginBottom: SIZES.xs4 },
-  filterContent: { paddingHorizontal: SIZES.lg24, gap: SIZES.sm8, paddingBottom: SIZES.xs4 },
-  filterTab: {
-    flexDirection: 'row', alignItems: 'center', gap: SIZES.xs4,
-    paddingHorizontal: SIZES.md16 - 2, paddingVertical: SIZES.xs4 + 4,
-    borderRadius: SIZES.r999, backgroundColor: COLORS.inputBg,
-    borderWidth: 1.5, borderColor: COLORS.border,
+  segmentedContainer: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.inputBg,
+    borderRadius: SIZES.r12,
+    marginHorizontal: SIZES.lg24,
+    padding: 3,
+    marginBottom: SIZES.sm8 + 4,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  filterTabOn:  { backgroundColor: COLORS.primaryDeep, borderColor: COLORS.primaryDeep },
-  filterText:   { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.textSecondary },
-  filterTextOn: { color: '#fff' },
-  speciesTab: {
-    paddingHorizontal: SIZES.sm8 + 4, paddingVertical: SIZES.xs4 + 3,
-    borderRadius: SIZES.r999, backgroundColor: COLORS.surface,
-    borderWidth: 1.5, borderColor: COLORS.border,
+  segmentBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: SIZES.radius,
   },
-  speciesTabOn:  { backgroundColor: COLORS.tagBg, borderColor: COLORS.primaryDeep },
-  speciesText:   { fontSize: SIZES.sm, fontWeight: '600', color: COLORS.textMuted },
-  speciesTextOn: { color: COLORS.primaryDeep, fontWeight: '700' },
+  segmentBtnActive: {
+    backgroundColor: COLORS.surface,
+    ...SHADOWS.card,
+  },
+  segmentText: {
+    fontSize: SIZES.small,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+  },
+  segmentTextActive: {
+    fontWeight: '800',
+    color: COLORS.brown,
+  },
 
-  legend: {
-    flexDirection: 'row', gap: SIZES.md16,
-    paddingHorizontal: SIZES.lg24, paddingTop: SIZES.xs4 + 2, paddingBottom: SIZES.xs4,
+  speciesContainer: {
+    marginBottom: 6,
+  },
+  sectionLabel: {
+    fontSize: SIZES.xsmall,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginHorizontal: SIZES.lg24,
+    marginBottom: 6,
+  },
+  speciesContent: {
+    paddingHorizontal: SIZES.lg24,
+    gap: 8,
+    paddingBottom: 4,
+  },
+  speciesChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: SIZES.radiusFull,
+    backgroundColor: COLORS.inputBg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  speciesChipActive: {
+    backgroundColor: COLORS.tagBg,
+    borderColor: COLORS.primaryLight,
+  },
+  speciesText: {
+    fontSize: SIZES.small,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  speciesTextActive: {
+    fontWeight: '800',
+    color: COLORS.primaryDeep,
+  },
+
+  legendBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: SIZES.lg24,
+    paddingTop: 6,
+    paddingBottom: 2,
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendText: { fontSize: SIZES.xs, color: COLORS.textMuted },
+  legendDot: { fontSize: SIZES.xsmall, color: COLORS.textMuted },
+  legendText: { fontSize: SIZES.xsmall, color: COLORS.textMuted, fontWeight: '500' },
 
   grid:    { padding: SIZES.md16, paddingBottom: 110 },
   gridRow: { flexDirection: 'row', gap: SIZES.md16, marginBottom: SIZES.md16 },

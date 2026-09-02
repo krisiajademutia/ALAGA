@@ -15,6 +15,7 @@ export default function ReportDetailScreen({ route, navigation }) {
   const { rescueReports, currentUser, addComment, respondToReport, markRescued } = useApp();
   const report = rescueReports.find((r) => r.id === reportId);
   const [commentText, setCommentText] = useState('');
+  const [replyTarget, setReplyTarget] = useState(null); // { id, name }
 
   if (!report) return null;
 
@@ -26,8 +27,9 @@ export default function ReportDetailScreen({ route, navigation }) {
 
   const handleComment = () => {
     if (!commentText.trim()) return;
-    addComment(reportId, commentText.trim());
+    addComment(reportId, commentText.trim(), replyTarget?.id || null);
     setCommentText('');
+    setReplyTarget(null);
   };
 
   const handleRespond = () => {
@@ -155,36 +157,41 @@ export default function ReportDetailScreen({ route, navigation }) {
 
         {/* Comments */}
         <Text style={styles.commentsTitle}>
-          Comments ({report.comments.length})
+          Comments ({countComments(report.comments)})
         </Text>
-        {report.comments.length === 0 && (
+        {(!report.comments || report.comments.length === 0) && (
           <Text style={styles.noComments}>No comments yet. Be the first to respond.</Text>
         )}
-        {report.comments.map((c) => (
-          <TouchableOpacity
+        {report.comments?.map((c) => (
+          <CommentNode
             key={c.id}
-            style={styles.commentItem}
-            onPress={() => navigation.navigate('PublicProfile', { userId: c.userId })}
-            activeOpacity={0.85}
-          >
-            <Avatar name={c.userName} size={32} />
-            <View style={styles.commentBubble}>
-              <Text style={styles.commentUser}>{c.userName}</Text>
-              <Text style={styles.commentText}>{c.text}</Text>
-              <Text style={styles.commentTime}>
-                {new Date(c.createdAt).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-            </View>
-          </TouchableOpacity>
+            comment={c}
+            onReply={(target) => {
+              setReplyTarget({ id: target.id, name: target.userName });
+            }}
+            onUserPress={(userId) => navigation.navigate('PublicProfile', { userId })}
+          />
         ))}
       </ScrollView>
+
+      {/* Replying Banner */}
+      {replyTarget && (
+        <View style={styles.replyBanner}>
+          <Text style={styles.replyBannerText}>
+            Replying to <Text style={{ fontWeight: '700' }}>{replyTarget.name}</Text>
+          </Text>
+          <TouchableOpacity onPress={() => setReplyTarget(null)}>
+            <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Comment input */}
       <View style={styles.inputBar}>
         <Avatar name={currentUser?.name} size={34} />
         <TextInput
           style={styles.commentInput}
-          placeholder="Write a comment..."
+          placeholder={replyTarget ? `Reply to ${replyTarget.name}...` : "Write a comment..."}
           placeholderTextColor={COLORS.textMuted}
           value={commentText}
           onChangeText={setCommentText}
@@ -204,6 +211,48 @@ export default function ReportDetailScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
+  );
+}
+
+function countComments(comments = []) {
+  let count = 0;
+  comments.forEach((c) => {
+    count += 1;
+    if (c.replies) count += countComments(c.replies);
+  });
+  return count;
+}
+
+function CommentNode({ comment, onReply, onUserPress, depth = 0 }) {
+  const isReply = depth > 0;
+  return (
+    <View style={[styles.commentNodeWrap, isReply && styles.replyIndent]}>
+      <View style={styles.commentItem}>
+        <TouchableOpacity onPress={() => onUserPress(comment.userId)} style={{ marginTop: 2 }}>
+          <Avatar name={comment.userName} size={isReply ? 26 : 32} />
+        </TouchableOpacity>
+        <View style={[styles.commentBubble, isReply && styles.commentBubbleReply]}>
+          <Text style={styles.commentUser}>{comment.userName}</Text>
+          <Text style={styles.commentText}>{comment.text}</Text>
+          <View style={styles.commentMeta}>
+            <Text style={styles.commentTime}>
+              {new Date(comment.createdAt).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+            <TouchableOpacity onPress={() => onReply(comment)} style={styles.replyBtn}>
+              <Ionicons name="chatbubble-outline" size={13} color={COLORS.primaryDeep} />
+              <Text style={styles.replyBtnText}>Reply</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+      {comment.replies && comment.replies.length > 0 && (
+        <View style={styles.repliesList}>
+          {comment.replies.map((r) => (
+            <CommentNode key={r.id} comment={r} onReply={onReply} onUserPress={onUserPress} depth={Math.min(depth + 1, 2)} />
+          ))}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -290,14 +339,37 @@ const styles = StyleSheet.create({
   },
   noComments: { fontSize: SIZES.body, color: COLORS.textMuted, marginBottom: SIZES.paddingM },
 
-  commentItem: { flexDirection: 'row', marginBottom: SIZES.paddingM, alignItems: 'flex-start' },
+  commentNodeWrap: { marginBottom: 8 },
+  replyIndent: {
+    marginLeft: 14,
+    paddingLeft: 8,
+    borderLeftWidth: 2,
+    borderLeftColor: COLORS.border,
+    marginTop: 6,
+  },
+  repliesList: { marginTop: 4 },
+  commentItem: { flexDirection: 'row', alignItems: 'flex-start' },
   commentBubble: {
-    flex: 1, marginLeft: 10, backgroundColor: COLORS.surface,
-    borderRadius: SIZES.radius, padding: 10, ...SHADOWS.card,
+    flex: 1, marginLeft: 8, backgroundColor: COLORS.surface,
+    borderRadius: SIZES.r12, paddingHorizontal: 12, paddingVertical: 10,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  commentBubbleReply: {
+    backgroundColor: COLORS.inputBg,
   },
   commentUser: { fontSize: SIZES.small, fontWeight: '700', color: COLORS.brown },
   commentText: { fontSize: SIZES.body, color: COLORS.textSecondary, marginTop: 2, lineHeight: 20 },
-  commentTime: { fontSize: SIZES.xsmall, color: COLORS.textMuted, marginTop: 4 },
+  commentMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
+  commentTime: { fontSize: SIZES.xsmall, color: COLORS.textMuted },
+  replyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 2 },
+  replyBtnText: { fontSize: SIZES.xsmall, fontWeight: '700', color: COLORS.primaryDeep },
+
+  replyBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: SIZES.paddingL, paddingVertical: 8,
+    backgroundColor: COLORS.tagBg, borderTopWidth: 1, borderTopColor: COLORS.divider,
+  },
+  replyBannerText: { fontSize: SIZES.small, color: COLORS.primaryDeep },
 
   inputBar: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
