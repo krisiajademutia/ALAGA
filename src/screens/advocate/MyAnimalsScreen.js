@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Alert, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity, Image, Alert, Modal, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
@@ -73,18 +73,21 @@ export default function MyAnimalsScreen({ navigation }) {
       </View>
 
       {/* Status filter */}
-      <View style={styles.filterRow}>
-        {STATUS_FILTERS.map((s) => (
-          <TouchableOpacity
-            key={s}
-            style={[styles.filterTab, filterStatus === s && styles.filterTabOn]}
-            onPress={() => setFilterStatus(s)}
-          >
-            <Text style={[styles.filterText, filterStatus === s && styles.filterTextOn]}>
-              {STATUS_EMOJI[s]} {s}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.filterContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          {STATUS_FILTERS.map((s) => (
+            <TouchableOpacity
+              key={s}
+              style={[styles.filterTab, filterStatus === s && styles.filterTabOn]}
+              onPress={() => setFilterStatus(s)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterText, filterStatus === s && styles.filterTextOn]}>
+                {STATUS_EMOJI[s]} {s}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       <FlatList
@@ -326,18 +329,21 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.tagBg, alignItems: 'center', justifyContent: 'center',
   },
 
-  filterRow: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.xs4 + 2,
-    paddingHorizontal: SIZES.md16, paddingVertical: SIZES.sm8 + 2,
+  filterContainer: {
     backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.divider,
   },
+  filterScroll: {
+    flexDirection: 'row', gap: 10,
+    paddingHorizontal: SIZES.lg24, paddingVertical: SIZES.sm8 + 4,
+  },
   filterTab: {
-    paddingHorizontal: SIZES.sm8 + 2, paddingVertical: SIZES.xs4 + 3,
-    borderRadius: SIZES.r999, backgroundColor: COLORS.inputBg,
-    borderWidth: 1.5, borderColor: COLORS.border,
+    paddingHorizontal: 16, paddingVertical: 10,
+    borderRadius: SIZES.r12, backgroundColor: COLORS.surface,
+    borderWidth: 1, borderColor: COLORS.border,
+    ...SHADOWS.card, shadowOpacity: 0.04, elevation: 1,
   },
   filterTabOn:  { backgroundColor: COLORS.primaryDeep, borderColor: COLORS.primaryDeep },
-  filterText:   { fontSize: SIZES.xs, fontWeight: '600', color: COLORS.textSecondary },
+  filterText:   { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.textSecondary },
   filterTextOn: { color: '#fff' },
 
   list: { padding: SIZES.md16, paddingBottom: 110 },

@@ -26,11 +26,14 @@ export default function AddAnimalScreen({ route, navigation }) {
 
   const [name, setName]               = useState('');
   const [species, setSpecies]         = useState('');
+  const [otherSpecies, setOtherSpecies] = useState('');
   const [breed, setBreed]             = useState('');
   const [age, setAge]                 = useState('');
+  const [size, setSize]               = useState('');
   const [gender, setGender]           = useState('');
   const [color, setColor]             = useState('');
   const [condition, setCondition]     = useState('');
+  const [specialNeeds, setSpecialNeeds] = useState('');
   const [description, setDescription] = useState('');
   const [listingType, setListingType] = useState('Adoption');
   const [readiness, setReadiness]     = useState('Available');
@@ -62,7 +65,9 @@ export default function AddAnimalScreen({ route, navigation }) {
     const e = {};
     if (!name.trim())        e.name    = 'Animal name is required.';
     if (!species)            e.species = 'Select the species.';
+    else if (species === 'Other' && !otherSpecies.trim()) e.species = 'Please specify the species.';
     if (!gender)             e.gender  = 'Select gender.';
+    if (!size)               e.size    = 'Select size.';
     if (!description.trim()) e.desc    = 'Add a description.';
     setErrors(e);
     return !Object.keys(e).length;
@@ -75,12 +80,14 @@ export default function AddAnimalScreen({ route, navigation }) {
     setTimeout(() => {
       addAnimal({
         name: name.trim(),
-        species,
+        species:  species === 'Other' ? otherSpecies.trim() : species,
         breed:    breed.trim()    || 'Unknown',
         age:      age.trim()      || 'Unknown',
+        size,
         gender,
         color:    color.trim()    || 'Unknown',
         condition:condition.trim()|| 'Healthy',
+        specialNeeds: specialNeeds.trim() || null,
         description: description.trim(),
         status: readiness,
         listingType,
@@ -118,30 +125,30 @@ export default function AddAnimalScreen({ route, navigation }) {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
         {/* ── Photo ─────────────────────────────────────────── */}
+        <Label text="PHOTO" />
         <View style={styles.photoSection}>
           {photo ? (
             <View style={styles.photoPreviewWrap}>
               <Image source={{ uri: photo }} style={styles.photoPreview} />
               <TouchableOpacity style={styles.removePhoto} onPress={() => setPhoto(null)}>
-                <Ionicons name="close-circle" size={24} color={COLORS.danger} />
+                <Ionicons name="close-circle" size={28} color={COLORS.danger} />
               </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.photoEmpty}>
-              <Ionicons name="camera-outline" size={30} color={COLORS.textMuted} />
-              <Text style={styles.photoHint}>Add a photo</Text>
+              <View style={styles.photoBtnRow}>
+                <TouchableOpacity style={styles.photoCircleBtn} onPress={takePhoto}>
+                  <Ionicons name="camera" size={24} color={COLORS.primaryDeep} />
+                  <Text style={styles.photoCircleText}>Camera</Text>
+                </TouchableOpacity>
+                <View style={styles.photoDivider} />
+                <TouchableOpacity style={styles.photoCircleBtn} onPress={pickPhoto}>
+                  <Ionicons name="image" size={24} color={COLORS.primaryDeep} />
+                  <Text style={styles.photoCircleText}>Gallery</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
-          <View style={styles.photoBtns}>
-            <TouchableOpacity style={styles.photoBtn} onPress={takePhoto}>
-              <Ionicons name="camera" size={18} color={COLORS.primaryDeep} />
-              <Text style={styles.photoBtnText}>Camera</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.photoBtn} onPress={pickPhoto}>
-              <Ionicons name="image" size={18} color={COLORS.primaryDeep} />
-              <Text style={styles.photoBtnText}>Gallery</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
         {/* ── Basic info ─────────────────────────────────────── */}
@@ -155,26 +162,43 @@ export default function AddAnimalScreen({ route, navigation }) {
         />
 
         <Label text="SPECIES" error={errors.species} />
-        <View style={styles.chipRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
           {ANIMAL_SPECIES.map((s) => (
             <Chip key={s} label={s} active={species === s}
-              onPress={() => { setSpecies(s); setErrors((e) => ({ ...e, species: null })); }} />
+              onPress={() => {
+                setSpecies((prev) => prev === s ? '' : s);
+                setErrors((e) => ({ ...e, species: null }));
+              }} />
           ))}
-        </View>
+        </ScrollView>
+        {species === 'Other' && (
+          <Input placeholder="Please specify species..." value={otherSpecies}
+            onChangeText={(t) => { setOtherSpecies(t); setErrors((e) => ({ ...e, species: null })); }}
+            autoCapitalize="words" style={{ marginBottom: SIZES.paddingM }} />
+        )}
 
         <Input label="Breed (optional)" placeholder="e.g. Aspin, Puspin" value={breed} onChangeText={setBreed} autoCapitalize="words" />
         <Input label="Estimated Age"   placeholder="e.g. ~2 years, 3 months" value={age} onChangeText={setAge} />
 
         <Label text="GENDER" error={errors.gender} />
-        <View style={styles.chipRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
           {GENDERS.map((g) => (
             <Chip key={g} label={g} active={gender === g}
               onPress={() => { setGender(g); setErrors((e) => ({ ...e, gender: null })); }} />
           ))}
-        </View>
+        </ScrollView>
+        
+        <Label text="SIZE" error={errors.size} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
+          {['Small', 'Medium', 'Large'].map((sz) => (
+            <Chip key={sz} label={sz} active={size === sz}
+              onPress={() => { setSize(sz); setErrors((e) => ({ ...e, size: null })); }} />
+          ))}
+        </ScrollView>
 
         <Input label="Color / Markings"  placeholder="e.g. Brown and white"  value={color}     onChangeText={setColor}     autoCapitalize="words" />
         <Input label="Current Condition" placeholder="e.g. Recovering, Healthy" value={condition} onChangeText={setCondition} autoCapitalize="words" />
+        <Input label="Special Needs (optional)" placeholder="e.g. Requires daily medication" value={specialNeeds} onChangeText={setSpecialNeeds} autoCapitalize="sentences" />
         <Input label="Description" placeholder="Tell adopters about this animal's personality and story..." value={description}
           onChangeText={(t) => { setDescription(t); setErrors((e) => ({ ...e, desc: null })); }}
           multiline numberOfLines={4} autoCapitalize="sentences" error={errors.desc} />
@@ -213,7 +237,7 @@ export default function AddAnimalScreen({ route, navigation }) {
         {needsFosterDuration && (
           <>
             <Label text="SUGGESTED FOSTER DURATION" />
-            <View style={styles.chipRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
               {FOSTER_DURATIONS.map((d) => (
                 <Chip
                   key={d} label={d}
@@ -222,26 +246,26 @@ export default function AddAnimalScreen({ route, navigation }) {
                   activeColor="#D97706"
                 />
               ))}
-            </View>
+            </ScrollView>
           </>
         )}
 
         {/* ── Readiness ──────────────────────────────────────── */}
         <Label text="IS THIS ANIMAL READY NOW?" />
-        <View style={styles.chipRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
           {READINESS.map((r) => (
             <TouchableOpacity
               key={r.key}
               style={[styles.readinessChip, readiness === r.key && { borderColor: r.color, backgroundColor: r.color + '14' }]}
               onPress={() => setReadiness(r.key)}
             >
-              <Ionicons name={r.icon} size={14} color={readiness === r.key ? r.color : COLORS.textMuted} />
+              <Ionicons name={r.icon} size={16} color={readiness === r.key ? r.color : COLORS.textMuted} />
               <Text style={[styles.readinessText, readiness === r.key && { color: r.color, fontWeight: '700' }]}>
                 {r.label}
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
 
         <Button
           title="Save Animal Profile"
@@ -298,7 +322,11 @@ const lbl = StyleSheet.create({
   err:  { color: COLORS.danger },
 });
 const ch = StyleSheet.create({
-  base: { paddingHorizontal: SIZES.sm8 + 4, paddingVertical: SIZES.xs4 + 4, borderRadius: SIZES.r999, backgroundColor: COLORS.inputBg, borderWidth: 1.5, borderColor: COLORS.border },
+  base: {
+    paddingHorizontal: 18, paddingVertical: 12, borderRadius: SIZES.r12,
+    backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border,
+    ...SHADOWS.card, shadowOpacity: 0.05, elevation: 1,
+  },
   text: { fontSize: SIZES.sm, fontWeight: '600', color: COLORS.textSecondary },
 });
 const tr = StyleSheet.create({
@@ -320,24 +348,19 @@ const styles = StyleSheet.create({
   photoSection: { marginBottom: SIZES.md16 },
   photoPreviewWrap: { position: 'relative', borderRadius: SIZES.r16, overflow: 'hidden', marginBottom: SIZES.sm8 },
   photoPreview: { width: '100%', height: 200, resizeMode: 'cover' },
-  removePhoto: { position: 'absolute', top: SIZES.sm8, right: SIZES.sm8 },
+  removePhoto: { position: 'absolute', top: 12, right: 12, backgroundColor: '#fff', borderRadius: 14, overflow: 'hidden' },
   photoEmpty: {
-    height: 140, backgroundColor: COLORS.inputBg, borderRadius: SIZES.r16,
-    alignItems: 'center', justifyContent: 'center', gap: SIZES.xs4,
-    borderWidth: 1.5, borderStyle: 'dashed', borderColor: COLORS.border,
+    height: 140, backgroundColor: COLORS.surface, borderRadius: SIZES.r16,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderStyle: 'dashed', borderColor: COLORS.border,
     marginBottom: SIZES.sm8,
   },
-  photoHint: { fontSize: SIZES.sm, color: COLORS.textMuted },
-  photoBtns: { flexDirection: 'row', gap: SIZES.sm8 },
-  photoBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: SIZES.xs4 + 2, paddingVertical: SIZES.sm8 + 2,
-    borderRadius: SIZES.r12, backgroundColor: COLORS.tagBg,
-    borderWidth: 1.5, borderColor: COLORS.primaryLight,
-  },
-  photoBtnText: { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.primaryDeep },
+  photoBtnRow: { flexDirection: 'row', alignItems: 'center', width: '100%' },
+  photoCircleBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: SIZES.paddingM },
+  photoCircleText: { fontSize: SIZES.small, fontWeight: '700', color: COLORS.textSecondary, marginTop: 8 },
+  photoDivider: { width: 2, height: '60%', backgroundColor: COLORS.border },
 
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.xs4 + 2, marginBottom: SIZES.md16 },
+  scrollRow: { flexDirection: 'row', gap: 10, paddingRight: SIZES.paddingL, marginBottom: SIZES.paddingM, marginTop: 4 },
 
   card: {
     backgroundColor: COLORS.surface, borderRadius: SIZES.r16,
@@ -358,12 +381,13 @@ const styles = StyleSheet.create({
   listingDesc:    { fontSize: SIZES.xs, color: COLORS.textMuted, marginTop: 2 },
 
   readinessChip: {
-    flexDirection: 'row', alignItems: 'center', gap: SIZES.xs4 + 2,
-    paddingHorizontal: SIZES.sm8 + 4, paddingVertical: SIZES.xs4 + 4,
-    borderRadius: SIZES.r999, borderWidth: 1.5, borderColor: COLORS.border,
+    flexDirection: 'row', alignItems: 'center', gap: SIZES.sm8,
+    paddingHorizontal: 18, paddingVertical: 12,
+    borderRadius: SIZES.r12, borderWidth: 1, borderColor: COLORS.border,
     backgroundColor: COLORS.surface,
+    ...SHADOWS.card, shadowOpacity: 0.05, elevation: 1,
   },
-  readinessText: { fontSize: SIZES.sm, color: COLORS.textMuted },
+  readinessText: { fontSize: SIZES.sm, color: COLORS.textSecondary },
 
   saveBtn: { marginTop: SIZES.sm8 },
 });
