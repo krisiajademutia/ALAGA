@@ -261,7 +261,7 @@ export const MOCK_NOTIFICATIONS = [
     iconColor:COLORS_NOTIF.primaryDeep,
     read:     true,
     createdAt:'2026-08-26T08:12:00Z',
-    navTarget:{ screen: 'Messages', params: {} },
+    navTarget:{ screen: 'Chat', params: { conversationId: 'conv1', name: 'Juan dela Cruz' } },
   },
   {
     id: 'n7',
@@ -274,7 +274,7 @@ export const MOCK_NOTIFICATIONS = [
     iconColor:'#5A9478',
     read:     true,
     createdAt:'2026-08-25T10:00:00Z',
-    navTarget:{ screen: 'Activity', params: {} },
+    navTarget:{ screen: 'Activity', params: { tab: 'donations' } },
   },
   {
     id: 'n8',
@@ -287,6 +287,6 @@ export const MOCK_NOTIFICATIONS = [
     iconColor:'#2D9E5F',
     read:     false,
     createdAt:'2026-08-26T09:15:00Z',
-    navTarget:{ screen: 'Messages', params: {} },
+    navTarget:{ screen: 'Chat', params: { conversationId: 'conv2', name: 'Juan dela Cruz' } },
   },
 ];

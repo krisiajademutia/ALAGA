@@ -30,12 +30,14 @@ function groupNotifications(notifs) {
 
 export default function NotificationScreen({ navigation }) {
   const {
+    currentUser,
     getUserNotifications,
     getUnreadCount,
     markNotificationRead,
     markAllNotificationsRead,
   } = useApp();
 
+  const isAdvocate  = currentUser?.role === 'advocate';
   const notifs      = getUserNotifications();
   const unreadCount = getUnreadCount();
   const groups      = groupNotifications(notifs);
@@ -54,9 +56,57 @@ export default function NotificationScreen({ navigation }) {
   const handleTap = (item) => {
     // Mark as read first
     markNotificationRead(item.id);
-    // Navigate to the target screen
+
+    // 1. If explicit navTarget specified, use it directly
     if (item.navTarget?.screen) {
       navigation.navigate(item.navTarget.screen, item.navTarget.params || {});
+      return;
+    }
+
+    // 2. Smart fallback based on notification category & payload
+    switch (item.type) {
+      case 'response':
+      case 'comment':
+      case 'report':
+        if (item.reportId) {
+          navigation.navigate('ReportDetail', { reportId: item.reportId });
+        } else {
+          navigation.navigate('Activity', { tab: 'reports' });
+        }
+        break;
+
+      case 'request':
+        if (isAdvocate) {
+          navigation.navigate('AdvocateRequests');
+        } else {
+          navigation.navigate('Activity', { tab: 'requests' });
+        }
+        break;
+
+      case 'donation':
+        navigation.navigate('Activity', { tab: 'donations' });
+        break;
+
+      case 'message':
+      case 'chat':
+        if (item.conversationId) {
+          navigation.navigate('Chat', { conversationId: item.conversationId, name: item.senderName || 'Chat' });
+        } else {
+          navigation.navigate('Messages');
+        }
+        break;
+
+      case 'approval':
+        navigation.navigate('Messages');
+        break;
+
+      case 'alert':
+        navigation.navigate('RescueAlerts');
+        break;
+
+      default:
+        navigation.navigate('Activity');
+        break;
     }
   };
 
