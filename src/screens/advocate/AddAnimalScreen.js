@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Image, Alert, KeyboardAvoidingView, Platform, Switch,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -313,7 +310,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: COLORS.background },
   navbar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SIZES.lg24, paddingTop: 52, paddingBottom: SIZES.md16,
+    paddingHorizontal: SIZES.lg24, paddingTop: Platform.OS === 'ios' ? 52 : 28, paddingBottom: SIZES.md16,
     backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.divider,
   },
   backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },

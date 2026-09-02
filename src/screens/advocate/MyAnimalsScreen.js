@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Image, Alert, Modal,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Alert, Modal, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
@@ -319,7 +316,7 @@ const styles = StyleSheet.create({
 
   navbar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SIZES.lg24, paddingTop: 52, paddingBottom: SIZES.md16,
+    paddingHorizontal: SIZES.lg24, paddingTop: Platform.OS === 'ios' ? 52 : 28, paddingBottom: SIZES.md16,
     backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.divider,
   },
   backBtn:  { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },

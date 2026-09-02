@@ -1,8 +1,5 @@
 import React from 'react';
-import {
-  View, Text, StyleSheet, FlatList,
-  TouchableOpacity, Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
@@ -161,7 +158,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SIZES.lg24,
-    paddingTop: Platform.OS === 'android' ? SIZES.lg24 : SIZES.xl32,
+    paddingTop: Platform.OS === 'ios' ? 52 : 28,
     paddingBottom: SIZES.md16,
     backgroundColor: COLORS.surface,
     borderBottomWidth: 1,

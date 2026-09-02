@@ -37,6 +37,7 @@ import ActivityScreen     from '../screens/shared/ActivityScreen';
 import DonateScreen       from '../screens/shared/DonateScreen';
 import ProfileScreen      from '../screens/shared/ProfileScreen';
 import PublicProfileScreen from '../screens/shared/PublicProfileScreen';
+import NotificationScreen  from '../screens/shared/NotificationScreen';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Styles — MUST be defined before navigator components that reference them
@@ -136,6 +137,7 @@ function RootStack() {
       <Stack.Screen name="Donate"         component={DonateScreen} />
       <Stack.Screen name="Profile"        component={ProfileScreen} />
       <Stack.Screen name="PublicProfile"  component={PublicProfileScreen} />
+      <Stack.Screen name="Notifications"  component={NotificationScreen} />
       <Stack.Screen name="Listings"       component={ListingsScreen} />
       <Stack.Screen name="RescueAlerts"   component={RescueAlertsScreen} />
       <Stack.Screen name="MyAnimals"      component={MyAnimalsScreen} />

@@ -1,7 +1,5 @@
 import React, { useRef, useState } from 'react';
-import {
-  View, Text, StyleSheet, Dimensions, TouchableOpacity, Animated,
-} from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Animated } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES } from '../../constants/theme';
@@ -57,54 +55,59 @@ export default function OnboardingScreen({ navigation }) {
         renderItem={({ item }) => <Slide item={item} />}
       />
 
-      {/* Dot indicators */}
-      <View style={styles.dots}>
-        {SLIDES.map((_, i) => {
-          const w = scrollX.interpolate({
-            inputRange: [(i - 1) * W, i * W, (i + 1) * W],
-            outputRange: [8, 22, 8],
-            extrapolate: 'clamp',
-          });
-          const op = scrollX.interpolate({
-            inputRange: [(i - 1) * W, i * W, (i + 1) * W],
-            outputRange: [0.3, 1, 0.3],
-            extrapolate: 'clamp',
-          });
-          return (
-            <Animated.View
-              key={i}
-              style={[styles.dot, { width: w, opacity: op }]}
-            />
-          );
-        })}
-      </View>
+      {/* Footer Area */}
+      <View style={styles.footerContainer}>
+        {/* Dot indicators */}
+        <View style={styles.dots}>
+          {SLIDES.map((_, i) => {
+            const w = scrollX.interpolate({
+              inputRange: [(i - 1) * W, i * W, (i + 1) * W],
+              outputRange: [8, 22, 8],
+              extrapolate: 'clamp',
+            });
+            const op = scrollX.interpolate({
+              inputRange: [(i - 1) * W, i * W, (i + 1) * W],
+              outputRange: [0.3, 1, 0.3],
+              extrapolate: 'clamp',
+            });
+            return (
+              <Animated.View
+                key={i}
+                style={[styles.dot, { width: w, opacity: op }]}
+              />
+            );
+          })}
+        </View>
 
-      {/* CTA */}
-      <View style={styles.footer}>
-        <Button
-          title={idx === SLIDES.length - 1 ? 'Get Started' : 'Next'}
-          onPress={next}
-          fullWidth
-          style={styles.btn}
-          icon={
-            <Ionicons
-              name={idx === SLIDES.length - 1 ? 'paw' : 'arrow-forward'}
-              size={17}
-              color="#fff"
-            />
-          }
-        />
-        {idx === SLIDES.length - 1 ? (
-          <TouchableOpacity
-            onPress={() => navigation.replace('Login')}
-            style={styles.loginLink}
-          >
-            <Text style={styles.loginText}>
-              Already have an account?{' '}
-              <Text style={styles.loginBold}>Log in</Text>
-            </Text>
-          </TouchableOpacity>
-        ) : null}
+        {/* CTA */}
+        <View style={styles.footer}>
+          <Button
+            title={idx === SLIDES.length - 1 ? 'Get Started' : 'Next'}
+            onPress={next}
+            fullWidth
+            style={styles.btn}
+            icon={
+              <Ionicons
+                name={idx === SLIDES.length - 1 ? 'paw' : 'arrow-forward'}
+                size={17}
+                color="#fff"
+              />
+            }
+          />
+          {idx === SLIDES.length - 1 ? (
+            <TouchableOpacity
+              onPress={() => navigation.replace('Login')}
+              style={styles.loginLink}
+            >
+              <Text style={styles.loginText}>
+                Already have an account?{' '}
+                <Text style={styles.loginBold}>Log in</Text>
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ height: 38 }} />
+          )}
+        </View>
       </View>
     </View>
   );
@@ -136,7 +139,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: SIZES.xl32,
     paddingTop: SIZES.xl40,
-    paddingBottom: SIZES.lg24,
+    paddingBottom: 200, // Make room for footer
   },
   iconCircle: {
     width: 160, height: 160, borderRadius: 80,
@@ -162,6 +165,14 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     lineHeight: 24,
+  },
+
+  footerContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingTop: SIZES.xl40, // Fade out gradient can go here if needed
   },
 
   dots: {

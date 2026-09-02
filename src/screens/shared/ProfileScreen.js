@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, Image, ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, ActivityIndicator, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -228,7 +225,7 @@ const styles = StyleSheet.create({
   heroBg: {
     backgroundColor: COLORS.surface,
     alignItems: 'center',
-    paddingTop: 56,
+    paddingTop: Platform.OS === 'ios' ? 52 : 28,
     paddingBottom: SIZES.paddingXL,
     paddingHorizontal: SIZES.paddingL,
     marginBottom: SIZES.paddingM,

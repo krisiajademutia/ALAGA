@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  KeyboardAvoidingView, Platform, Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
@@ -35,11 +32,7 @@ export default function LoginScreen({ navigation }) {
     }, 700);
   };
 
-  const fillDemo = (role) => {
-    setEmail(role === 'community' ? 'maria@email.com' : 'juan@email.com');
-    setPassword('123456');
-    setErrors({});
-  };
+
 
   return (
     <KeyboardAvoidingView
@@ -87,22 +80,6 @@ export default function LoginScreen({ navigation }) {
 
           <Button title="Log In" onPress={submit} loading={loading} fullWidth />
 
-          {/* Demo buttons */}
-          <View style={styles.divRow}>
-            <View style={styles.divLine} />
-            <Text style={styles.divText}>Quick demo</Text>
-            <View style={styles.divLine} />
-          </View>
-          <View style={styles.demoRow}>
-            <TouchableOpacity style={styles.demoBtn} onPress={() => fillDemo('community')}>
-              <Ionicons name="person-outline" size={15} color={COLORS.primaryDeep} />
-              <Text style={styles.demoBtnText}>Community</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.demoBtn, styles.demoBtnGreen]} onPress={() => fillDemo('advocate')}>
-              <Ionicons name="shield-checkmark-outline" size={15} color={COLORS.secondaryDark} />
-              <Text style={[styles.demoBtnText, { color: COLORS.secondaryDark }]}>Advocate</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
         <View style={styles.signupRow}>

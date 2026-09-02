@@ -1,7 +1,5 @@
 import React from 'react';
-import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
@@ -89,7 +87,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     paddingHorizontal: SIZES.paddingL,
-    paddingTop: 56,
+    paddingTop: Platform.OS === 'ios' ? 52 : 28,
     paddingBottom: SIZES.paddingM,
   },
   title: { fontSize: SIZES.xxlarge, fontWeight: '800', color: COLORS.textPrimary },

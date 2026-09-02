@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View, Text, StyleSheet, TouchableOpacity, Modal,
-  SafeAreaView, StatusBar as RNStatusBar, Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, SafeAreaView, StatusBar as RNStatusBar, Platform } from 'react-native';
 import MapView, { Marker, UrlTile, PROVIDER_DEFAULT } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS } from '../constants/theme';

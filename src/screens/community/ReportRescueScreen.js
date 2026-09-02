@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Image, Alert, KeyboardAvoidingView, Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -16,12 +13,19 @@ export default function ReportRescueScreen({ navigation }) {
   const { addRescueReport } = useApp();
 
   const [animalType, setAnimalType] = useState('');
+  const [otherAnimalType, setOtherAnimalType] = useState('');
   const [condition, setCondition] = useState('');
+  const [otherCondition, setOtherCondition] = useState('');
   const [urgency, setUrgency] = useState('');
   const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
+  const [landmark, setLandmark] = useState('');
+  const [contact, setContact] = useState('');
+  const [isContained, setIsContained] = useState('');
+  
   const [photo, setPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingLoc, setLoadingLoc] = useState(false);
   const [errors, setErrors] = useState({});
 
   const pickPhoto = async () => {
@@ -56,12 +60,27 @@ export default function ReportRescueScreen({ navigation }) {
   const validate = () => {
     const e = {};
     if (!animalType) e.animalType = 'Select the animal type.';
+    else if (animalType === 'Other' && !otherAnimalType.trim()) e.animalType = 'Please specify the animal type.';
+    
     if (!condition) e.condition = 'Select the condition.';
+    else if (condition === 'Other' && !otherCondition.trim()) e.condition = 'Please specify the condition.';
+    
     if (!urgency) e.urgency = 'Select urgency level.';
+    if (!isContained) e.isContained = 'Select if contained.';
     if (!description.trim()) e.description = 'Describe the situation.';
     if (!address.trim()) e.address = 'Enter the location.';
+    if (!contact.trim()) e.contact = 'Contact number is required.';
     setErrors(e);
     return Object.keys(e).length === 0;
+  };
+
+  const fetchLocation = async () => {
+    setLoadingLoc(true);
+    setAddress('Fetching GPS coordinates...');
+    setTimeout(() => {
+      setAddress('123 Mango Avenue, Cebu City, Philippines');
+      setLoadingLoc(false);
+    }, 1500);
   };
 
   const handleSubmit = () => {
@@ -69,15 +88,18 @@ export default function ReportRescueScreen({ navigation }) {
     setLoading(true);
     setTimeout(() => {
       addRescueReport({
-        animalType,
-        condition,
+        animalType: animalType === 'Other' ? otherAnimalType.trim() : animalType,
+        condition: condition === 'Other' ? otherCondition.trim() : condition,
         urgency,
         description: description.trim(),
+        contact: contact.trim(),
+        isContained,
         photo,
         location: {
           latitude: 10.3157 + (Math.random() - 0.5) * 0.05,
           longitude: 123.8854 + (Math.random() - 0.5) * 0.05,
           address: address.trim(),
+          landmark: landmark.trim(),
         },
       });
       setLoading(false);
@@ -111,60 +133,83 @@ export default function ReportRescueScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
       >
         {/* Photo section */}
-        <Text style={styles.sectionLabel}>PHOTO</Text>
+        <Text style={styles.sectionLabel}>PHOTO {errors.photo && <Text style={styles.errInline}> · {errors.photo}</Text>}</Text>
         <View style={styles.photoRow}>
           {photo ? (
             <View style={styles.photoPreviewWrap}>
               <Image source={{ uri: photo }} style={styles.photoPreview} />
               <TouchableOpacity style={styles.removePhoto} onPress={() => setPhoto(null)}>
-                <Ionicons name="close-circle" size={24} color={COLORS.danger} />
+                <Ionicons name="close-circle" size={28} color={COLORS.danger} />
               </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.photoPlaceholder}>
-              <Ionicons name="camera-outline" size={36} color={COLORS.textMuted} />
-              <Text style={styles.photoHint}>Add a photo of the animal</Text>
+              <View style={styles.photoBtnRow}>
+                <TouchableOpacity style={styles.photoCircleBtn} onPress={takePhoto}>
+                  <Ionicons name="camera" size={24} color={COLORS.primaryDeep} />
+                  <Text style={styles.photoCircleText}>Camera</Text>
+                </TouchableOpacity>
+                <View style={styles.photoDivider} />
+                <TouchableOpacity style={styles.photoCircleBtn} onPress={pickPhoto}>
+                  <Ionicons name="image" size={24} color={COLORS.primaryDeep} />
+                  <Text style={styles.photoCircleText}>Gallery</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
-          <View style={styles.photoButtons}>
-            <TouchableOpacity style={styles.photoBtn} onPress={takePhoto}>
-              <Ionicons name="camera" size={20} color={COLORS.primary} />
-              <Text style={styles.photoBtnText}>Camera</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.photoBtn} onPress={pickPhoto}>
-              <Ionicons name="image" size={20} color={COLORS.primary} />
-              <Text style={styles.photoBtnText}>Gallery</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
         {/* Animal type */}
         <Text style={styles.sectionLabel}>ANIMAL TYPE {errors.animalType && <Text style={styles.errInline}> · {errors.animalType}</Text>}</Text>
-        <View style={styles.chipRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
           {ANIMAL_SPECIES.map((s) => (
             <TouchableOpacity
               key={s}
               style={[styles.chip, animalType === s && styles.chipActive]}
-              onPress={() => { setAnimalType(s); setErrors((e) => ({ ...e, animalType: null })); }}
+              onPress={() => {
+                setAnimalType((prev) => prev === s ? '' : s);
+                setErrors((e) => ({ ...e, animalType: null }));
+              }}
             >
               <Text style={[styles.chipText, animalType === s && styles.chipTextActive]}>{s}</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
+        {animalType === 'Other' && (
+          <Input
+            placeholder="Please specify animal type..."
+            value={otherAnimalType}
+            onChangeText={(t) => { setOtherAnimalType(t); setErrors((e) => ({ ...e, animalType: null })); }}
+            autoCapitalize="words"
+            style={{ marginBottom: SIZES.paddingM }}
+          />
+        )}
 
         {/* Condition */}
         <Text style={styles.sectionLabel}>CONDITION {errors.condition && <Text style={styles.errInline}> · {errors.condition}</Text>}</Text>
-        <View style={styles.chipRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
           {ANIMAL_CONDITIONS.map((c) => (
             <TouchableOpacity
               key={c}
               style={[styles.chip, condition === c && styles.chipActive]}
-              onPress={() => { setCondition(c); setErrors((e) => ({ ...e, condition: null })); }}
+              onPress={() => {
+                setCondition((prev) => prev === c ? '' : c);
+                setErrors((e) => ({ ...e, condition: null }));
+              }}
             >
               <Text style={[styles.chipText, condition === c && styles.chipTextActive]}>{c}</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
+        {condition === 'Other' && (
+          <Input
+            placeholder="Please specify condition..."
+            value={otherCondition}
+            onChangeText={(t) => { setOtherCondition(t); setErrors((e) => ({ ...e, condition: null })); }}
+            autoCapitalize="words"
+            style={{ marginBottom: SIZES.paddingM }}
+          />
+        )}
 
         {/* Urgency */}
         <Text style={styles.sectionLabel}>URGENCY LEVEL {errors.urgency && <Text style={styles.errInline}> · {errors.urgency}</Text>}</Text>
@@ -181,6 +226,20 @@ export default function ReportRescueScreen({ navigation }) {
           ))}
         </View>
 
+        {/* Is Contained */}
+        <Text style={styles.sectionLabel}>IS THE ANIMAL CONTAINED? {errors.isContained && <Text style={styles.errInline}> · {errors.isContained}</Text>}</Text>
+        <View style={styles.binaryRow}>
+          {['Yes, secured', 'No, roaming free'].map((c) => (
+            <TouchableOpacity
+              key={c}
+              style={[styles.binaryBtn, isContained === c && styles.binaryBtnActive]}
+              onPress={() => { setIsContained(c); setErrors((e) => ({ ...e, isContained: null })); }}
+            >
+              <Text style={[styles.binaryBtnText, isContained === c && styles.binaryBtnTextActive]}>{c}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {/* Description */}
         <Input
           label="Description"
@@ -193,15 +252,42 @@ export default function ReportRescueScreen({ navigation }) {
           error={errors.description}
         />
 
-        {/* Location */}
+        {/* Contact Number */}
         <Input
-          label="Location / Address"
+          label="Contact Number"
+          placeholder="e.g. 09123456789"
+          value={contact}
+          onChangeText={(t) => { setContact(t); setErrors((e) => ({ ...e, contact: null })); }}
+          keyboardType="phone-pad"
+          error={errors.contact}
+          icon={<Ionicons name="call-outline" size={18} color={COLORS.textMuted} />}
+        />
+
+        {/* Location Section */}
+        <View style={styles.locationHeader}>
+          <Text style={styles.sectionLabel}>LOCATION / ADDRESS {errors.address && <Text style={styles.errInline}> · {errors.address}</Text>}</Text>
+          <TouchableOpacity style={styles.fetchBtn} onPress={fetchLocation} disabled={loadingLoc}>
+            <Ionicons name="locate" size={16} color={COLORS.primaryDeep} />
+            <Text style={styles.fetchBtnText}>{loadingLoc ? 'Fetching...' : 'Use Current'}</Text>
+          </TouchableOpacity>
+        </View>
+        <Input
           placeholder="e.g. Near Carbon Market, Cebu City"
           value={address}
           onChangeText={(t) => { setAddress(t); setErrors((e) => ({ ...e, address: null })); }}
           autoCapitalize="words"
           error={errors.address}
           icon={<Ionicons name="location-outline" size={18} color={COLORS.textMuted} />}
+        />
+
+        {/* Landmark */}
+        <Input
+          label="Nearby Landmark (Optional)"
+          placeholder="e.g. Across Jollibee"
+          value={landmark}
+          onChangeText={setLandmark}
+          autoCapitalize="words"
+          icon={<Ionicons name="flag-outline" size={18} color={COLORS.textMuted} />}
         />
 
         <Button
@@ -220,7 +306,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: COLORS.background },
   navbar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SIZES.paddingL, paddingTop: 56, paddingBottom: SIZES.paddingM,
+    paddingHorizontal: SIZES.paddingL, paddingTop: Platform.OS === 'ios' ? 52 : 28, paddingBottom: SIZES.paddingM,
     backgroundColor: COLORS.background,
   },
   backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
@@ -235,40 +321,59 @@ const styles = StyleSheet.create({
 
   photoRow: { marginBottom: SIZES.paddingM },
   photoPreviewWrap: { position: 'relative', marginBottom: 10 },
-  photoPreview: { width: '100%', height: 180, borderRadius: SIZES.radius, resizeMode: 'cover' },
-  removePhoto: { position: 'absolute', top: 8, right: 8 },
+  photoPreview: { width: '100%', height: 200, borderRadius: SIZES.r16, resizeMode: 'cover' },
+  removePhoto: { position: 'absolute', top: 12, right: 12, backgroundColor: '#fff', borderRadius: 14, overflow: 'hidden' },
   photoPlaceholder: {
-    height: 150, backgroundColor: COLORS.inputBg, borderRadius: SIZES.radius,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1.5,
-    borderColor: COLORS.border, borderStyle: 'dashed', marginBottom: 10,
+    height: 140, backgroundColor: COLORS.surface, borderRadius: SIZES.r16,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 2,
+    borderColor: COLORS.border, borderStyle: 'dashed',
   },
-  photoHint: { fontSize: SIZES.small, color: COLORS.textMuted, marginTop: 6 },
-  photoButtons: { flexDirection: 'row', gap: 10 },
-  photoBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 10, borderRadius: SIZES.radius,
-    backgroundColor: COLORS.tagBg, borderWidth: 1.5, borderColor: COLORS.primaryLight,
-  },
-  photoBtnText: { fontSize: SIZES.small, fontWeight: '700', color: COLORS.primary },
+  photoBtnRow: { flexDirection: 'row', alignItems: 'center', width: '100%' },
+  photoCircleBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: SIZES.paddingM },
+  photoCircleText: { fontSize: SIZES.small, fontWeight: '700', color: COLORS.textSecondary, marginTop: 8 },
+  photoDivider: { width: 2, height: '60%', backgroundColor: COLORS.border },
 
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SIZES.paddingM },
+  scrollRow: { flexDirection: 'row', gap: 10, paddingRight: SIZES.paddingL, marginBottom: SIZES.paddingM, marginTop: 4 },
   chip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: SIZES.radiusFull,
-    backgroundColor: COLORS.inputBg, borderWidth: 1.5, borderColor: COLORS.border,
+    paddingHorizontal: 18, paddingVertical: 12, borderRadius: SIZES.r12,
+    backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border,
+    ...SHADOWS.card, shadowOpacity: 0.05, elevation: 1,
   },
-  chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  chipActive: { backgroundColor: COLORS.primaryDeep, borderColor: COLORS.primaryDeep },
   chipText: { fontSize: SIZES.small, fontWeight: '600', color: COLORS.textSecondary },
   chipTextActive: { color: '#fff' },
 
-  urgencyRow: { flexDirection: 'row', gap: 10, marginBottom: SIZES.paddingM },
+  urgencyRow: { flexDirection: 'row', gap: 10, marginBottom: SIZES.paddingM, marginTop: 4 },
   urgencyCard: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 12, borderRadius: SIZES.radius,
+    gap: 6, paddingVertical: 12, borderRadius: SIZES.r12,
     backgroundColor: COLORS.surface, borderWidth: 1.5, borderColor: COLORS.border,
-    ...SHADOWS.card,
+    ...SHADOWS.card, shadowOpacity: 0.08, elevation: 2,
   },
   urgencyDot: { width: 10, height: 10, borderRadius: 5 },
   urgencyText: { fontSize: SIZES.small, fontWeight: '700' },
+
+  binaryRow: { flexDirection: 'row', gap: 10, marginBottom: SIZES.paddingM, marginTop: 4 },
+  binaryBtn: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 12, borderRadius: SIZES.r12,
+    backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border,
+    ...SHADOWS.card, shadowOpacity: 0.05, elevation: 1,
+  },
+  binaryBtnActive: { backgroundColor: COLORS.primaryDeep, borderColor: COLORS.primaryDeep },
+  binaryBtnText: { fontSize: SIZES.small, fontWeight: '600', color: COLORS.textSecondary },
+  binaryBtnTextActive: { color: '#fff' },
+
+  locationHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: SIZES.xs4,
+  },
+  fetchBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: COLORS.tagBg, paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: SIZES.r12, borderWidth: 1, borderColor: COLORS.primaryLight,
+  },
+  fetchBtnText: { fontSize: SIZES.xs, fontWeight: '700', color: COLORS.primaryDeep },
 
   submitBtn: { marginTop: SIZES.paddingS, borderRadius: SIZES.radiusFull },
 });

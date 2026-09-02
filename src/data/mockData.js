@@ -171,8 +171,8 @@ export const URGENCY_LEVELS = [
   { label: 'Low',    color: '#27AE60', bg: '#E8F5EE' },
 ];
 
-export const ANIMAL_SPECIES    = ['Dog', 'Cat', 'Bird', 'Rabbit', 'Other'];
-export const ANIMAL_CONDITIONS = ['Injured', 'Stray', 'Abandoned', 'Malnourished', 'Sick', 'Healthy'];
+export const ANIMAL_SPECIES    = ['Dog', 'Cat', 'Other'];
+export const ANIMAL_CONDITIONS = ['Injured', 'Stray', 'Abandoned', 'Malnourished', 'Sick', 'Healthy', 'Other'];
 export const FOSTER_DURATIONS  = ['1 month', '2 months', '3 months', '4–6 months', 'Until adopted', 'Flexible'];
 export const PAYMENT_METHODS   = ['GCash', 'Maya', 'Bank Transfer', 'Cash'];
 
