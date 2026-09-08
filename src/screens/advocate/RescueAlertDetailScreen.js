@@ -27,7 +27,7 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
   const isResponder    = currentUser?.id === report.responderId;
   const canRespond     = report.status === 'Open';
   const canMarkRescued = isResponder && report.status === 'Responded';
-  const canAddAnimal   = isResponder && report.status === 'Resqued';
+  const canAddAnimal   = isResponder && report.status === 'Rescued';
 
   const handleRespond = () => {
     Alert.alert(

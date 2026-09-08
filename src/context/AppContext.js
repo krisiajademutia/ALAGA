@@ -324,6 +324,12 @@ export function AppProvider({ children }) {
     ]);
   };
 
+  // ── Rescue Case Linking ───────────────────────────────────────────────────
+  const getAdvocateRescuedCases = () =>
+    rescueReports.filter((r) => 
+      r.responderId === currentUser?.id && r.status === 'Rescued'
+    ).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
   return (
     <AppContext.Provider
       value={{
@@ -374,6 +380,8 @@ export function AppProvider({ children }) {
         markNotificationRead,
         markAllNotificationsRead,
         pushNotification,
+        // rescue linking
+        getAdvocateRescuedCases,
       }}
     >
       {children}

@@ -21,8 +21,9 @@ const READINESS = [
 ];
 
 export default function AddAnimalScreen({ route, navigation }) {
-  const { addAnimal } = useApp();
+  const { addAnimal, getAdvocateRescuedCases } = useApp();
   const rescueReportId = route.params?.rescueReportId || null;
+  const rescuedCases = getAdvocateRescuedCases();
 
   const [name, setName]               = useState('');
   const [species, setSpecies]         = useState('');
@@ -44,6 +45,10 @@ export default function AddAnimalScreen({ route, navigation }) {
   const [tagsText, setTagsText]       = useState('');
   const [loading, setLoading]         = useState(false);
   const [errors, setErrors]           = useState({});
+  
+  // Rescue linking state
+  const [selectedRescueId, setSelectedRescueId] = useState(rescueReportId);
+  const [showRescueSelector, setShowRescueSelector] = useState(false);
 
   const needsFosterDuration = listingType === 'Foster' || listingType === 'Both';
 
@@ -98,7 +103,7 @@ export default function AddAnimalScreen({ route, navigation }) {
           neutered,
           photo,
           tags,
-          rescueReportId,
+          rescueReportId: selectedRescueId,
         });
         
         setLoading(false);
@@ -125,7 +130,6 @@ export default function AddAnimalScreen({ route, navigation }) {
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-        {/* ── Photo ─────────────────────────────────────────── */}
         <Label text="PHOTO" />
         <View style={styles.photoSection}>
           {photo ? (
@@ -151,6 +155,16 @@ export default function AddAnimalScreen({ route, navigation }) {
             </View>
           )}
         </View>
+
+        {/* ── Link to Rescue Case ───────────────────────────── */}
+        <Label text="LINK TO RESCUE CASE (OPTIONAL)" />
+        <LinkToRescueSection 
+          rescuedCases={rescuedCases}
+          selectedRescueId={selectedRescueId}
+          onSelectRescue={setSelectedRescueId}
+          showSelector={showRescueSelector}
+          onToggleSelector={setShowRescueSelector}
+        />
 
         {/* ── Basic info ─────────────────────────────────────── */}
         <Input
@@ -346,6 +360,14 @@ const styles = StyleSheet.create({
   navTitle:{ fontSize: SIZES.lg, fontWeight: '700', color: COLORS.brown },
   scroll:  { paddingHorizontal: SIZES.lg24, paddingTop: SIZES.md16, paddingBottom: 48 },
 
+  rescueBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: SIZES.sm8,
+    backgroundColor: '#D8F0E4', borderRadius: SIZES.r12,
+    padding: SIZES.md16, marginBottom: SIZES.md16,
+    borderWidth: 1, borderColor: '#A8D8BC',
+  },
+  rescueBannerText: { flex: 1, fontSize: SIZES.sm, fontWeight: '700', color: COLORS.success },
+
   photoSection: { marginBottom: SIZES.md16 },
   photoPreviewWrap: { position: 'relative', borderRadius: SIZES.r16, overflow: 'hidden', marginBottom: SIZES.sm8 },
   photoPreview: { width: '100%', height: 200, resizeMode: 'cover' },
@@ -391,4 +413,216 @@ const styles = StyleSheet.create({
   readinessText: { fontSize: SIZES.sm, color: COLORS.textSecondary },
 
   saveBtn: { marginTop: SIZES.sm8 },
+
+  // Rescue linking section
+  rescueSection: { marginBottom: SIZES.md16 },
+  rescueEmpty: {
+    flexDirection: 'row', alignItems: 'center', gap: SIZES.sm8,
+    backgroundColor: COLORS.inputBg, borderRadius: SIZES.r12,
+    padding: SIZES.md16,
+  },
+  rescueEmptyText: { flex: 1, fontSize: SIZES.sm, color: COLORS.textMuted, lineHeight: 18 },
+  
+  rescueLink: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: COLORS.surface, borderRadius: SIZES.r16,
+    padding: SIZES.md16, borderWidth: 1, borderColor: COLORS.border,
+    ...SHADOWS.card,
+  },
+  rescueLinkLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SIZES.md16 },
+  rescueLinkIcon: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: COLORS.tagBg, alignItems: 'center', justifyContent: 'center',
+  },
+  rescueLinkTitle: { fontSize: SIZES.body, fontWeight: '700', color: COLORS.brown, marginBottom: 2 },
+  rescueLinkSub: { fontSize: SIZES.sm, color: COLORS.textSecondary },
+
+  rescueSelected: {
+    backgroundColor: '#D8F0E4', borderRadius: SIZES.r16,
+    padding: SIZES.md16, borderWidth: 1, borderColor: '#A8D8BC',
+  },
+  rescueSelectedTop: { flexDirection: 'row', alignItems: 'flex-start', gap: SIZES.md16, marginBottom: SIZES.md16 },
+  rescueIcon: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: COLORS.success, alignItems: 'center', justifyContent: 'center',
+  },
+  rescueSelectedInfo: { flex: 1 },
+  rescueSelectedTitle: { fontSize: SIZES.body, fontWeight: '800', color: COLORS.success, marginBottom: 2 },
+  rescueSelectedSub: { fontSize: SIZES.sm, color: '#2D6B3F', marginBottom: 2 },
+  rescueSelectedReporter: { fontSize: SIZES.xs, color: '#2D6B3F', fontStyle: 'italic' },
+  rescueActions: { flexDirection: 'row', gap: SIZES.sm8 },
+  rescueChangeBtn: {
+    flex: 1, backgroundColor: '#fff', borderRadius: SIZES.r12,
+    paddingVertical: SIZES.sm8, alignItems: 'center',
+    borderWidth: 1, borderColor: '#A8D8BC',
+  },
+  rescueChangeBtnText: { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.success },
+  rescueUnlinkBtn: {
+    flex: 1, backgroundColor: 'transparent', borderRadius: SIZES.r12,
+    paddingVertical: SIZES.sm8, alignItems: 'center',
+    borderWidth: 1, borderColor: '#A8D8BC',
+  },
+  rescueUnlinkBtnText: { fontSize: SIZES.sm, fontWeight: '700', color: '#2D6B3F' },
+
+  rescueSelector: {
+    backgroundColor: COLORS.surface, borderRadius: SIZES.r16,
+    borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.card,
+  },
+  rescueSelectorHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: SIZES.md16, borderBottomWidth: 1, borderBottomColor: COLORS.divider,
+  },
+  rescueSelectorTitle: { fontSize: SIZES.body, fontWeight: '700', color: COLORS.brown },
+  rescueSelectorCancel: { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.primaryDeep },
+  
+  rescueOption: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    padding: SIZES.md16, borderBottomWidth: 1, borderBottomColor: COLORS.divider,
+  },
+  rescueOptionLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SIZES.md16 },
+  rescueOptionIcon: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: '#D8F0E4', alignItems: 'center', justifyContent: 'center',
+  },
+  rescueOptionInfo: { flex: 1 },
+  rescueOptionTitle: { fontSize: SIZES.body, fontWeight: '700', color: COLORS.brown, marginBottom: 2 },
+  rescueOptionSub: { fontSize: SIZES.sm, color: COLORS.textSecondary, marginBottom: 2 },
+  rescueOptionDate: { fontSize: SIZES.xs, color: COLORS.textMuted },
 });
+
+// ── Link to Rescue Case Component ────────────────────────────────────────────
+function LinkToRescueSection({ rescuedCases, selectedRescueId, onSelectRescue, showSelector, onToggleSelector }) {
+  const selectedCase = rescuedCases.find(r => r.id === selectedRescueId);
+  
+  const formatDate = (iso) => {
+    return new Date(iso).toLocaleDateString('en-PH', { 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  if (rescuedCases.length === 0) {
+    // No rescued cases available
+    return (
+      <View style={styles.rescueSection}>
+        <View style={styles.rescueEmpty}>
+          <Ionicons name="information-circle-outline" size={20} color={COLORS.textMuted} />
+          <Text style={styles.rescueEmptyText}>
+            No rescued cases available. This animal profile will not be linked to a rescue case.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (selectedCase) {
+    // Show selected rescue case
+    return (
+      <View style={styles.rescueSection}>
+        <View style={styles.rescueSelected}>
+          <View style={styles.rescueSelectedTop}>
+            <View style={styles.rescueIcon}>
+              <Ionicons name="link" size={16} color="#fff" />
+            </View>
+            <View style={styles.rescueSelectedInfo}>
+              <Text style={styles.rescueSelectedTitle}>
+                {selectedCase.animalType} · {selectedCase.condition}
+              </Text>
+              <Text style={styles.rescueSelectedSub}>
+                {selectedCase.location?.address || 'No location'} · {formatDate(selectedCase.updatedAt)}
+              </Text>
+              <Text style={styles.rescueSelectedReporter}>
+                Reported by: {selectedCase.reporterName || 'Anonymous'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.rescueActions}>
+            <TouchableOpacity 
+              style={styles.rescueChangeBtn}
+              onPress={() => onToggleSelector(true)}
+            >
+              <Text style={styles.rescueChangeBtnText}>Change</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.rescueUnlinkBtn}
+              onPress={() => onSelectRescue(null)}
+            >
+              <Text style={styles.rescueUnlinkBtnText}>Unlink</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  if (showSelector) {
+    // Show rescue case selector
+    return (
+      <View style={styles.rescueSection}>
+        <View style={styles.rescueSelector}>
+          <View style={styles.rescueSelectorHeader}>
+            <Text style={styles.rescueSelectorTitle}>Choose a rescue case:</Text>
+            <TouchableOpacity onPress={() => onToggleSelector(false)}>
+              <Text style={styles.rescueSelectorCancel}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+          {rescuedCases.map((rescue) => (
+            <TouchableOpacity
+              key={rescue.id}
+              style={styles.rescueOption}
+              onPress={() => {
+                onSelectRescue(rescue.id);
+                onToggleSelector(false);
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={styles.rescueOptionLeft}>
+                <View style={styles.rescueOptionIcon}>
+                  <Ionicons name="shield-checkmark" size={16} color={COLORS.success} />
+                </View>
+                <View style={styles.rescueOptionInfo}>
+                  <Text style={styles.rescueOptionTitle}>
+                    {rescue.animalType} · {rescue.condition}
+                  </Text>
+                  <Text style={styles.rescueOptionSub}>
+                    {rescue.location?.address || 'No location'}
+                  </Text>
+                  <Text style={styles.rescueOptionDate}>
+                    Rescued: {formatDate(rescue.updatedAt)}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  // Default state - show option to link
+  return (
+    <View style={styles.rescueSection}>
+      <TouchableOpacity 
+        style={styles.rescueLink}
+        onPress={() => onToggleSelector(true)}
+        activeOpacity={0.8}
+      >
+        <View style={styles.rescueLinkLeft}>
+          <View style={styles.rescueLinkIcon}>
+            <Ionicons name="link-outline" size={20} color={COLORS.primaryDeep} />
+          </View>
+          <View>
+            <Text style={styles.rescueLinkTitle}>Link to rescue case</Text>
+            <Text style={styles.rescueLinkSub}>
+              Connect this profile to a rescue you completed ({rescuedCases.length} available)
+            </Text>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+      </TouchableOpacity>
+    </View>
+  );
+}

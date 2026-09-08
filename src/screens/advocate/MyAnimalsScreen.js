@@ -11,7 +11,7 @@ const STATUS_FILTERS = ['All', 'Available', 'Being Fostered', 'Adopted', 'Under 
 const STATUS_EMOJI   = { All: '🐾', Available: '', 'Being Fostered': '', Adopted: '', 'Under Care': '' };
 
 export default function MyAnimalsScreen({ navigation }) {
-  const { getAdvocateAnimals, returnAnimalToListings, markAnimalAdopted, updateAnimal } = useApp();
+  const { getAdvocateAnimals, returnAnimalToListings, markAnimalAdopted, updateAnimal, rescueReports } = useApp();
   const [filterStatus, setFilterStatus] = useState('All');
   const [actionAnimal, setActionAnimal] = useState(null); // animal for the action modal
 
@@ -123,6 +123,22 @@ export default function MyAnimalsScreen({ navigation }) {
               <Text style={styles.sheetStatus}>
                 Current status: <Text style={{ fontWeight: '700' }}>{actionAnimal.status}</Text>
               </Text>
+
+              {/* Show rescue link info if available */}
+              {actionAnimal.rescueReportId && (() => {
+                const rescueCase = rescueReports.find(r => r.id === actionAnimal.rescueReportId);
+                return rescueCase ? (
+                  <View style={styles.rescueInfo}>
+                    <Ionicons name="link" size={16} color={COLORS.primaryDeep} />
+                    <View style={styles.rescueInfoText}>
+                      <Text style={styles.rescueInfoTitle}>Linked to rescue case</Text>
+                      <Text style={styles.rescueInfoDesc}>
+                        {rescueCase.animalType} · {rescueCase.condition} · {rescueCase.location?.address || 'No location'}
+                      </Text>
+                    </View>
+                  </View>
+                ) : null;
+              })()}
 
               {/* ── Being Fostered actions ─────────────── */}
               {actionAnimal.status === 'Being Fostered' && (
@@ -294,6 +310,14 @@ function AnimalManageCard({ animal, onPress, onActions }) {
           </View>
         )}
 
+        {/* Rescue link info */}
+        {animal.rescueReportId && (
+          <View style={styles.rescueLinkRow}>
+            <Ionicons name="link" size={12} color={COLORS.primaryDeep} />
+            <Text style={styles.rescueLinkText}>Linked to rescue case</Text>
+          </View>
+        )}
+
         <View style={styles.cardFooter}>
           <View style={styles.listingTypePill}>
             <Ionicons
@@ -375,6 +399,9 @@ const styles = StyleSheet.create({
   durationRow:   { flexDirection: 'row', alignItems: 'center', gap: SIZES.xs4, marginBottom: SIZES.xs4 + 2 },
   durationText:  { fontSize: SIZES.xs, color: COLORS.textMuted },
 
+  rescueLinkRow: { flexDirection: 'row', alignItems: 'center', gap: SIZES.xs4, marginBottom: SIZES.xs4 + 2 },
+  rescueLinkText:{ fontSize: SIZES.xs, color: COLORS.primaryDeep, fontWeight: '600' },
+
   cardFooter: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingTop: SIZES.xs4 + 2, borderTopWidth: 1, borderTopColor: COLORS.divider,
@@ -409,6 +436,15 @@ const styles = StyleSheet.create({
     padding: SIZES.sm8 + 2, marginBottom: SIZES.md16,
   },
   fosterInfoText: { fontSize: SIZES.sm, color: '#92400E' },
+
+  rescueInfo: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: SIZES.xs4 + 2,
+    backgroundColor: COLORS.tagBg, borderRadius: SIZES.r12,
+    padding: SIZES.sm8 + 2, marginBottom: SIZES.md16,
+  },
+  rescueInfoText: { flex: 1 },
+  rescueInfoTitle: { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.primaryDeep, marginBottom: 2 },
+  rescueInfoDesc: { fontSize: SIZES.xs, color: COLORS.textSecondary, lineHeight: 16 },
 
   actionBtn: {
     flexDirection: 'row', alignItems: 'flex-start', gap: SIZES.md16,
