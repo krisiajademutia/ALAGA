@@ -81,6 +81,7 @@ export function AppProvider({ children }) {
   // ── Firebase Real-Time Synchronization ─────────────────────────────────────
   useEffect(() => {
     if (!isMockFirebase()) {
+      // Public feeds (Rescue alerts and Adoptable animals)
       const unsubRescues = subscribeToRescueReports((liveReports) => {
         setRescueReports(liveReports || []);
       });
@@ -89,17 +90,24 @@ export function AppProvider({ children }) {
         setAnimals(liveAnimals || []);
       });
 
-      const unsubApps = subscribeToApplications((liveApps) => {
-        setRequests(liveApps || []);
-      });
-
       return () => {
         unsubRescues();
         unsubAnimals();
-        unsubApps();
       };
     }
   }, []);
+
+  // User-specific applications listener (runs only when authenticated)
+  useEffect(() => {
+    if (!isMockFirebase() && currentUser) {
+      const unsubApps = subscribeToApplications(currentUser, (liveApps) => {
+        setRequests(liveApps || []);
+      });
+      return () => unsubApps();
+    } else {
+      setRequests([]);
+    }
+  }, [currentUser]);
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   const login = async (email, password) => {

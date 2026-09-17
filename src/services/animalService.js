@@ -5,10 +5,11 @@ import {
   updateDoc,
   onSnapshot,
   query,
+  where,
   orderBy,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { isMockFirebase } from '../config/firebaseConfig';
 
 const ANIMALS_COLLECTION = 'animals';
@@ -92,14 +93,30 @@ export async function updateAnimalFirebase(animalId, updates) {
 /**
  * Real-time listener for adoption & foster applications
  */
-export function subscribeToApplications(onUpdate, onError) {
+export function subscribeToApplications(user, onUpdate, onError) {
   if (isMockFirebase() || !db) return () => {};
 
+  // Applications are private and require an authenticated user
+  const currentUid = user?.id || auth?.currentUser?.uid;
+  if (!currentUid) {
+    if (onUpdate) onUpdate([]);
+    return () => {};
+  }
+
   try {
-    const q = query(
-      collection(db, APPLICATIONS_COLLECTION),
-      orderBy('createdAt', 'desc')
-    );
+    let q;
+    if (user?.role === 'advocate') {
+      q = query(
+        collection(db, APPLICATIONS_COLLECTION),
+        orderBy('createdAt', 'desc')
+      );
+    } else {
+      q = query(
+        collection(db, APPLICATIONS_COLLECTION),
+        where('requesterId', '==', currentUid),
+        orderBy('createdAt', 'desc')
+      );
+    }
 
     return onSnapshot(
       q,
@@ -111,7 +128,7 @@ export function subscribeToApplications(onUpdate, onError) {
             ...docSnap.data(),
           });
         });
-        onUpdate(apps);
+        if (onUpdate) onUpdate(apps);
       },
       (error) => {
         console.warn('[animalService] Applications snapshot error:', error);

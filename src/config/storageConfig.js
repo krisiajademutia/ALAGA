@@ -6,5 +6,5 @@
 export const IMGBB_API_KEY = "b0ed7e4f7c4b45b65885e3a75a9289cb";
 
 export const isMockStorage = () => {
-  return !IMGBB_API_KEY || IMGBB_API_KEY === "b0ed7e4f7c4b45b65885e3a75a9289cb" || IMGBB_API_KEY.length < 15;
+  return !IMGBB_API_KEY || IMGBB_API_KEY === "YOUR_IMGBB_API_KEY" || IMGBB_API_KEY.length < 15;
 };
