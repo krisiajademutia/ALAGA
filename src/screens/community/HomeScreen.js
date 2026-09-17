@@ -1,279 +1,508 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Dimensions } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Platform,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
-import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
-import RescueCard from '../../components/RescueCard';
-import SectionHeader from '../../components/SectionHeader';
-import EmptyState from '../../components/EmptyState';
+import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import Avatar from '../../components/Avatar';
+import AnimalCard from '../../components/AnimalCard';
 
-const W = Dimensions.get('window').width;
+const CATEGORIES = [
+  { id: 'all', label: 'All Pets', icon: 'paw' },
+  { id: 'cats', label: 'Cats', icon: 'paw-outline' },
+  { id: 'dogs', label: 'Dogs', icon: 'paw-outline' },
+  { id: 'birds', label: 'Other Animals', icon: 'heart-outline' },
+];
 
-// Simple, clean pet illustration using emoji + shapes
-function HeroIllustration() {
-  return (
-    <View style={ill.wrap}>
-      <View style={ill.bubble}>
-        <Text style={ill.pet}>🐶</Text>
-      </View>
-      <View style={[ill.bubble, ill.bubble2]}>
-        <Text style={ill.pet}>🐱</Text>
-      </View>
-      <View style={ill.starRow}>
-        <Text style={ill.star}>✦</Text>
-        <Text style={[ill.star, { fontSize: 8, opacity: 0.5 }]}>✦</Text>
-        <Text style={[ill.star, { fontSize: 6, opacity: 0.4 }]}>✦</Text>
-      </View>
-    </View>
-  );
-}
+const SEGMENTS = ['All Pets', 'Urgent / Foster', 'Nearby (<3km)'];
 
 export default function CommunityHomeScreen({ navigation }) {
-  const { currentUser, rescueReports, getUnreadCount } = useApp();
-  const recent        = rescueReports.slice(0, 10);
-  const openCount     = rescueReports.filter((r) => r.status === 'Open').length;
-  const respondedCount= rescueReports.filter((r) => r.status === 'Responded').length;
-  const rescuedCount  = rescueReports.filter((r) => r.status === 'Rescued').length;
-  const unreadNotifs  = getUnreadCount();
+  const { currentUser, animals, getUnreadCount } = useApp();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('all');
+  const [activeSegment, setActiveSegment] = useState('All Pets');
+
+  const unreadNotifs = getUnreadCount();
+
+  const filteredAnimals = animals.filter((a) => {
+    if (activeCategory === 'cats' && a.species !== 'Cat') return false;
+    if (activeCategory === 'dogs' && a.species !== 'Dog') return false;
+    if (activeSegment === 'Urgent / Foster' && !a.fosterNeeded && a.listingType !== 'Foster') return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return (
+        a.name.toLowerCase().includes(q) ||
+        a.breed.toLowerCase().includes(q) ||
+        a.location?.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
 
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-
-        {/* ── Hero ──────────────────────────────────────────── */}
-        <View style={styles.hero}>
-          <View style={styles.heroBlob1} />
-          <View style={styles.heroBlob2} />
-
-          <View style={styles.heroTop}>
-            <View style={styles.heroGreetCol}>
-              <Text style={styles.heroGreet}>
-                Hello, {currentUser?.name?.split(' ')[0]}! 👋
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+      >
+        {/* ── Top Location Header ───────────────────────────── */}
+        <View style={styles.header}>
+          <View style={styles.locationContainer}>
+            <View style={styles.locIconWrap}>
+              <Ionicons name="location-sharp" size={20} color={COLORS.primaryDeep} />
+            </View>
+            <View>
+              <Text style={styles.locLabel}>Your Location</Text>
+              <Text style={styles.locValue}>
+                {currentUser?.location || 'San Antonio, Pasig'}
               </Text>
-              <Text style={styles.heroSub}>Ready to help an animal today?</Text>
-            </View>
-            <View style={styles.heroActions}>
-              {/* Notification bell */}
-              <TouchableOpacity
-                style={styles.notifBtn}
-                onPress={() => navigation.navigate('Notifications')}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="notifications-outline" size={22} color={COLORS.brown} />
-                {unreadNotifs > 0 && (
-                  <View style={styles.notifBadge}>
-                    <Text style={styles.notifBadgeText}>
-                      {unreadNotifs > 9 ? '9+' : unreadNotifs}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              {/* Avatar */}
-              <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.avatarWrap}>
-                <Avatar name={currentUser?.name} uri={currentUser?.avatar} size={44} />
-              </TouchableOpacity>
             </View>
           </View>
 
-          <View style={styles.heroMid}>
-            <HeroIllustration />
-            <View style={styles.taglineCol}>
-              <Text style={styles.tagline1}>Every animal</Text>
-              <Text style={styles.tagline2}>deserves ALAGA.</Text>
-            </View>
-          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.notifBtn}
+              onPress={() => navigation.navigate('Notifications')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="notifications-outline" size={22} color={COLORS.brown} />
+              {unreadNotifs > 0 && <View style={styles.notifBadge} />}
+            </TouchableOpacity>
 
-          {/* Stats */}
-          <View style={styles.statsRow}>
-            <Stat icon="alert-circle"     value={openCount}      label="Needs Help"  color={COLORS.danger}  bg="#FCE8E8" />
-            <View style={styles.statDiv} />
-            <Stat icon="shield-half"      value={respondedCount} label="Responding"  color={COLORS.warning} bg="#FEF3DC" />
-            <View style={styles.statDiv} />
-            <Stat icon="checkmark-circle" value={rescuedCount}   label="Rescued"     color={COLORS.success} bg="#D8F0E4" />
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Profile')}
+              style={styles.avatarWrap}
+            >
+              <Avatar name={currentUser?.name || 'Kareena Jane'} uri={currentUser?.avatar} size={42} />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* ── Report CTA ─────────────────────────────────────── */}
-        <TouchableOpacity
-          style={styles.cta}
-          onPress={() => navigation.navigate('ReportRescue')}
-          activeOpacity={0.86}
-        >
-          <View style={styles.ctaIconWrap}>
-            <Ionicons name="alert-circle" size={22} color="#fff" />
-          </View>
-          <View style={styles.ctaTextCol}>
-            <Text style={styles.ctaTitle}>Spotted an animal in need?</Text>
-            <Text style={styles.ctaSub}>File a rescue report — takes 30 seconds</Text>
-          </View>
-          <View style={styles.ctaArrow}>
-            <Ionicons name="arrow-forward" size={16} color={COLORS.primaryDeep} />
-          </View>
-        </TouchableOpacity>
-
-        {/* ── Feed ───────────────────────────────────────────── */}
-        <SectionHeader
-          title="Recent Rescue Reports"
-          actionLabel="See All"
-          onAction={() => navigation.navigate('AllReports')}
-          style={styles.sectionHeader}
-        />
-
-        {recent.length === 0 ? (
-          <EmptyState
-            icon="paw-outline"
-            title="No reports yet"
-            subtitle="Be the first to report an animal in need."
-            style={styles.empty}
+        {/* ── Search Bar ────────────────────────────────────── */}
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search breed, location, or shelter..."
+            placeholderTextColor={COLORS.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
-        ) : (
-          <View style={styles.feed}>
-            {recent.map((r) => (
-              <RescueCard
-                key={r.id}
-                report={r}
-                onPress={() => navigation.navigate('ReportDetail', { reportId: r.id })}
-              />
-            ))}
+          <TouchableOpacity style={styles.filterBtn}>
+            <Ionicons name="options-outline" size={20} color={COLORS.brown} />
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Save the Animals Banner ──────────────────────── */}
+        <View style={styles.banner}>
+          <View style={styles.bannerDecor1} />
+          <View style={styles.bannerDecor2} />
+
+          <View style={styles.bannerLeft}>
+            <View style={styles.tagWrap}>
+              <Text style={styles.tagText}>ALAGA NETWORK</Text>
+            </View>
+            <Text style={styles.bannerTitle}>Save the animals!</Text>
+            <Text style={styles.bannerSub}>
+              Every stray deserves safety and love. Adopt, foster, or volunteer today.
+            </Text>
+            <TouchableOpacity
+              style={styles.helpBtn}
+              onPress={() => navigation.navigate('ReportRescue')}
+              activeOpacity={0.88}
+            >
+              <Text style={styles.helpBtnText}>Help Now  →</Text>
+            </TouchableOpacity>
           </View>
-        )}
+
+          <View style={styles.bannerRight}>
+            <View style={styles.pawCircle}>
+              <Ionicons name="paw" size={32} color={COLORS.brown} />
+            </View>
+          </View>
+        </View>
+
+        {/* ── Category Pills ────────────────────────────────── */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.catScroll}
+        >
+          {CATEGORIES.map((cat) => {
+            const active = activeCategory === cat.id;
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                style={[styles.catPill, active ? styles.catPillActive : styles.catPillInactive]}
+                onPress={() => setActiveCategory(cat.id)}
+                activeOpacity={0.8}
+              >
+                {cat.icon && (
+                  <Ionicons
+                    name={cat.icon}
+                    size={16}
+                    color={active ? COLORS.surface : COLORS.textSecondary}
+                    style={{ marginRight: 6 }}
+                  />
+                )}
+                <Text
+                  style={[
+                    styles.catPillText,
+                    active ? styles.catPillTextActive : styles.catPillTextInactive,
+                  ]}
+                >
+                  {cat.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* ── Segmented Tabs ────────────────────────────────── */}
+        <View style={styles.segmentContainer}>
+          {SEGMENTS.map((seg) => {
+            const active = activeSegment === seg;
+            return (
+              <TouchableOpacity
+                key={seg}
+                style={[styles.segBtn, active && styles.segBtnActive]}
+                onPress={() => setActiveSegment(seg)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.segText, active && styles.segTextActive]}>
+                  {seg}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* ── Available for Adoption Section ────────────────── */}
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>Available for Adoption</Text>
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeText}>{filteredAnimals.length}</Text>
+            </View>
+          </View>
+          <TouchableOpacity onPress={() => navigation.navigate('Listings')} activeOpacity={0.7}>
+            <Text style={styles.seeAllText}>See All</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Pet Cards Feed */}
+        <View style={styles.cardsFeed}>
+          {filteredAnimals.map((pet) => (
+            <AnimalCard
+              key={pet.id}
+              animal={pet}
+              onPress={() => navigation.navigate('AnimalDetail', { animalId: pet.id })}
+            />
+          ))}
+        </View>
       </ScrollView>
     </View>
   );
 }
 
-function Stat({ icon, value, label, color, bg }) {
-  return (
-    <View style={[styles.stat, { backgroundColor: bg }]}>
-      <Ionicons name={icon} size={14} color={color} />
-      <Text style={[styles.statVal, { color }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color }]}>{label}</Text>
-    </View>
-  );
-}
-
-const ill = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'flex-end', position: 'relative', gap: 6 },
-  bubble: {
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.6)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)',
-  },
-  bubble2: { width: 40, height: 40, borderRadius: 20, marginBottom: 6 },
-  pet:  { fontSize: 26 },
-  starRow: { flexDirection: 'column', alignItems: 'center', gap: 2, paddingBottom: 4 },
-  star: { fontSize: 11, color: COLORS.accentDark, fontWeight: '800' },
-});
-
 const styles = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: COLORS.background },
-  scroll: { paddingBottom: 110 },
-
-  // Hero
-  hero: {
-    margin: SIZES.md16,
-    borderRadius: SIZES.r20,
-    padding: SIZES.lg24,
-    paddingBottom: SIZES.md16,
-    backgroundColor: COLORS.surface,
-    overflow: 'hidden',
-    position: 'relative',
-    ...SHADOWS.hero,
+  root: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
-  heroBlob1: {
-    position: 'absolute', width: W * 0.45, height: W * 0.45,
-    borderRadius: W * 0.225,
-    backgroundColor: COLORS.primaryLight, opacity: 0.45,
-    top: -W * 0.1, right: -W * 0.08,
-  },
-  heroBlob2: {
-    position: 'absolute', width: W * 0.3, height: W * 0.3,
-    borderRadius: W * 0.15,
-    backgroundColor: COLORS.accent, opacity: 0.28,
-    bottom: -W * 0.06, left: -W * 0.06,
+  scroll: {
+    paddingBottom: 90,
   },
 
-  heroTop: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'flex-start', marginBottom: SIZES.md16, zIndex: 1,
+  // Location Header
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 50 : 32,
+    paddingBottom: 14,
   },
-  heroGreetCol: { flex: 1, paddingRight: SIZES.sm8 },
-  heroGreet: {
-    fontSize: SIZES.xl, fontWeight: '800',
-    color: COLORS.brown, letterSpacing: -0.3,
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  heroSub: { fontSize: SIZES.sm, color: COLORS.textSecondary, marginTop: 3 },
-  heroActions: { flexDirection: 'row', alignItems: 'center', gap: SIZES.sm8 },
+  locIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locLabel: {
+    ...FONTS.caption,
+    color: COLORS.textMuted,
+  },
+  locValue: {
+    ...FONTS.subheading,
+    fontSize: 15,
+    color: COLORS.brown,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   notifBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.75)',
-    alignItems: 'center', justifyContent: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    alignItems: 'center',
+    justifyContent: 'center',
     position: 'relative',
-    ...SHADOWS.sm,
   },
   notifBadge: {
-    position: 'absolute', top: 5, right: 5,
-    width: 14, height: 14, borderRadius: 7,
+    position: 'absolute',
+    top: 9,
+    right: 9,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
     backgroundColor: COLORS.danger,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: COLORS.surface,
   },
-  notifBadgeText: { fontSize: 8, color: '#fff', fontWeight: '800' },
-  avatarWrap: { ...SHADOWS.sm },
-
-  heroMid: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'flex-end', marginBottom: SIZES.md16, zIndex: 1,
-  },
-  taglineCol: { flex: 1, alignItems: 'flex-end' },
-  tagline1: { fontSize: SIZES.md, fontWeight: '600', color: COLORS.textSecondary, lineHeight: 21 },
-  tagline2: { fontSize: SIZES.md + 1, fontWeight: '900', color: COLORS.primaryDeep, lineHeight: 21 },
-
-  statsRow: {
-    flexDirection: 'row', zIndex: 1,
-    backgroundColor: 'rgba(240,248,251,0.7)',
-    borderRadius: SIZES.r12, paddingVertical: SIZES.sm8,
-  },
-  stat: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: SIZES.xs4,
-    paddingVertical: SIZES.xs4 + 2, borderRadius: SIZES.r12,
-  },
-  statDiv:   { width: 1, backgroundColor: COLORS.divider, marginVertical: SIZES.xs4 },
-  statVal:   { fontSize: SIZES.md, fontWeight: '800' },
-  statLabel: { fontSize: SIZES.xs, fontWeight: '600' },
-
-  // CTA
-  cta: {
-    flexDirection: 'row', alignItems: 'center', gap: SIZES.md16,
-    marginHorizontal: SIZES.md16, marginBottom: SIZES.lg24,
-    padding: SIZES.md16, borderRadius: SIZES.r16,
-    backgroundColor: COLORS.primaryDeep,
-    ...SHADOWS.button,
-  },
-  ctaIconWrap: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  ctaTextCol: { flex: 1 },
-  ctaTitle:   { fontSize: SIZES.body, fontWeight: '800', color: '#fff' },
-  ctaSub:     { fontSize: SIZES.xs, color: 'rgba(255,255,255,0.78)', marginTop: 2 },
-  ctaArrow: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: '#fff',
-    alignItems: 'center', justifyContent: 'center',
+  avatarWrap: {
+    ...SHADOWS.sm,
   },
 
+  // Search Bar
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: SIZES.r24 + 1,
+    marginHorizontal: 20,
+    paddingHorizontal: 16,
+    height: 48,
+    marginBottom: 16,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    ...FONTS.bodyMedium,
+    fontSize: 13,
+    color: COLORS.brown,
+  },
+  filterBtn: {
+    padding: 4,
+  },
+
+  // Save Animals Banner
+  banner: {
+    backgroundColor: COLORS.accent,
+    marginHorizontal: 20,
+    borderRadius: SIZES.r24,
+    padding: 20,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: 18,
+    ...SHADOWS.card,
+  },
+  bannerDecor1: {
+    position: 'absolute',
+    right: -10,
+    top: -20,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: COLORS.secondary,
+    opacity: 0.5,
+  },
+  bannerDecor2: {
+    position: 'absolute',
+    right: 40,
+    bottom: -30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: COLORS.secondary,
+    opacity: 0.4,
+  },
+  bannerLeft: {
+    flex: 1,
+    zIndex: 2,
+  },
+  tagWrap: {
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: SIZES.r12,
+    marginBottom: 8,
+  },
+  tagText: {
+    ...FONTS.badge,
+    fontSize: 9,
+    color: COLORS.brown,
+    letterSpacing: 0.5,
+  },
+  bannerTitle: {
+    ...FONTS.titleXl,
+    fontSize: 18,
+    color: COLORS.brown,
+    marginBottom: 4,
+  },
+  bannerSub: {
+    ...FONTS.bodyRegular,
+    fontSize: 12.5,
+    color: COLORS.textSecondary,
+    lineHeight: 17,
+    marginBottom: 14,
+    paddingRight: 10,
+  },
+  helpBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.brown,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: SIZES.r20,
+  },
+  helpBtnText: {
+    ...FONTS.button,
+    fontSize: 12,
+    color: COLORS.surface,
+  },
+  bannerRight: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingLeft: 8,
+    zIndex: 2,
+  },
+  pawCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.sm,
+  },
+
+  // Category Pills
+  catScroll: {
+    paddingHorizontal: 20,
+    gap: 8,
+    marginBottom: 16,
+  },
+  catPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: SIZES.r20,
+    borderWidth: 1,
+  },
+  catPillActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  catPillInactive: {
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
+  },
+  catPillText: {
+    ...FONTS.subheading,
+    fontSize: 13,
+  },
+  catPillTextActive: {
+    color: COLORS.surface,
+  },
+  catPillTextInactive: {
+    color: COLORS.brown,
+  },
+
+  // Segment Tabs
+  segmentContainer: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: SIZES.r24 + 1,
+    marginHorizontal: 20,
+    padding: 3,
+    marginBottom: 18,
+  },
+  segBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: SIZES.r20,
+  },
+  segBtnActive: {
+    backgroundColor: COLORS.secondaryLight,
+  },
+  segText: {
+    ...FONTS.bodyMedium,
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  segTextActive: {
+    ...FONTS.subheading,
+    color: COLORS.brown,
+  },
+
+  // Section Header
   sectionHeader: {
-    paddingHorizontal: SIZES.md16,
-    marginBottom: SIZES.md16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 14,
   },
-  feed:  { paddingHorizontal: SIZES.md16 },
-  empty: { marginHorizontal: SIZES.md16 },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sectionTitle: {
+    ...FONTS.titleXl,
+    fontSize: 20,
+    color: COLORS.brown,
+  },
+  countBadge: {
+    backgroundColor: COLORS.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: SIZES.r12,
+  },
+  countBadgeText: {
+    ...FONTS.badge,
+    fontSize: 12,
+    color: COLORS.primaryDarkest,
+  },
+  seeAllText: {
+    ...FONTS.button,
+    fontSize: 13,
+    color: COLORS.primaryDarkest,
+  },
+
+  // Cards Feed
+  cardsFeed: {
+    paddingHorizontal: 20,
+  },
 });
+

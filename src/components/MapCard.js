@@ -26,20 +26,20 @@ export default function MapCard({ location, title, style }) {
   const region = {
     latitude:        location.latitude,
     longitude:       location.longitude,
-    latitudeDelta:   0.008,
-    longitudeDelta:  0.008,
+    latitudeDelta:   0.015,
+    longitudeDelta:  0.015,
   };
 
   const fullRegion = {
     ...region,
-    latitudeDelta:  0.04,
-    longitudeDelta: 0.04,
+    latitudeDelta:  0.045,
+    longitudeDelta: 0.045,
   };
 
   // Web fallback using OpenStreetMap iframe embed (since react-native-maps renders a black box on Web)
   if (Platform.OS === 'web') {
-    const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${location.longitude - 0.008}%2C${location.latitude - 0.008}%2C${location.longitude + 0.008}%2C${location.latitude + 0.008}&layer=mapnik&marker=${location.latitude}%2C${location.longitude}`;
-    const fullMapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${location.longitude - 0.03}%2C${location.latitude - 0.03}%2C${location.longitude + 0.03}%2C${location.latitude + 0.03}&layer=mapnik&marker=${location.latitude}%2C${location.longitude}`;
+    const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${location.longitude - 0.015}%2C${location.latitude - 0.015}%2C${location.longitude + 0.015}%2C${location.latitude + 0.015}&layer=mapnik&marker=${location.latitude}%2C${location.longitude}`;
+    const fullMapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${location.longitude - 0.045}%2C${location.latitude - 0.045}%2C${location.longitude + 0.045}%2C${location.latitude + 0.045}&layer=mapnik&marker=${location.latitude}%2C${location.longitude}`;
 
     return (
       <>

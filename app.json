@@ -2,6 +2,7 @@
   "expo": {
     "name": "ALAGA",
     "slug": "alaga-app",
+    "scheme": "alaga",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -9,7 +10,9 @@
     "splash": {
       "backgroundColor": "#E8622A"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.alaga.app",
@@ -46,7 +49,8 @@
         {
           "locationWhenInUsePermission": "ALAGA uses your location to tag the rescue location."
         }
-      ]
+      ],
+      "expo-web-browser"
     ]
   }
 }

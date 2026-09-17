@@ -39,5 +39,5 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.r999,
     alignSelf: 'flex-start',
   },
-  text: { fontSize: SIZES.xs, fontWeight: '700', letterSpacing: 0.3 },
+  text: { fontSize: SIZES.xs, fontWeight: '700', letterSpacing: 0.3, fontFamily: 'PlusJakartaSans_700Bold' },
 });

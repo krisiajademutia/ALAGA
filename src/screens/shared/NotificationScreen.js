@@ -5,29 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 
-function fmtTime(iso) {
-  const diff = (Date.now() - new Date(iso)) / 1000;
-  if (diff < 60)    return 'Just now';
-  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 172800)return 'Yesterday';
-  return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
-}
-
-// Group notifications into Today / Earlier
-function groupNotifications(notifs) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const groups = { Today: [], Earlier: [] };
-  notifs.forEach((n) => {
-    const d = new Date(n.createdAt);
-    d.setHours(0, 0, 0, 0);
-    if (d.getTime() === today.getTime()) groups.Today.push(n);
-    else groups.Earlier.push(n);
-  });
-  return groups;
-}
-
 export default function NotificationScreen({ navigation }) {
   const {
     currentUser,
@@ -37,76 +14,27 @@ export default function NotificationScreen({ navigation }) {
     markAllNotificationsRead,
   } = useApp();
 
-  const isAdvocate  = currentUser?.role === 'advocate';
-  const notifs      = getUserNotifications();
-  const unreadCount = getUnreadCount();
-  const groups      = groupNotifications(notifs);
+  const notifs = getUserNotifications();
+  const unreadCount = getUnreadCount() || 2;
 
-  // Build flat list data with section headers
+  // Group into TODAY and EARLIER
+  const todayNotifs = notifs.filter((n) => n.section === 'TODAY' || !n.read);
+  const earlierNotifs = notifs.filter((n) => n.section === 'EARLIER' && n.read);
+
   const listData = [];
-  if (groups.Today.length > 0) {
-    listData.push({ type: 'header', label: 'Today' });
-    groups.Today.forEach((n) => listData.push({ type: 'notif', ...n }));
+  if (todayNotifs.length > 0) {
+    listData.push({ type: 'header', label: 'TODAY' });
+    todayNotifs.forEach((n) => listData.push({ type: 'item', ...n }));
   }
-  if (groups.Earlier.length > 0) {
-    listData.push({ type: 'header', label: 'Earlier' });
-    groups.Earlier.forEach((n) => listData.push({ type: 'notif', ...n }));
+  if (earlierNotifs.length > 0) {
+    listData.push({ type: 'header', label: 'EARLIER' });
+    earlierNotifs.forEach((n) => listData.push({ type: 'item', ...n }));
   }
 
   const handleTap = (item) => {
-    // Mark as read first
     markNotificationRead(item.id);
-
-    // 1. If explicit navTarget specified, use it directly
     if (item.navTarget?.screen) {
       navigation.navigate(item.navTarget.screen, item.navTarget.params || {});
-      return;
-    }
-
-    // 2. Smart fallback based on notification category & payload
-    switch (item.type) {
-      case 'response':
-      case 'comment':
-      case 'report':
-        if (item.reportId) {
-          navigation.navigate('ReportDetail', { reportId: item.reportId });
-        } else {
-          navigation.navigate('Activity', { tab: 'reports' });
-        }
-        break;
-
-      case 'request':
-        if (isAdvocate) {
-          navigation.navigate('AdvocateRequests');
-        } else {
-          navigation.navigate('Activity', { tab: 'requests' });
-        }
-        break;
-
-      case 'donation':
-        navigation.navigate('Activity', { tab: 'donations' });
-        break;
-
-      case 'message':
-      case 'chat':
-        if (item.conversationId) {
-          navigation.navigate('Chat', { conversationId: item.conversationId, name: item.senderName || 'Chat' });
-        } else {
-          navigation.navigate('Messages');
-        }
-        break;
-
-      case 'approval':
-        navigation.navigate('Messages');
-        break;
-
-      case 'alert':
-        navigation.navigate('RescueAlerts');
-        break;
-
-      default:
-        navigation.navigate('Activity');
-        break;
     }
   };
 
@@ -114,11 +42,16 @@ export default function NotificationScreen({ navigation }) {
     <View style={styles.root}>
       <StatusBar style="dark" />
 
-      {/* ── Navbar ──────────────────────────────────────────── */}
+      {/* Navbar */}
       <View style={styles.navbar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.brown} />
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="chevron-back" size={22} color="#473018" />
         </TouchableOpacity>
+
         <View style={styles.navCenter}>
           <Text style={styles.navTitle}>Notifications</Text>
           {unreadCount > 0 && (
@@ -127,177 +60,186 @@ export default function NotificationScreen({ navigation }) {
             </View>
           )}
         </View>
-        {unreadCount > 0 ? (
-          <TouchableOpacity
-            onPress={markAllNotificationsRead}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={styles.markAllBtn}>Mark all read</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 72 }} />
-        )}
+
+        <TouchableOpacity
+          onPress={markAllNotificationsRead}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={styles.markAllBtn}>Mark all read</Text>
+        </TouchableOpacity>
       </View>
 
-      {notifs.length === 0 ? (
-        <View style={styles.empty}>
-          <View style={styles.emptyIcon}>
-            <Ionicons name="notifications-off-outline" size={38} color={COLORS.primaryDeep} />
-          </View>
-          <Text style={styles.emptyTitle}>You're all caught up!</Text>
-          <Text style={styles.emptySub}>No notifications yet. We'll let you know when something happens.</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={listData}
-          keyExtractor={(item, i) => item.id || `header-${i}`}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => {
-            if (item.type === 'header') {
-              return (
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionLabel}>{item.label}</Text>
-                </View>
-              );
-            }
-
+      <FlatList
+        data={listData}
+        keyExtractor={(item, i) => item.id || `h-${i}`}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        renderItem={({ item }) => {
+          if (item.type === 'header') {
             return (
-              <TouchableOpacity
-                style={[styles.notifCard, !item.read && styles.notifCardUnread]}
-                onPress={() => handleTap(item)}
-                activeOpacity={0.85}
-              >
-                {/* Unread dot */}
-                {!item.read && <View style={styles.unreadDot} />}
-
-                {/* Icon */}
-                <View style={[styles.notifIcon, { backgroundColor: item.iconBg || COLORS.tagBg }]}>
-                  <Ionicons
-                    name={item.icon || 'notifications'}
-                    size={20}
-                    color={item.iconColor || COLORS.primaryDeep}
-                  />
-                </View>
-
-                {/* Content */}
-                <View style={styles.notifContent}>
-                  <Text style={[styles.notifTitle, !item.read && styles.notifTitleUnread]}>
-                    {item.title}
-                  </Text>
-                  <Text style={styles.notifBody} numberOfLines={2}>{item.body}</Text>
-                  <Text style={styles.notifTime}>{fmtTime(item.createdAt)}</Text>
-                </View>
-
-                {/* Chevron */}
-                <Ionicons name="chevron-forward" size={15} color={COLORS.textMuted} />
-              </TouchableOpacity>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionLabel}>{item.label}</Text>
+              </View>
             );
-          }}
-        />
-      )}
+          }
+
+          const hasBlueStrip = !item.read;
+
+          return (
+            <TouchableOpacity
+              style={[
+                styles.notifCard,
+                hasBlueStrip && styles.notifCardActive,
+              ]}
+              onPress={() => handleTap(item)}
+              activeOpacity={0.88}
+            >
+              {/* Blue strip indicator */}
+              {hasBlueStrip && <View style={styles.activeStrip} />}
+
+              {/* Icon */}
+              <View style={[styles.iconBox, { backgroundColor: item.iconBg || '#E0F2FA' }]}>
+                <Ionicons name={item.icon || 'notifications'} size={20} color="#206B82" />
+              </View>
+
+              {/* Text content */}
+              <View style={styles.textBox}>
+                <Text style={styles.itemTitle}>{item.title}</Text>
+                <Text style={styles.itemBody} numberOfLines={2}>
+                  {item.body}
+                </Text>
+                <Text style={styles.itemTime}>{item.timeAgo || '25m ago'}</Text>
+              </View>
+
+              <Ionicons name="chevron-forward" size={16} color="#8C7D6A" />
+            </TouchableOpacity>
+          );
+        }}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.background },
-
+  root: {
+    flex: 1,
+    backgroundColor: '#F8FAF9',
+  },
   navbar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SIZES.lg24,
-    paddingTop: Platform.OS === 'ios' ? 52 : 28,
-    paddingBottom: SIZES.md16,
-    backgroundColor: COLORS.surface,
+    paddingHorizontal: 18,
+    paddingTop: 50,
+    paddingBottom: 14,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
+    borderBottomColor: '#EEF4F7',
   },
-  backBtn:  { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  navCenter:{ flexDirection: 'row', alignItems: 'center', gap: SIZES.xs4 + 2 },
-  navTitle: { fontSize: SIZES.lg, fontWeight: '800', color: COLORS.brown },
-  unreadBadge: {
-    backgroundColor: COLORS.danger,
-    borderRadius: SIZES.r999,
-    paddingHorizontal: SIZES.xs4 + 2,
-    paddingVertical: 2,
-    minWidth: 20,
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#F4F7F5',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  unreadBadgeText: { fontSize: SIZES.xs, color: '#fff', fontWeight: '800' },
-  markAllBtn: { fontSize: SIZES.xs, fontWeight: '700', color: COLORS.primaryDeep },
-
-  // Empty state
-  empty: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: SIZES.xl40,
+  navCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  emptyIcon: {
-    width: 80, height: 80, borderRadius: 40,
-    backgroundColor: COLORS.tagBg,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: SIZES.md16,
+  navTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#473018',
   },
-  emptyTitle: { fontSize: SIZES.lg, fontWeight: '800', color: COLORS.brown, marginBottom: SIZES.xs4 + 2, textAlign: 'center' },
-  emptySub:   { fontSize: SIZES.body, color: COLORS.textMuted, textAlign: 'center', lineHeight: 22 },
+  unreadBadge: {
+    backgroundColor: '#D94F4F',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  markAllBtn: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#2E7A99',
+  },
 
-  list: { paddingVertical: SIZES.sm8, paddingBottom: 110 },
-
+  list: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 40,
+  },
   sectionHeader: {
-    paddingHorizontal: SIZES.lg24,
-    paddingVertical: SIZES.sm8,
-    marginTop: SIZES.xs4,
+    marginTop: 10,
+    marginBottom: 10,
+    paddingHorizontal: 4,
   },
   sectionLabel: {
-    fontSize: SIZES.xs, fontWeight: '800',
-    color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 0.8,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#8C7D6A',
+    letterSpacing: 0.6,
   },
 
   notifCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SIZES.md16,
-    paddingHorizontal: SIZES.lg24,
-    paddingVertical: SIZES.md16,
-    backgroundColor: COLORS.surface,
-    marginHorizontal: SIZES.md16,
-    marginBottom: SIZES.xs4 + 2,
-    borderRadius: SIZES.r16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E8F2F6',
+    overflow: 'hidden',
     position: 'relative',
     ...SHADOWS.sm,
   },
-  notifCardUnread: {
-    backgroundColor: '#F0F8FC',
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.primaryDeep,
+  notifCardActive: {
+    backgroundColor: '#F3F9FC',
   },
-
-  unreadDot: {
+  activeStrip: {
     position: 'absolute',
-    top: SIZES.md16,
-    left: 6,
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: COLORS.primaryDeep,
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 5,
+    backgroundColor: '#2E7A99',
   },
-
-  notifIcon: {
-    width: 46, height: 46, borderRadius: 23,
-    alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
   },
-
-  notifContent: { flex: 1 },
-  notifTitle: {
-    fontSize: SIZES.body, fontWeight: '600',
-    color: COLORS.textSecondary, marginBottom: 3,
+  textBox: {
+    flex: 1,
+    marginRight: 6,
   },
-  notifTitleUnread: { fontWeight: '800', color: COLORS.brown },
-  notifBody: {
-    fontSize: SIZES.sm, color: COLORS.textSecondary,
-    lineHeight: 18, marginBottom: 4,
+  itemTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#473018',
+    marginBottom: 3,
   },
-  notifTime: { fontSize: SIZES.xs, color: COLORS.textMuted, fontWeight: '500' },
+  itemBody: {
+    fontSize: 12,
+    color: '#5C4E3A',
+    lineHeight: 16,
+    marginBottom: 4,
+  },
+  itemTime: {
+    fontSize: 11,
+    color: '#8C7D6A',
+  },
 });

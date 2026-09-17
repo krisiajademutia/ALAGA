@@ -1,69 +1,167 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
-  MOCK_USERS,
-  MOCK_RESCUE_REPORTS,
-  MOCK_ANIMALS,
-  MOCK_REQUESTS,
-  MOCK_CONVERSATIONS,
-  MOCK_DONATIONS,
-  MOCK_NOTIFICATIONS,
-} from '../data/mockData';
+  loginWithFirebase,
+  registerWithFirebase,
+  logoutFromFirebase,
+  updateUserProfile,
+  loginWithGoogleCredential,
+  loginWithGoogleProfile,
+} from '../services/authService';
+import {
+  subscribeToRescueReports,
+  createRescueReportFirebase,
+  claimRescueReportFirebase,
+  markReportRescuedFirebase,
+  addRescueCommentFirebase,
+} from '../services/rescueService';
+import {
+  subscribeToAnimals,
+  addAnimalFirebase,
+  updateAnimalFirebase,
+  subscribeToApplications,
+  submitApplicationFirebase,
+} from '../services/animalService';
+import { isMockFirebase } from '../config/firebaseConfig';
 
-const AppContext = createContext(null);
+const defaultContext = {
+  currentUser: null,
+  users: [],
+  rescueReports: [],
+  animals: [],
+  requests: [],
+  conversations: [],
+  donations: [],
+  notifications: [],
+  login: () => ({ success: false }),
+  register: () => ({ success: false }),
+  loginWithGoogle: () => ({ success: false }),
+  logout: () => {},
+  updateUser: () => {},
+  addRescueReport: () => {},
+  respondToReport: () => {},
+  markRescued: () => {},
+  addComment: () => {},
+  addAnimal: () => {},
+  updateAnimal: () => {},
+  returnAnimalToListings: () => {},
+  markAnimalAdopted: () => {},
+  submitRequest: () => {},
+  updateRequestStatus: () => {},
+  sendMessage: () => {},
+  startConversation: () => '',
+  submitDonation: () => {},
+  getUserConversations: () => [],
+  getUserReports: () => [],
+  getAdvocateResponses: () => [],
+  getUserRequests: () => [],
+  getAdvocateRequests: () => [],
+  getAdvocateAnimals: () => [],
+  getAnimalsByAdvocate: () => [],
+  getUserDonations: () => [],
+  getUserNotifications: () => [],
+  getUnreadCount: () => 0,
+  markNotificationRead: () => {},
+  markAllNotificationsRead: () => {},
+  pushNotification: () => {},
+  getAdvocateRescuedCases: () => [],
+};
+
+const AppContext = createContext(defaultContext);
 
 export function AppProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
-  const [users, setUsers] = useState(MOCK_USERS);
-  const [rescueReports, setRescueReports] = useState(MOCK_RESCUE_REPORTS);
-  const [animals, setAnimals] = useState(MOCK_ANIMALS);
-  const [requests, setRequests] = useState(MOCK_REQUESTS);
-  const [conversations, setConversations] = useState(MOCK_CONVERSATIONS);
-  const [donations, setDonations] = useState(MOCK_DONATIONS);
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const [users, setUsers] = useState([]);
+  const [rescueReports, setRescueReports] = useState([]);
+  const [animals, setAnimals] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [conversations, setConversations] = useState([]);
+  const [donations, setDonations] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+
+  // ── Firebase Real-Time Synchronization ─────────────────────────────────────
+  useEffect(() => {
+    if (!isMockFirebase()) {
+      const unsubRescues = subscribeToRescueReports((liveReports) => {
+        setRescueReports(liveReports || []);
+      });
+
+      const unsubAnimals = subscribeToAnimals((liveAnimals) => {
+        setAnimals(liveAnimals || []);
+      });
+
+      const unsubApps = subscribeToApplications((liveApps) => {
+        setRequests(liveApps || []);
+      });
+
+      return () => {
+        unsubRescues();
+        unsubAnimals();
+        unsubApps();
+      };
+    }
+  }, []);
 
   // ── Auth ──────────────────────────────────────────────────────────────────
-  const login = (email, password) => {
-    const user = users.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-    if (user) {
-      setCurrentUser(user);
-      return { success: true, user };
+  const login = async (email, password) => {
+    const fbResult = await loginWithFirebase(email, password);
+    if (fbResult.success) {
+      setCurrentUser(fbResult.user);
+      return { success: true, user: fbResult.user };
     }
-    return { success: false, error: 'Invalid email or password.' };
+    return { success: false, error: fbResult.error || 'Invalid email or password.' };
   };
 
-  const register = (data) => {
-    const exists = users.find((u) => u.email.toLowerCase() === data.email.toLowerCase());
-    if (exists) return { success: false, error: 'Email already registered.' };
-    const newUser = {
-      id: `u${Date.now()}`,
-      ...data,
-      avatar: null,
-      joinedAt: new Date().toISOString().split('T')[0],
-      ...(data.role === 'advocate' ? { rescueCount: 0 } : {}),
-    };
-    setUsers((prev) => [...prev, newUser]);
-    setCurrentUser(newUser);
-    return { success: true, user: newUser };
+  const register = async (data) => {
+    const fbResult = await registerWithFirebase(data);
+    if (fbResult.success) {
+      setCurrentUser(fbResult.user);
+      setUsers((prev) => [...prev, fbResult.user]);
+      return { success: true, user: fbResult.user };
+    }
+    return { success: false, error: fbResult.error || 'Registration failed.' };
   };
 
-  const logout = () => setCurrentUser(null);
+  const loginWithGoogle = async (googleData) => {
+    let result;
+    if (typeof googleData === 'string') {
+      result = await loginWithGoogleCredential(googleData);
+    } else {
+      result = await loginWithGoogleProfile(googleData);
+    }
+
+    if (result.success) {
+      setCurrentUser(result.user);
+      setUsers((prev) => {
+        const exists = prev.some((u) => u.id === result.user.id);
+        return exists ? prev : [...prev, result.user];
+      });
+      return { success: true, user: result.user };
+    }
+    return { success: false, error: result.error || 'Google login failed' };
+  };
+
+  const logout = () => {
+    logoutFromFirebase();
+    setCurrentUser(null);
+  };
 
   // ── Update current user profile ───────────────────────────────────────────
   const updateUser = (updates) => {
     setUsers((prev) =>
-      prev.map((u) => (u.id === currentUser.id ? { ...u, ...updates } : u))
+      prev.map((u) => (u.id === currentUser?.id ? { ...u, ...updates } : u))
     );
     setCurrentUser((prev) => ({ ...prev, ...updates }));
+    if (currentUser?.id) {
+      updateUserProfile(currentUser.id, updates);
+    }
   };
 
   // ── Rescue Reports ────────────────────────────────────────────────────────
   const addRescueReport = (reportData) => {
     const newReport = {
       id: `r${Date.now()}`,
-      reporterId: currentUser.id,
-      reporterName: currentUser.name,
+      reporterId: currentUser?.id || 'u_anon',
+      reporterName: currentUser?.name || 'Community Member',
       status: 'Open',
       createdAt: new Date().toISOString(),
       responderId: null,
@@ -71,6 +169,7 @@ export function AppProvider({ children }) {
       ...reportData,
     };
     setRescueReports((prev) => [newReport, ...prev]);
+    createRescueReportFirebase(newReport);
     return newReport;
   };
 
@@ -78,10 +177,16 @@ export function AppProvider({ children }) {
     setRescueReports((prev) =>
       prev.map((r) =>
         r.id === reportId
-          ? { ...r, status: 'Responded', responderId: currentUser.id }
+          ? {
+              ...r,
+              status: 'Responded',
+              responderId: currentUser?.id,
+              responderName: currentUser?.name,
+            }
           : r
       )
     );
+    claimRescueReportFirebase(reportId, currentUser?.id, currentUser?.name);
   };
 
   const markRescued = (reportId) => {
@@ -90,13 +195,14 @@ export function AppProvider({ children }) {
         r.id === reportId ? { ...r, status: 'Rescued' } : r
       )
     );
+    markReportRescuedFirebase(reportId);
   };
 
   const addComment = (reportId, text, parentCommentId = null) => {
     const newComment = {
       id: `c${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-      userId: currentUser.id,
-      userName: currentUser.name,
+      userId: currentUser?.id || 'u_anon',
+      userName: currentUser?.name || 'Community Member',
       text,
       createdAt: new Date().toISOString(),
       replies: [],
@@ -120,20 +226,22 @@ export function AppProvider({ children }) {
         return { ...r, comments: appendReply(r.comments) };
       })
     );
+    addRescueCommentFirebase(reportId, newComment);
   };
 
   // ── Animal Profiles ───────────────────────────────────────────────────────
   const addAnimal = (animalData) => {
     const newAnimal = {
       id: `a${Date.now()}`,
-      advocateId: currentUser.id,
-      advocateName: currentUser.name,
+      advocateId: currentUser?.id || 'u2',
+      advocateName: currentUser?.name || 'Elena Ramos',
       createdAt: new Date().toISOString(),
       fosterId: null,
       fosterName: null,
       ...animalData,
     };
     setAnimals((prev) => [newAnimal, ...prev]);
+    addAnimalFirebase(newAnimal);
     return newAnimal;
   };
 
@@ -141,6 +249,7 @@ export function AppProvider({ children }) {
     setAnimals((prev) =>
       prev.map((a) => (a.id === animalId ? { ...a, ...updates } : a))
     );
+    updateAnimalFirebase(animalId, updates);
   };
 
   // Return a fostered animal back to available listings
@@ -152,6 +261,7 @@ export function AppProvider({ children }) {
           : a
       )
     );
+    updateAnimalFirebase(animalId, { status: 'Available', fosterId: null, fosterName: null });
   };
 
   // Permanently mark an animal as adopted
@@ -163,19 +273,21 @@ export function AppProvider({ children }) {
           : a
       )
     );
+    updateAnimalFirebase(animalId, { status: 'Adopted', fosterId: null, fosterName: null });
   };
 
   // ── Adoption / Foster Requests ────────────────────────────────────────────
   const submitRequest = (requestData) => {
     const newRequest = {
       id: `req${Date.now()}`,
-      requesterId: currentUser.id,
-      requesterName: currentUser.name,
+      requesterId: currentUser?.id || 'u1',
+      requesterName: currentUser?.name || 'Community Member',
       status: 'Pending',
       createdAt: new Date().toISOString(),
       ...requestData,
     };
     setRequests((prev) => [newRequest, ...prev]);
+    submitApplicationFirebase(newRequest);
     return newRequest;
   };
 
@@ -328,7 +440,7 @@ export function AppProvider({ children }) {
   const getAdvocateRescuedCases = () =>
     rescueReports.filter((r) => 
       r.responderId === currentUser?.id && r.status === 'Rescued'
-    ).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    ).sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 
   return (
     <AppContext.Provider
@@ -345,6 +457,7 @@ export function AppProvider({ children }) {
         // auth
         login,
         register,
+        loginWithGoogle,
         logout,
         updateUser,
         // rescue
@@ -391,6 +504,5 @@ export function AppProvider({ children }) {
 
 export const useApp = () => {
   const ctx = useContext(AppContext);
-  if (!ctx) throw new Error('useApp must be used inside AppProvider');
-  return ctx;
+  return ctx || defaultContext;
 };

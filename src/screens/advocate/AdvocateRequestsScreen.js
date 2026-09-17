@@ -21,7 +21,7 @@ export default function AdvocateRequestsScreen({ navigation }) {
   const handleApprove = (req) => {
     const isAdoption = req.type === 'Adoption';
     Alert.alert(
-      isAdoption ? '🏠 Approve Adoption' : '💛 Approve Foster',
+      isAdoption ? 'Approve Adoption' : 'Approve Foster',
       isAdoption
         ? `Approve ${req.requesterName} to permanently adopt ${req.animalName}? This will mark ${req.animalName} as Adopted.`
         : `Approve ${req.requesterName} to foster ${req.animalName}? This will mark ${req.animalName} as Being Fostered.\n\nCommit duration: ${req.commitDuration || 'Not specified'}`,
@@ -32,8 +32,8 @@ export default function AdvocateRequestsScreen({ navigation }) {
           onPress: () => {
             updateRequestStatus(req.id, 'Approved');
             const msg = isAdoption
-              ? `Hi ${req.requesterName}! Your adoption request for ${req.animalName} has been approved! Welcome to the family! 🏠`
-              : `Hi ${req.requesterName}! Your foster request for ${req.animalName} has been approved! Let's discuss the handover. 💛`;
+              ? `Hi ${req.requesterName}! Your adoption request for ${req.animalName} has been approved! Welcome to the family!`
+              : `Hi ${req.requesterName}! Your foster request for ${req.animalName} has been approved! Let's coordinate the handover.`;
             const convId = startConversation(req.requesterId, req.requesterName, msg);
             Alert.alert(
               'Request Approved!',

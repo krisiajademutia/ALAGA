@@ -1,114 +1,100 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  Image,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Dimensions,
+  ScrollView,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
-import Button from '../../components/Button';
-import Input from '../../components/Input';
 import { useApp } from '../../context/AppContext';
-import { ANIMAL_SPECIES, ANIMAL_CONDITIONS, URGENCY_LEVELS } from '../../data/mockData';
+import { COLORS, SHADOWS } from '../../constants/theme';
+import { uploadImageToImgBB } from '../../services/storageService';
+
+const CONDITIONS = [
+  { id: 'injured', label: 'Injured (Urgent)' },
+  { id: 'litter', label: 'Stray Litter' },
+  { id: 'malnourished', label: 'Malnourished' },
+];
 
 export default function ReportRescueScreen({ navigation }) {
   const { addRescueReport } = useApp();
 
-  const [animalType, setAnimalType] = useState('');
-  const [otherAnimalType, setOtherAnimalType] = useState('');
-  const [condition, setCondition] = useState('');
-  const [otherCondition, setOtherCondition] = useState('');
-  const [urgency, setUrgency] = useState('');
-  const [description, setDescription] = useState('');
-  const [address, setAddress] = useState('');
-  const [landmark, setLandmark] = useState('');
-  const [contact, setContact] = useState('');
-  const [isContained, setIsContained] = useState('');
-  
+  const [selectedCondition, setSelectedCondition] = useState('injured');
   const [photo, setPhoto] = useState(null);
+  const [locationDesc, setLocationDesc] = useState('');
   const [loading, setLoading] = useState(false);
-  const [loadingLoc, setLoadingLoc] = useState(false);
-  const [errors, setErrors] = useState({});
 
   const pickPhoto = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Allow photo access to attach an image.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.7,
-    });
-    if (!result.canceled) setPhoto(result.assets[0].uri);
-  };
-
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Allow camera access to take a photo.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.7,
-    });
-    if (!result.canceled) setPhoto(result.assets[0].uri);
-  };
-
-  const validate = () => {
-    const e = {};
-    if (!animalType) e.animalType = 'Select the animal type.';
-    else if (animalType === 'Other' && !otherAnimalType.trim()) e.animalType = 'Please specify the animal type.';
-    
-    if (!condition) e.condition = 'Select the condition.';
-    else if (condition === 'Other' && !otherCondition.trim()) e.condition = 'Please specify the condition.';
-    
-    if (!urgency) e.urgency = 'Select urgency level.';
-    if (!isContained) e.isContained = 'Select if contained.';
-    if (!description.trim()) e.description = 'Describe the situation.';
-    if (!address.trim()) e.address = 'Enter the location.';
-    if (!contact.trim()) e.contact = 'Contact number is required.';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const fetchLocation = async () => {
-    setLoadingLoc(true);
-    setAddress('Fetching GPS coordinates...');
-    setTimeout(() => {
-      setAddress('123 Mango Avenue, Cebu City, Philippines');
-      setLoadingLoc(false);
-    }, 1500);
-  };
-
-  const handleSubmit = () => {
-    if (!validate()) return;
-    setLoading(true);
-    setTimeout(() => {
-      addRescueReport({
-        animalType: animalType === 'Other' ? otherAnimalType.trim() : animalType,
-        condition: condition === 'Other' ? otherCondition.trim() : condition,
-        urgency,
-        description: description.trim(),
-        contact: contact.trim(),
-        isContained,
-        photo,
-        location: {
-          latitude: 10.3157 + (Math.random() - 0.5) * 0.05,
-          longitude: 123.8854 + (Math.random() - 0.5) * 0.05,
-          address: address.trim(),
-          landmark: landmark.trim(),
+    Alert.alert('Upload Photo', 'Choose photo source:', [
+      {
+        text: 'Camera',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert('Permission needed', 'Camera access is required.');
+            return;
+          }
+          const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+          if (!result.canceled) setPhoto(result.assets[0].uri);
         },
-      });
-      setLoading(false);
-      Alert.alert(
-        'Report Submitted!',
-        'Your rescue report has been posted. Animal Advocates in the area will be notified.',
-        [{ text: 'View Reports', onPress: () => navigation.navigate('AllReports') }]
-      );
-    }, 1000);
+      },
+      {
+        text: 'Gallery',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert('Permission needed', 'Gallery access is required.');
+            return;
+          }
+          const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7 });
+          if (!result.canceled) setPhoto(result.assets[0].uri);
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const handleSubmit = async () => {
+    if (!locationDesc.trim()) {
+      Alert.alert('Location required', 'Please describe the exact location.');
+      return;
+    }
+
+    setLoading(true);
+    let finalPhoto = photo;
+    if (photo && !photo.startsWith('http')) {
+      finalPhoto = await uploadImageToImgBB(photo);
+    }
+
+    addRescueReport({
+      title: selectedCondition === 'injured' ? 'Injured Pup' : 'Stray Animal',
+      animalType: 'Dog',
+      condition: selectedCondition === 'injured' ? 'Injured' : 'Stray',
+      urgency: selectedCondition === 'injured' ? 'High' : 'Medium',
+      description: locationDesc.trim(),
+      photo: finalPhoto || 'https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=600&q=80',
+      location: {
+        latitude: 14.5764,
+        longitude: 121.0851,
+        address: 'Pasig Blvd, near Rotonda',
+        landmark: locationDesc.trim(),
+      },
+    });
+    setLoading(false);
+    Alert.alert(
+      'Rescue Dispatch Submitted',
+      'Immediately alerted registered foster volunteers in the area.',
+      [{ text: 'View Alerts', onPress: () => navigation.goBack() }]
+    );
   };
 
   return (
@@ -118,262 +104,513 @@ export default function ReportRescueScreen({ navigation }) {
     >
       <StatusBar style="dark" />
 
-      {/* Navbar */}
-      <View style={styles.navbar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>Report an Animal</Text>
-        <View style={{ width: 36 }} />
+      {/* ── Map Canvas Background ─────────────────────────── */}
+      <View style={styles.mapCanvas}>
+        {/* Soft roads and green shapes mockup */}
+        <View style={styles.roadH1} />
+        <View style={styles.roadH2} />
+        <View style={styles.roadV1} />
+        <View style={styles.roadV2} />
+        <View style={styles.roadDiag} />
+        <View style={styles.river} />
+
+        {/* Map Marker 1: Injured Pup (Ortigas) */}
+        <View style={[styles.markerWrap, { top: '35%', left: '30%' }]}>
+          <View style={styles.pinCircleAlert}>
+            <Ionicons name="medical" size={18} color="#D94F4F" />
+          </View>
+          <View style={styles.pinCallout}>
+            <Text style={styles.pinCalloutText}>Injured Pup (Ortigas)</Text>
+          </View>
+        </View>
+
+        {/* Map Marker 2: Bantay Hayop Clinic */}
+        <View style={[styles.markerWrap, { top: '44%', right: '12%' }]}>
+          <View style={styles.pinCircleClinic}>
+            <Ionicons name="business" size={18} color="#2E7A99" />
+          </View>
+          <View style={styles.pinCallout}>
+            <Text style={styles.pinCalloutText}>Bantay Hayop Clinic</Text>
+          </View>
+        </View>
+
+        {/* Map Marker 3: Stray Cat Colony */}
+        <View style={[styles.markerWrap, { top: '54%', left: '22%' }]}>
+          <View style={styles.pinCircleCat}>
+            <Ionicons name="paw" size={16} color="#B45309" />
+          </View>
+          <View style={styles.pinCallout}>
+            <Text style={styles.pinCalloutText}>Stray Cat Colony</Text>
+          </View>
+        </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Photo section */}
-        <Text style={styles.sectionLabel}>PHOTO {errors.photo && <Text style={styles.errInline}> · {errors.photo}</Text>}</Text>
-        <View style={styles.photoRow}>
-          {photo ? (
-            <View style={styles.photoPreviewWrap}>
-              <Image source={{ uri: photo }} style={styles.photoPreview} />
-              <TouchableOpacity style={styles.removePhoto} onPress={() => setPhoto(null)}>
-                <Ionicons name="close-circle" size={28} color={COLORS.danger} />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.photoPlaceholder}>
-              <View style={styles.photoBtnRow}>
-                <TouchableOpacity style={styles.photoCircleBtn} onPress={takePhoto}>
-                  <Ionicons name="camera" size={24} color={COLORS.primaryDeep} />
-                  <Text style={styles.photoCircleText}>Camera</Text>
-                </TouchableOpacity>
-                <View style={styles.photoDivider} />
-                <TouchableOpacity style={styles.photoCircleBtn} onPress={pickPhoto}>
-                  <Ionicons name="image" size={24} color={COLORS.primaryDeep} />
-                  <Text style={styles.photoCircleText}>Gallery</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
+      {/* ── Top Header Bar ────────────────────────────────── */}
+      <View style={styles.topHeader}>
+        <View style={styles.navRow}>
+          <TouchableOpacity
+            style={styles.backCircle}
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="chevron-back" size={22} color="#473018" />
+          </TouchableOpacity>
+
+          <View style={styles.titleCenter}>
+            <Text style={styles.networkLabel}>ALAGA COMMUNITY</Text>
+            <Text style={styles.dispatchTitle}>Rescue Dispatch & Live Map</Text>
+          </View>
+
+          <View style={styles.liveIndicatorCircle}>
+            <View style={styles.liveDot} />
+          </View>
         </View>
 
-        {/* Animal type */}
-        <Text style={styles.sectionLabel}>ANIMAL TYPE {errors.animalType && <Text style={styles.errInline}> · {errors.animalType}</Text>}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScrollRow}>
-          {ANIMAL_SPECIES.map((s) => (
-            <TouchableOpacity
-              key={s}
-              style={[styles.chip, animalType === s && styles.chipActive]}
-              onPress={() => {
-                setAnimalType((prev) => prev === s ? '' : s);
-                setErrors((e) => ({ ...e, animalType: null }));
-              }}
-            >
-              <Text style={[styles.chipText, animalType === s && styles.chipTextActive]}>{s}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        {animalType === 'Other' && (
-          <Input
-            placeholder="Please specify animal type..."
-            value={otherAnimalType}
-            onChangeText={(t) => { setOtherAnimalType(t); setErrors((e) => ({ ...e, animalType: null })); }}
-            autoCapitalize="words"
-            style={{ marginBottom: SIZES.paddingM }}
-          />
-        )}
-
-        {/* Condition */}
-        <Text style={styles.sectionLabel}>CONDITION {errors.condition && <Text style={styles.errInline}> · {errors.condition}</Text>}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScrollRow}>
-          {ANIMAL_CONDITIONS.map((c) => (
-            <TouchableOpacity
-              key={c}
-              style={[styles.chip, condition === c && styles.chipActive]}
-              onPress={() => {
-                setCondition((prev) => prev === c ? '' : c);
-                setErrors((e) => ({ ...e, condition: null }));
-              }}
-            >
-              <Text style={[styles.chipText, condition === c && styles.chipTextActive]}>{c}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        {condition === 'Other' && (
-          <Input
-            placeholder="Please specify condition..."
-            value={otherCondition}
-            onChangeText={(t) => { setOtherCondition(t); setErrors((e) => ({ ...e, condition: null })); }}
-            autoCapitalize="words"
-            style={{ marginBottom: SIZES.paddingM }}
-          />
-        )}
-
-        {/* Urgency */}
-        <Text style={styles.sectionLabel}>URGENCY LEVEL {errors.urgency && <Text style={styles.errInline}> · {errors.urgency}</Text>}</Text>
-        <View style={styles.urgencyRow}>
-          {URGENCY_LEVELS.map((u) => (
-            <TouchableOpacity
-              key={u.label}
-              style={[styles.urgencyCard, urgency === u.label && { borderColor: u.color, borderWidth: 2 }]}
-              onPress={() => { setUrgency(u.label); setErrors((e) => ({ ...e, urgency: null })); }}
-            >
-              <View style={[styles.urgencyDot, { backgroundColor: u.color }]} />
-              <Text style={[styles.urgencyText, { color: u.color }]}>{u.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Is Contained */}
-        <Text style={styles.sectionLabel}>IS THE ANIMAL CONTAINED? {errors.isContained && <Text style={styles.errInline}> · {errors.isContained}</Text>}</Text>
-        <View style={styles.binaryRow}>
-          {['Yes, secured', 'No, roaming free'].map((c) => (
-            <TouchableOpacity
-              key={c}
-              style={[styles.binaryBtn, isContained === c && styles.binaryBtnActive]}
-              onPress={() => { setIsContained(c); setErrors((e) => ({ ...e, isContained: null })); }}
-            >
-              <Text style={[styles.binaryBtnText, isContained === c && styles.binaryBtnTextActive]}>{c}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Description */}
-        <Input
-          label="Description"
-          placeholder="Describe the animal's situation, any visible injuries, behavior..."
-          value={description}
-          onChangeText={(t) => { setDescription(t); setErrors((e) => ({ ...e, description: null })); }}
-          multiline
-          numberOfLines={4}
-          autoCapitalize="sentences"
-          error={errors.description}
-        />
-
-        {/* Contact Number */}
-        <Input
-          label="Contact Number"
-          placeholder="e.g. 09123456789"
-          value={contact}
-          onChangeText={(t) => { setContact(t); setErrors((e) => ({ ...e, contact: null })); }}
-          keyboardType="phone-pad"
-          error={errors.contact}
-          icon={<Ionicons name="call-outline" size={18} color={COLORS.textMuted} />}
-        />
-
-        {/* Location Section */}
-        <View style={styles.locationHeader}>
-          <Text style={styles.sectionLabel}>LOCATION / ADDRESS {errors.address && <Text style={styles.errInline}> · {errors.address}</Text>}</Text>
-          <TouchableOpacity style={styles.fetchBtn} onPress={fetchLocation} disabled={loadingLoc}>
-            <Ionicons name="locate" size={16} color={COLORS.primaryDeep} />
-            <Text style={styles.fetchBtnText}>{loadingLoc ? 'Fetching...' : 'Use Current'}</Text>
+        {/* GPS Coordinates Bar */}
+        <View style={styles.gpsBar}>
+          <View style={styles.gpsTargetWrap}>
+            <View style={styles.gpsTargetDot} />
+          </View>
+          <View style={styles.gpsTextCol}>
+            <Text style={styles.gpsLabel}>ACTIVE GPS COORDINATES</Text>
+            <Text style={styles.gpsCoords}>Pasig Blvd, near Rotonda</Text>
+          </View>
+          <TouchableOpacity style={styles.compassBtn}>
+            <Ionicons name="compass-outline" size={20} color="#8C7D6A" />
           </TouchableOpacity>
         </View>
-        <Input
-          placeholder="e.g. Near Carbon Market, Cebu City"
-          value={address}
-          onChangeText={(t) => { setAddress(t); setErrors((e) => ({ ...e, address: null })); }}
-          autoCapitalize="words"
-          error={errors.address}
-          icon={<Ionicons name="location-outline" size={18} color={COLORS.textMuted} />}
-        />
+      </View>
 
-        {/* Landmark */}
-        <Input
-          label="Nearby Landmark (Optional)"
-          placeholder="e.g. Across Jollibee"
-          value={landmark}
-          onChangeText={setLandmark}
-          autoCapitalize="words"
-          icon={<Ionicons name="flag-outline" size={18} color={COLORS.textMuted} />}
-        />
+      {/* ── Bottom Sheet Form ─────────────────────────────── */}
+      <View style={styles.bottomSheet}>
+        <View style={styles.sheetHandle} />
 
-        <Button
-          title="Submit Rescue Report"
+        <Text style={styles.sheetTitle}>Report Stray or Injured Animal</Text>
+        <Text style={styles.sheetSub}>
+          Immediately alerts 14 registered foster volunteers within 2 km.
+        </Text>
+
+        {/* Observed Urgency & Condition */}
+        <Text style={styles.fieldLabel}>Observed Urgency & Condition:</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.pillsRow}
+        >
+          {CONDITIONS.map((c) => {
+            const active = selectedCondition === c.id;
+            return (
+              <TouchableOpacity
+                key={c.id}
+                style={[styles.condPill, active && styles.condPillActive]}
+                onPress={() => setSelectedCondition(c.id)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.condPillText, active && styles.condPillTextActive]}>
+                  {c.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* Photo Proof Upload */}
+        <TouchableOpacity
+          style={styles.uploadContainer}
+          onPress={pickPhoto}
+          activeOpacity={0.85}
+        >
+          {photo ? (
+            <Image source={{ uri: photo }} style={styles.uploadedImg} resizeMode="cover" />
+          ) : (
+            <View style={styles.uploadInner}>
+              <View style={styles.cameraIconCircle}>
+                <Ionicons name="camera" size={20} color="#2E7A99" />
+              </View>
+              <Text style={styles.uploadText}>
+                Tap to upload photo proof & landmark
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Location input */}
+        <View style={styles.inputWrap}>
+          <TextInput
+            style={styles.locationInput}
+            placeholder="Describe exact location (e.g. across gas station)..."
+            placeholderTextColor="#9A8B7A"
+            value={locationDesc}
+            onChangeText={setLocationDesc}
+          />
+        </View>
+
+        {/* Submit Button */}
+        <TouchableOpacity
+          style={[styles.submitBtn, loading && { opacity: 0.8 }]}
           onPress={handleSubmit}
-          loading={loading}
-          style={styles.submitBtn}
-          icon={<Ionicons name="alert-circle" size={18} color="#fff" />}
-        />
-      </ScrollView>
+          activeOpacity={0.88}
+          disabled={loading}
+        >
+          <Text style={styles.submitBtnText}>
+            {loading ? 'Submitting...' : 'Submit Rescue Dispatch'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: COLORS.background },
-  navbar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SIZES.paddingL, paddingTop: Platform.OS === 'ios' ? 52 : 28, paddingBottom: SIZES.paddingM,
-    backgroundColor: COLORS.background,
+  flex: {
+    flex: 1,
+    backgroundColor: '#E8F2EC',
   },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  navTitle: { fontSize: SIZES.large, fontWeight: '700', color: COLORS.textPrimary },
-  scroll: { paddingHorizontal: SIZES.paddingL, paddingBottom: 40 },
 
-  sectionLabel: {
-    fontSize: SIZES.xsmall, fontWeight: '700', color: COLORS.textSecondary,
-    letterSpacing: 0.8, marginBottom: 10, marginTop: SIZES.paddingS,
+  // Mock Map Background Canvas
+  mapCanvas: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#E5EFE9',
+    overflow: 'hidden',
   },
-  errInline: { color: COLORS.danger, fontWeight: '600' },
+  roadH1: {
+    position: 'absolute',
+    top: '30%',
+    left: 0,
+    right: 0,
+    height: 14,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.8,
+  },
+  roadH2: {
+    position: 'absolute',
+    top: '48%',
+    left: 0,
+    right: 0,
+    height: 14,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.8,
+  },
+  roadV1: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: '38%',
+    width: 14,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.8,
+  },
+  roadV2: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: '68%',
+    width: 14,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.8,
+  },
+  roadDiag: {
+    position: 'absolute',
+    top: '15%',
+    left: '-20%',
+    width: '140%',
+    height: 12,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.8,
+    transform: [{ rotate: '25deg' }],
+  },
+  river: {
+    position: 'absolute',
+    top: '46%',
+    left: 0,
+    right: 0,
+    height: 38,
+    backgroundColor: '#B5DCED',
+    opacity: 0.85,
+    transform: [{ rotate: '-8deg' }],
+  },
 
-  photoRow: { marginBottom: SIZES.paddingM },
-  photoPreviewWrap: { position: 'relative', marginBottom: 10 },
-  photoPreview: { width: '100%', height: 200, borderRadius: SIZES.r16, resizeMode: 'cover' },
-  removePhoto: { position: 'absolute', top: 12, right: 12, backgroundColor: '#fff', borderRadius: 14, overflow: 'hidden' },
-  photoPlaceholder: {
-    height: 140, backgroundColor: COLORS.surface, borderRadius: SIZES.r16,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 2,
-    borderColor: COLORS.border, borderStyle: 'dashed',
+  // Map Pins
+  markerWrap: {
+    position: 'absolute',
+    alignItems: 'center',
   },
-  photoBtnRow: { flexDirection: 'row', alignItems: 'center', width: '100%' },
-  photoCircleBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: SIZES.paddingM },
-  photoCircleText: { fontSize: SIZES.small, fontWeight: '700', color: COLORS.textSecondary, marginTop: 8 },
-  photoDivider: { width: 2, height: '60%', backgroundColor: COLORS.border },
+  pinCircleAlert: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FEF0B3',
+    borderWidth: 3,
+    borderColor: '#473018',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.sm,
+  },
+  pinCircleClinic: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#A2D3EA',
+    borderWidth: 3,
+    borderColor: '#473018',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.sm,
+  },
+  pinCircleCat: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#C5E2D2',
+    borderWidth: 3,
+    borderColor: '#473018',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.sm,
+  },
+  pinCallout: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginTop: 4,
+    ...SHADOWS.sm,
+  },
+  pinCalloutText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#473018',
+  },
 
-  horizontalScrollRow: { flexDirection: 'row', gap: 10, marginBottom: SIZES.paddingM, marginTop: 4, paddingRight: 16 },
-  chip: {
-    paddingHorizontal: 18, paddingVertical: 12, borderRadius: SIZES.r12,
-    backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border,
-    ...SHADOWS.card, shadowOpacity: 0.05, elevation: 1,
+  // Top Header
+  topHeader: {
+    paddingTop: 50,
+    paddingHorizontal: 18,
   },
-  chipActive: { backgroundColor: COLORS.primaryDeep, borderColor: COLORS.primaryDeep },
-  chipText: { fontSize: SIZES.small, fontWeight: '600', color: COLORS.textSecondary },
-  chipTextActive: { color: '#fff' },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  backCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.sm,
+  },
+  titleCenter: {
+    alignItems: 'center',
+  },
+  networkLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#8C7D6A',
+    letterSpacing: 0.8,
+  },
+  dispatchTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#473018',
+  },
+  liveIndicatorCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.sm,
+  },
+  liveDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#D94F4F',
+  },
 
-  urgencyRow: { flexDirection: 'row', gap: 10, marginBottom: SIZES.paddingM, marginTop: 4 },
-  urgencyCard: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 12, borderRadius: SIZES.r12,
-    backgroundColor: COLORS.surface, borderWidth: 1.5, borderColor: COLORS.border,
-    ...SHADOWS.card, shadowOpacity: 0.08, elevation: 2,
+  // GPS Coordinates Bar
+  gpsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 25,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    ...SHADOWS.card,
   },
-  urgencyDot: { width: 10, height: 10, borderRadius: 5 },
-  urgencyText: { fontSize: SIZES.small, fontWeight: '700' },
+  gpsTargetWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#CCE3EE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  gpsTargetDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#2D1F12',
+  },
+  gpsTextCol: {
+    flex: 1,
+  },
+  gpsLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#8C7D6A',
+    letterSpacing: 0.5,
+  },
+  gpsCoords: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#473018',
+  },
+  compassBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EEF7FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
-  binaryRow: { flexDirection: 'row', gap: 10, marginBottom: SIZES.paddingM, marginTop: 4 },
-  binaryBtn: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 12, borderRadius: SIZES.r12,
-    backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border,
-    ...SHADOWS.card, shadowOpacity: 0.05, elevation: 1,
+  // Bottom Sheet Form
+  bottomSheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 22,
+    paddingTop: 14,
+    paddingBottom: 28,
+    ...SHADOWS.card,
   },
-  binaryBtnActive: { backgroundColor: COLORS.primaryDeep, borderColor: COLORS.primaryDeep },
-  binaryBtnText: { fontSize: SIZES.small, fontWeight: '600', color: COLORS.textSecondary },
-  binaryBtnTextActive: { color: '#fff' },
+  sheetHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#D6D3D1',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#473018',
+    marginBottom: 4,
+  },
+  sheetSub: {
+    fontSize: 12,
+    color: '#5C4E3A',
+    marginBottom: 14,
+  },
 
-  locationHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: SIZES.xs4,
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#473018',
+    marginBottom: 8,
   },
-  fetchBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: COLORS.tagBg, paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: SIZES.r12, borderWidth: 1, borderColor: COLORS.primaryLight,
+  pillsRow: {
+    gap: 8,
+    marginBottom: 14,
   },
-  fetchBtnText: { fontSize: SIZES.xs, fontWeight: '700', color: COLORS.primaryDeep },
+  condPill: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CCE3EE',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  condPillActive: {
+    backgroundColor: '#FEF8DE',
+    borderColor: '#473018',
+    borderWidth: 1.5,
+  },
+  condPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#473018',
+  },
+  condPillTextActive: {
+    fontWeight: '800',
+  },
 
-  submitBtn: { marginTop: SIZES.paddingS, borderRadius: SIZES.radiusFull },
+  uploadContainer: {
+    height: 80,
+    borderWidth: 1.5,
+    borderColor: '#CCE3EE',
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    backgroundColor: '#F8FAF9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  uploadedImg: {
+    width: '100%',
+    height: '100%',
+  },
+  uploadInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#CCE3EE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  uploadText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#473018',
+  },
+
+  inputWrap: {
+    backgroundColor: '#F8FAF9',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#CCE3EE',
+    paddingHorizontal: 14,
+    height: 46,
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  locationInput: {
+    fontSize: 12,
+    color: '#473018',
+  },
+
+  submitBtn: {
+    backgroundColor: '#85BBD2',
+    borderRadius: 25,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#2E7A99',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  submitBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#473018',
+  },
 });

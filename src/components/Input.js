@@ -73,6 +73,7 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.xs4 + 2,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
   row: {
     flexDirection: 'row',
@@ -92,6 +93,7 @@ const styles = StyleSheet.create({
     paddingVertical: SIZES.sm8 + 3,
     fontSize: SIZES.body,
     color: COLORS.textPrimary,
+    fontFamily: 'PlusJakartaSans_500Medium',
   },
   inputMulti: {
     minHeight: 88,
@@ -105,5 +107,6 @@ const styles = StyleSheet.create({
     color: COLORS.danger,
     marginTop: SIZES.xs4,
     fontWeight: '500',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
   },
 });

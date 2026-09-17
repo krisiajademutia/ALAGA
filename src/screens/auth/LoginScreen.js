@@ -1,11 +1,22 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  Image,
+  TouchableOpacity,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
-import Button from '../../components/Button';
-import Input from '../../components/Input';
+import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import { useApp } from '../../context/AppContext';
+import Input from '../../components/Input';
+import Button from '../../components/Button';
+import AlertModal from '../../components/AlertModal';
 
 export default function LoginScreen({ navigation }) {
   const { login } = useApp();
@@ -14,25 +25,48 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
+  // Custom Blurred Dialog State
+  const [modalConfig, setModalConfig] = useState({
+    visible: false,
+    type: 'error',
+    title: '',
+    message: '',
+  });
+
+  const showDialog = (type, title, message) => {
+    setModalConfig({ visible: true, type, title, message });
+  };
+
+  const hideDialog = () => {
+    setModalConfig((prev) => ({ ...prev, visible: false }));
+  };
+
   const validate = () => {
     const e = {};
     if (!email.trim()) e.email = 'Email is required.';
-    if (!password)     e.password = 'Password is required.';
+    if (!password) e.password = 'Password is required.';
     setErrors(e);
     return !Object.keys(e).length;
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!validate()) return;
     setLoading(true);
-    setTimeout(() => {
-      const r = login(email.trim(), password);
+    try {
+      const r = await login(email.trim(), password);
+      if (!r.success) {
+        showDialog(
+          'error',
+          'Sign In Failed',
+          r.error || 'Incorrect email or password.'
+        );
+      }
+    } catch (err) {
+      showDialog('error', 'Sign In Error', err.message || 'An unexpected error occurred.');
+    } finally {
       setLoading(false);
-      if (!r.success) Alert.alert('Login Failed', r.error);
-    }, 700);
+    }
   };
-
-
 
   return (
     <KeyboardAvoidingView
@@ -45,102 +79,155 @@ export default function LoginScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Logo */}
-        <View style={styles.logoBlock}>
-          <View style={styles.logoRing}>
-            <Ionicons name="paw" size={34} color={COLORS.primaryDeep} />
-          </View>
-          <Text style={styles.appName}>ALAGA</Text>
-          <Text style={styles.appTagline}>Alert. Respond. Alaga.</Text>
+        {/* Top ALAGA Mascot Logo */}
+        <View style={styles.logoWrap}>
+          <Image
+            source={require('../../../assets/alaga-logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+          <Text style={styles.tagline}>Alert · Respond · Alaga</Text>
         </View>
 
-        {/* Form card */}
+        {/* Clean White Form Card */}
         <View style={styles.card}>
-          <Text style={styles.title}>Welcome back</Text>
-          <Text style={styles.subtitle}>Sign in to continue</Text>
+          <Text style={styles.cardTitle}>Welcome back</Text>
+          <Text style={styles.cardSubtitle}>
+            Sign in with your email and password
+          </Text>
 
           <Input
-            label="Email"
+            label="EMAIL"
             placeholder="your@email.com"
             value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
+            onChangeText={(t) => {
+              setEmail(t);
+              if (errors.email) setErrors((e) => ({ ...e, email: null }));
+            }}
             error={errors.email}
-            icon={<Ionicons name="mail-outline" size={17} color={COLORS.textMuted} />}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            icon={<Ionicons name="mail-outline" size={18} color={COLORS.primary} />}
           />
+
           <Input
-            label="Password"
+            label="PASSWORD"
             placeholder="Enter your password"
             value={password}
-            onChangeText={setPassword}
-            secureTextEntry
+            onChangeText={(t) => {
+              setPassword(t);
+              if (errors.password) setErrors((e) => ({ ...e, password: null }));
+            }}
             error={errors.password}
-            icon={<Ionicons name="lock-closed-outline" size={17} color={COLORS.textMuted} />}
+            secureTextEntry
+            icon={<Ionicons name="lock-closed-outline" size={18} color={COLORS.primary} />}
           />
 
-          <Button title="Log In" onPress={submit} loading={loading} fullWidth />
-
+          <Button
+            title="Sign In"
+            onPress={submit}
+            loading={loading}
+            fullWidth
+            style={styles.signInBtn}
+          />
         </View>
 
+        {/* Sign up Link */}
         <View style={styles.signupRow}>
-          <Text style={styles.signupText}>Don't have an account? </Text>
+          <Text style={styles.signupText}>Don’t have an account? </Text>
           <TouchableOpacity onPress={() => navigation.navigate('Register')}>
             <Text style={styles.signupLink}>Sign Up</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Blurred Background Dialog Box */}
+      <AlertModal
+        visible={modalConfig.visible}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onClose={hideDialog}
+      />
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: COLORS.background },
+  flex: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
   scroll: {
     flexGrow: 1,
-    paddingHorizontal: SIZES.lg24,
-    paddingTop: SIZES.xl40 + SIZES.md16,
-    paddingBottom: SIZES.xl40,
+    paddingHorizontal: 22,
+    paddingTop: Platform.OS === 'ios' ? 44 : 32,
+    paddingBottom: 36,
+    justifyContent: 'center',
   },
 
-  logoBlock: { alignItems: 'center', marginBottom: SIZES.xl32 },
-  logoRing: {
-    width: 72, height: 72, borderRadius: 36,
-    backgroundColor: COLORS.tagBg,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: SIZES.md16,
-    ...SHADOWS.card,
+  logoWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 22,
   },
-  appName:    { fontSize: SIZES.xl + 6, fontWeight: '900', color: COLORS.brown, letterSpacing: 6 },
-  appTagline: { fontSize: SIZES.sm, color: COLORS.textMuted, letterSpacing: 1.2, marginTop: 4 },
+  logoImage: {
+    width: 220,
+    height: 80,
+  },
+  tagline: {
+    ...FONTS.caption,
+    color: COLORS.textMuted,
+    letterSpacing: 1.2,
+    marginTop: 4,
+    fontWeight: '600',
+  },
 
   card: {
     backgroundColor: COLORS.surface,
     borderRadius: SIZES.r20,
-    padding: SIZES.lg24,
-    marginBottom: SIZES.lg24,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E2ECF0',
     ...SHADOWS.card,
+    shadowColor: '#0D1B2A',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  title:    { fontSize: SIZES.xl, fontWeight: '800', color: COLORS.brown, marginBottom: 4 },
-  subtitle: { fontSize: SIZES.body, color: COLORS.textMuted, marginBottom: SIZES.lg24 },
-
-  divRow:  { flexDirection: 'row', alignItems: 'center', marginVertical: SIZES.md16 },
-  divLine: { flex: 1, height: 1, backgroundColor: COLORS.divider },
-  divText: { paddingHorizontal: SIZES.sm8 + 4, fontSize: SIZES.sm, color: COLORS.textMuted, fontWeight: '600' },
-
-  demoRow:     { flexDirection: 'row', gap: SIZES.sm8 },
-  demoBtn: {
-    flex: 1,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: SIZES.xs4 + 2,
-    paddingVertical: SIZES.sm8 + 2,
-    borderRadius: SIZES.r12,
-    borderWidth: 1.5, borderColor: COLORS.primaryDeep,
-    backgroundColor: COLORS.tagBg,
+  cardTitle: {
+    ...FONTS.titleXl,
+    color: COLORS.textPrimary,
+    marginBottom: 4,
   },
-  demoBtnGreen: { borderColor: COLORS.secondaryDark, backgroundColor: COLORS.advocateBadge },
-  demoBtnText:  { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.primaryDeep },
+  cardSubtitle: {
+    ...FONTS.subtitle,
+    color: COLORS.textSecondary,
+    marginBottom: 20,
+  },
 
-  signupRow:  { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  signupText: { fontSize: SIZES.body, color: COLORS.textSecondary },
-  signupLink: { fontSize: SIZES.body, fontWeight: '700', color: COLORS.primaryDeep },
+  signInBtn: {
+    marginTop: 8,
+    backgroundColor: COLORS.primary,
+  },
+
+  signupRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 22,
+  },
+  signupText: {
+    ...FONTS.bodyMedium,
+    color: COLORS.textSecondary,
+  },
+  signupLink: {
+    ...FONTS.bodyMedium,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
 });
+
+

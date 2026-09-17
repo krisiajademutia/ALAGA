@@ -9,7 +9,7 @@ import EmptyState from '../../components/EmptyState';
 import StatusPill from '../../components/StatusPill';
 
 export default function PublicProfileScreen({ route, navigation }) {
-  const { userId } = route.params;
+  const { userId } = route.params || {};
   const { users, animals, rescueReports, currentUser, startConversation, getAnimalsByAdvocate } = useApp();
 
   const user = users.find((u) => u.id === userId);

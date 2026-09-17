@@ -7,8 +7,7 @@ import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import StatusPill from '../../components/StatusPill';
 import EmptyState from '../../components/EmptyState';
 
-const STATUS_FILTERS = ['All', 'Available', 'Being Fostered', 'Adopted', 'Under Care'];
-const STATUS_EMOJI   = { All: '🐾', Available: '', 'Being Fostered': '', Adopted: '', 'Under Care': '' };
+const STATUS_FILTERS = ['All', 'Available', 'Being Fostered', 'Under Care', 'Adopted'];
 
 export default function MyAnimalsScreen({ navigation }) {
   const { getAdvocateAnimals, returnAnimalToListings, markAnimalAdopted, updateAnimal, rescueReports } = useApp();
@@ -83,7 +82,7 @@ export default function MyAnimalsScreen({ navigation }) {
               activeOpacity={0.7}
             >
               <Text style={[styles.filterText, filterStatus === s && styles.filterTextOn]}>
-                {STATUS_EMOJI[s]} {s}
+                {s}
               </Text>
             </TouchableOpacity>
           ))}

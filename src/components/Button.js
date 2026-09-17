@@ -83,5 +83,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconWrap: { marginRight: SIZES.xs4 + 2 },
-  label: { fontWeight: '700', letterSpacing: 0.2 },
+  label: { fontWeight: '700', letterSpacing: 0.2, fontFamily: 'PlusJakartaSans_700Bold' },
 });

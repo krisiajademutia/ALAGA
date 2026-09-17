@@ -1,100 +1,193 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SIZES, SHADOWS } from '../constants/theme';
-import StatusPill from './StatusPill';
-import Badge from './Badge';
+import { COLORS, SIZES, SHADOWS, FONTS } from '../constants/theme';
 
 export default function AnimalCard({ animal, onPress, style, horizontal = false }) {
+  const [isFav, setIsFav] = useState(false);
+
+  const toggleFavorite = (e) => {
+    e.stopPropagation();
+    setIsFav(!isFav);
+  };
+
   if (horizontal) {
+    const isFoster = animal.fosterNeeded || animal.listingType === 'Foster';
+    const bgColors = {
+      Cat: '#E0F2FA',
+      Dog: '#FEF8DE',
+      Rabbit: '#B8E4E5',
+    };
+    const avatarBg = animal.avatarBg || bgColors[animal.species] || '#D8EDE4';
+
     return (
-      <TouchableOpacity style={[styles.grid, style]} onPress={onPress} activeOpacity={0.88}>
-        <View style={styles.gridPhotoWrap}>
+      <TouchableOpacity style={[styles.gridCard, style]} onPress={onPress} activeOpacity={0.88}>
+        {/* Top visual box */}
+        <View style={styles.gridVisualBox}>
           {animal.photo ? (
-            <Image source={{ uri: animal.photo }} style={styles.gridPhoto} resizeMode="cover" />
+            <Image source={{ uri: animal.photo }} style={styles.cardCoverPhoto} resizeMode="cover" />
           ) : (
-            <View style={styles.gridPhotoFallback}>
-              <Ionicons name="paw-outline" size={24} color={COLORS.primaryLight} />
+            <View style={[styles.fallbackBox, { backgroundColor: avatarBg }]}>
+              <Ionicons name="paw" size={36} color={COLORS.primaryDarkest} />
             </View>
           )}
-          <View style={styles.gridStatus}>
-            <StatusPill status={animal.status} />
-          </View>
-          {animal.vaccinated ? (
-            <View style={styles.vacDot}>
-              <Ionicons name="shield-checkmark" size={9} color="#fff" />
+
+          {/* Top Row: Available Badge & Heart */}
+          <View style={styles.topRowOverlay}>
+            <View style={styles.availableBadge}>
+              <Text style={styles.availableText}>Available</Text>
             </View>
-          ) : null}
+            <TouchableOpacity
+              style={styles.heartCircle}
+              onPress={toggleFavorite}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Ionicons
+                name={isFav ? 'heart' : 'heart-outline'}
+                size={14}
+                color={isFav ? COLORS.danger : COLORS.textMuted}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
-        <View style={styles.gridBody}>
-          <Text style={styles.gridName} numberOfLines={1}>{animal.name}</Text>
-          <Text style={styles.gridBreed} numberOfLines={1}>{animal.breed}</Text>
-          <View style={styles.gridMeta}>
-            <Ionicons name="paw-outline" size={10} color={COLORS.textMuted} />
-            <Text style={styles.gridMetaText}>{animal.species} · {animal.gender}</Text>
+
+        {/* Content Box */}
+        <View style={styles.gridContent}>
+          <Text style={styles.petName} numberOfLines={1}>
+            {animal.name}
+          </Text>
+          <Text style={styles.petBreed} numberOfLines={1}>
+            {animal.species} · {animal.breed} · {animal.ageTag || animal.age}
+          </Text>
+          <View style={styles.locRow}>
+            <Ionicons name="location-sharp" size={12} color={COLORS.danger} style={{ marginRight: 2 }} />
+            <Text style={styles.locText} numberOfLines={1}>
+              {animal.location || 'Pasig City (1.8 km)'}
+            </Text>
           </View>
-          {/* Foster duration badge */}
-          {animal.fosterDuration && (animal.listingType === 'Foster' || animal.listingType === 'Both') ? (
-            <View style={styles.fosterBadge}>
-              <Ionicons name="time-outline" size={10} color="#B45309" />
-              <Text style={styles.fosterBadgeText}>{animal.fosterDuration}</Text>
-            </View>
-          ) : animal.tags?.length > 0 ? (
-            <Badge label={animal.tags[0]} style={{ marginTop: SIZES.xs4 + 2 }} />
-          ) : null}
+
+          {/* Action/type tag row */}
+          <View style={styles.actionTagsRow}>
+            {animal.listingType === 'Both' ? (
+              <>
+                <View style={styles.adoptTag}>
+                  <Text style={styles.adoptTagText}>Adopt</Text>
+                </View>
+                <View style={styles.fosterTag}>
+                  <Text style={styles.fosterTagText}>Foster</Text>
+                </View>
+              </>
+            ) : isFoster ? (
+              <View style={styles.fosterTag}>
+                <Text style={styles.fosterTagText}>
+                  Foster{animal.fosterDuration ? ` · ${animal.fosterDuration}` : ''}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.adoptTag}>
+                <Text style={styles.adoptTagText}>Adopt</Text>
+              </View>
+            )}
+          </View>
         </View>
       </TouchableOpacity>
     );
   }
 
+  // Full-width card matching HomeScreen design
+  const isFoster = animal.fosterNeeded || animal.listingType === 'Foster';
+  const badges = animal.personalityBadges || [animal.gender, animal.ageTag || animal.age];
+
   return (
-    <TouchableOpacity style={[styles.card, style]} onPress={onPress} activeOpacity={0.9}>
-      <View style={styles.photoWrap}>
+    <TouchableOpacity style={[styles.petCard, style]} onPress={onPress} activeOpacity={0.9}>
+      {/* Visual Image Banner with Floating Badges */}
+      <View style={styles.imageBannerWrap}>
         {animal.photo ? (
-          <Image source={{ uri: animal.photo }} style={styles.photo} resizeMode="cover" />
+          <Image
+            source={{ uri: animal.photo }}
+            style={styles.cardImage}
+            resizeMode="cover"
+          />
         ) : (
-          <View style={styles.photoFallback}>
-            <Ionicons name="paw-outline" size={36} color={COLORS.primaryLight} />
+          <View style={styles.imageFallbackWrap}>
+            <Ionicons name="paw" size={46} color={COLORS.primary} />
           </View>
         )}
-        <View style={styles.statusPos}>
-          <StatusPill status={animal.status} />
+
+        {/* Top-Left Status Badge */}
+        <View style={[styles.statusPill, isFoster ? styles.statusPillFoster : styles.statusPillAvailable]}>
+          <Ionicons
+            name={isFoster ? 'heart' : 'paw'}
+            size={12}
+            color={isFoster ? '#92400E' : '#15803D'}
+            style={{ marginRight: 3 }}
+          />
+          <Text style={[styles.statusPillText, isFoster ? styles.statusTextFoster : styles.statusTextAvailable]}>
+            {isFoster ? 'Foster Needed' : 'Available'}
+          </Text>
         </View>
-        {animal.vaccinated ? (
-          <View style={styles.vacBadge}>
-            <Ionicons name="shield-checkmark" size={11} color="#fff" />
-            <Text style={styles.vacText}>Vaccinated</Text>
+
+        {/* Top-Right Distance & Favorite */}
+        <View style={styles.topRightOverlay}>
+          <View style={styles.distancePill}>
+            <Ionicons name="location-sharp" size={11} color={COLORS.primaryDarkest} style={{ marginRight: 2 }} />
+            <Text style={styles.distancePillText}>{animal.distance || '1.2 km'}</Text>
           </View>
-        ) : null}
+          <TouchableOpacity
+            style={styles.heartCircle}
+            onPress={toggleFavorite}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={isFav ? 'heart' : 'heart-outline'}
+              size={16}
+              color={isFav ? COLORS.danger : '#6B7280'}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View style={styles.body}>
-        <View style={styles.nameRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{animal.name}</Text>
-            <Text style={styles.sub} numberOfLines={1}>
-              {animal.species} · {animal.breed} · {animal.gender}
-            </Text>
-          </View>
-          <View style={styles.agePill}>
-            <Text style={styles.ageText}>{animal.age}</Text>
-          </View>
+      {/* Card Body */}
+      <View style={styles.cardBody}>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {animal.name}
+        </Text>
+        <View style={styles.cardMetaRow}>
+          <Ionicons name="location-outline" size={13} color={COLORS.textMuted} style={{ marginRight: 4 }} />
+          <Text style={styles.cardMetaText} numberOfLines={1}>
+            {animal.location || 'Pasig City'} · {animal.breed} · {animal.gender}
+          </Text>
         </View>
 
-        {animal.tags?.length > 0 ? (
-          <View style={styles.tags}>
-            {animal.tags.slice(0, 3).map((t) => <Badge key={t} label={t} />)}
-          </View>
-        ) : null}
+        {/* Description preview */}
+        <Text style={styles.cardDescText} numberOfLines={2}>
+          {animal.description}
+        </Text>
 
-        <View style={styles.footer}>
-          <View style={styles.advocateRow}>
-            <Ionicons name="person-circle-outline" size={13} color={COLORS.textMuted} />
-            <Text style={styles.advocateName} numberOfLines={1}>{animal.advocateName}</Text>
-          </View>
-          <View style={styles.viewRow}>
-            <Text style={styles.viewLabel}>View</Text>
-            <Ionicons name="chevron-forward" size={12} color={COLORS.primaryDeep} />
+        {/* Tags Row */}
+        <View style={styles.tagsContainer}>
+          {badges.map((b) => (
+            <View key={b} style={styles.tagPill}>
+              <Text style={styles.tagPillText}>{b}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Footer CTA */}
+        <View style={styles.cardFooter}>
+          <Text style={styles.ageBadgeText}>
+            Age: {animal.ageTag || animal.age}
+          </Text>
+          <View style={[styles.actionPill, isFoster && styles.actionPillFoster]}>
+            <Text style={[styles.actionPillText, isFoster && styles.actionPillTextFoster]}>
+              {isFoster ? 'Apply to Foster' : `Adopt ${animal.name}`}
+            </Text>
+            <Ionicons
+              name="arrow-forward"
+              size={13}
+              color={isFoster ? COLORS.brown : COLORS.primaryDarkest}
+              style={{ marginLeft: 4 }}
+            />
           </View>
         </View>
       </View>
@@ -103,83 +196,263 @@ export default function AnimalCard({ animal, onPress, style, horizontal = false 
 }
 
 const styles = StyleSheet.create({
-  // Full-width
-  card: {
+  // Grid card mode
+  gridCard: {
     backgroundColor: COLORS.surface,
-    borderRadius: SIZES.r16,
+    borderRadius: SIZES.r20,
     overflow: 'hidden',
-    marginBottom: SIZES.md16,
-    ...SHADOWS.card,
-  },
-  photoWrap:    { position: 'relative' },
-  photo:        { width: '100%', height: 200 },
-  photoFallback:{
-    width: '100%', height: 160,
-    backgroundColor: COLORS.tagBg,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  statusPos:    { position: 'absolute', top: SIZES.sm8, right: SIZES.sm8 },
-  vacBadge: {
-    position: 'absolute', bottom: SIZES.sm8, left: SIZES.sm8,
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: COLORS.secondaryDark,
-    paddingHorizontal: SIZES.sm8, paddingVertical: 3,
-    borderRadius: SIZES.r999,
-  },
-  vacText: { fontSize: SIZES.xs, color: '#fff', fontWeight: '700' },
-
-  body:    { padding: SIZES.md16 },
-  nameRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: SIZES.sm8 },
-  name:    { fontSize: SIZES.lg, fontWeight: '800', color: COLORS.textPrimary },
-  sub:     { fontSize: SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
-  agePill: {
-    backgroundColor: COLORS.tagBg,
-    paddingHorizontal: SIZES.sm8 + 2, paddingVertical: 4,
-    borderRadius: SIZES.r999, marginLeft: SIZES.sm8,
-  },
-  ageText: { fontSize: SIZES.xs, fontWeight: '700', color: COLORS.primaryDeep },
-  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.xs4 + 2, marginBottom: SIZES.sm8 + 2 },
-  footer: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingTop: SIZES.sm8 + 2, borderTopWidth: 1, borderTopColor: COLORS.divider,
-  },
-  advocateRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
-  advocateName:{ fontSize: SIZES.xs, color: COLORS.textMuted },
-  viewRow:     { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  viewLabel:   { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.primaryDeep },
-
-  // Grid / horizontal
-  grid: {
-    backgroundColor: COLORS.surface,
-    borderRadius: SIZES.r16,
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E8F2F6',
     flex: 1,
     ...SHADOWS.card,
   },
-  gridPhotoWrap: { position: 'relative' },
-  gridPhoto:     { width: '100%', height: 120 },
-  gridPhotoFallback: {
-    width: '100%', height: 120,
-    backgroundColor: COLORS.tagBg,
-    alignItems: 'center', justifyContent: 'center',
+  gridVisualBox: {
+    height: 125,
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: '#E8F2F6',
   },
-  gridStatus: { position: 'absolute', top: SIZES.xs4 + 2, right: SIZES.xs4 + 2 },
-  vacDot: {
-    position: 'absolute', bottom: 5, left: 5,
-    width: 18, height: 18, borderRadius: 9,
-    backgroundColor: COLORS.secondaryDark,
-    alignItems: 'center', justifyContent: 'center',
+  cardCoverPhoto: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
-  gridBody:     { padding: SIZES.sm8 + 2 },
-  gridName:     { fontSize: SIZES.body, fontWeight: '800', color: COLORS.textPrimary },
-  gridBreed:    { fontSize: SIZES.xs, color: COLORS.textSecondary, marginTop: 1 },
-  gridMeta:     { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: SIZES.xs4 },
-  fosterBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: SIZES.xs4 + 2,
-    backgroundColor: '#FEF3DC',
-    paddingHorizontal: SIZES.xs4 + 2, paddingVertical: 2,
-    borderRadius: SIZES.r999,
-    alignSelf: 'flex-start',
+  fallbackBox: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  fosterBadgeText: { fontSize: SIZES.xs - 1, color: '#B45309', fontWeight: '700' },
+  topRowOverlay: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 10,
+    zIndex: 2,
+  },
+  availableBadge: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    ...SHADOWS.sm,
+  },
+  availableText: {
+    ...FONTS.badge,
+    color: COLORS.success,
+  },
+  heartCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: COLORS.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.sm,
+  },
+
+  gridContent: {
+    padding: 12,
+    backgroundColor: COLORS.surface,
+  },
+  petName: {
+    ...FONTS.subheading,
+    fontSize: 15,
+    color: COLORS.brown,
+    marginBottom: 2,
+  },
+  petBreed: {
+    ...FONTS.caption,
+    color: COLORS.textMuted,
+    marginBottom: 4,
+  },
+  locRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  locText: {
+    ...FONTS.caption,
+    color: COLORS.textSecondary,
+  },
+  actionTagsRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  adoptTag: {
+    backgroundColor: COLORS.inputBg,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  adoptTagText: {
+    ...FONTS.badge,
+    fontSize: 10,
+    color: COLORS.primaryDeep,
+  },
+  fosterTag: {
+    backgroundColor: '#FEF8DE',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  fosterTagText: {
+    ...FONTS.badge,
+    fontSize: 10,
+    color: '#92400E',
+  },
+
+  // Full-width card mode
+  petCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 22,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#EBF1F4',
+    marginBottom: 16,
+    ...SHADOWS.card,
+  },
+  imageBannerWrap: {
+    height: 180,
+    width: '100%',
+    position: 'relative',
+    backgroundColor: '#E8F2F6',
+    overflow: 'hidden',
+  },
+  imageFallbackWrap: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E8F2F6',
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  statusPill: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  statusPillAvailable: {
+    backgroundColor: '#F0FDF4',
+  },
+  statusPillFoster: {
+    backgroundColor: '#FEF3E2',
+  },
+  statusPillText: {
+    ...FONTS.badge,
+  },
+  statusTextAvailable: {
+    color: '#15803D',
+  },
+  statusTextFoster: {
+    color: '#B45309',
+  },
+  topRightOverlay: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  distancePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  distancePillText: {
+    ...FONTS.badge,
+    color: COLORS.primaryDarkest,
+  },
+  cardBody: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 16,
+  },
+  cardTitle: {
+    ...FONTS.titleMd,
+    color: COLORS.brown,
+    marginBottom: 3,
+  },
+  cardMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  cardMetaText: {
+    ...FONTS.meta,
+    color: '#706050',
+  },
+  cardDescText: {
+    ...FONTS.bodyRegular,
+    color: '#4B3F33',
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 14,
+  },
+  tagPill: {
+    backgroundColor: COLORS.inputBg,
+    borderWidth: 1,
+    borderColor: '#D4EAF2',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  tagPillText: {
+    ...FONTS.badge,
+    fontSize: 10,
+    color: COLORS.primaryDarkest,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.divider,
+    paddingTop: 12,
+  },
+  ageBadgeText: {
+    ...FONTS.meta,
+    color: '#706050',
+  },
+  actionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F8FB',
+    borderWidth: 1.2,
+    borderColor: COLORS.border,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  actionPillFoster: {
+    backgroundColor: COLORS.accent,
+    borderColor: '#F5E38C',
+  },
+  actionPillText: {
+    ...FONTS.badge,
+    color: COLORS.primaryDarkest,
+  },
+  actionPillTextFoster: {
+    color: COLORS.brown,
+  },
 });

@@ -1,70 +1,85 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Image,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../../context/AppContext';
-import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
-import Button from '../../components/Button';
-import Input from '../../components/Input';
-import { PAYMENT_METHODS } from '../../data/mockData';
+import { COLORS, SHADOWS } from '../../constants/theme';
 
-const PRESET_AMOUNTS = [100, 250, 500, 1000];
+const PRESET_AMOUNTS = ['100', '250', '500', '1,000'];
+const PAYMENT_METHODS = [
+  { id: 'GCash', label: 'GCash', icon: 'phone-portrait-outline' },
+  { id: 'Maya', label: 'Maya', icon: 'card-outline' },
+  { id: 'Bank Transfer', label: 'Bank Transfer', icon: 'business-outline' },
+  { id: 'Cash', label: 'Cash', icon: 'cash-outline' },
+];
 
 export default function DonateScreen({ route, navigation }) {
-  const { animalId, animalName } = route.params || {};
-  const { submitDonation, animals } = useApp();
+  const { animalName } = route.params || {};
+  const { submitDonation } = useApp();
 
-  const animal = animals.find((a) => a.id === animalId);
-  const targetName = animalName || animal?.name || 'General Fund';
-
-  const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState('');
-  const [reference, setReference] = useState('');
+  const targetName = animalName || 'Papet (Limb Rehab)';
+  const [amount, setAmount] = useState('1,000');
+  const [method, setMethod] = useState('GCash');
+  const [reference, setReference] = useState('GC20260826001');
   const [message, setMessage] = useState('');
-  const [proof, setProof] = useState(null);
+  const [proof, setProof] = useState('receipt_screenshot.png');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({});
 
   const pickProof = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true, quality: 0.7,
-    });
-    if (!result.canceled) setProof(result.assets[0].uri);
-  };
-
-  const validate = () => {
-    const e = {};
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) e.amount = 'Enter a valid donation amount.';
-    if (!method) e.method = 'Select a payment method.';
-    if (!reference.trim()) e.reference = 'Enter the reference or transaction number.';
-    setErrors(e);
-    return Object.keys(e).length === 0;
+    Alert.alert('Upload Receipt', 'Attach proof of transaction:', [
+      {
+        text: 'Camera',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') return;
+          const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+          if (!result.canceled) setProof(result.assets[0].uri);
+        },
+      },
+      {
+        text: 'Gallery',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') return;
+          const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7 });
+          if (!result.canceled) setProof(result.assets[0].uri);
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const handleSubmit = () => {
-    if (!validate()) return;
     setLoading(true);
     setTimeout(() => {
       submitDonation({
-        animalId: animalId || null,
         animalName: targetName,
-        amount: Number(amount),
+        amount: 1000,
+        amountDisplay: `₱${amount}`,
         method,
-        referenceNumber: reference.trim(),
+        referenceNumber: reference,
         proofPhoto: proof,
-        message: message.trim(),
+        message: message.trim() || 'For orthopedic follow-up and treats!',
       });
       setLoading(false);
       Alert.alert(
-        'Thank you! 💛',
-        `Your donation of ₱${amount} for ${targetName} has been submitted and is pending verification.`,
-        [{ text: 'Done', onPress: () => navigation.goBack() }]
+        'Donation Submitted',
+        `Thank you! Your donation for ${targetName} is submitted and will be verified by the advocate.`,
+        [{ text: 'View Activity', onPress: () => navigation.navigate('Activity', { tab: 'donations' }) }]
       );
-    }, 900);
+    }, 700);
   };
 
   return (
@@ -73,115 +88,154 @@ export default function DonateScreen({ route, navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <StatusBar style="dark" />
+
+      {/* Navbar */}
       <View style={styles.navbar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.textPrimary} />
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="chevron-back" size={22} color="#473018" />
         </TouchableOpacity>
         <Text style={styles.navTitle}>Donate</Text>
-        <View style={{ width: 36 }} />
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-
-        {/* Target banner */}
-        <View style={styles.targetBanner}>
-          <View style={styles.targetIconWrap}>
-            <Ionicons name="gift" size={28} color={COLORS.secondary} />
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Top Green Card: Donating For */}
+        <View style={styles.donatingForCard}>
+          <View style={styles.giftCircle}>
+            <Ionicons name="gift-outline" size={24} color="#2D9E5F" />
           </View>
-          <View style={styles.targetText}>
-            <Text style={styles.targetLabel}>Donating for</Text>
-            <Text style={styles.targetName}>{targetName}</Text>
+          <View style={styles.donatingTextCol}>
+            <Text style={styles.donatingLabel}>Donating for</Text>
+            <Text style={styles.donatingName}>{targetName}</Text>
           </View>
         </View>
 
         {/* Amount presets */}
-        <Text style={styles.sectionLabel}>AMOUNT (₱) {errors.amount && <Text style={styles.errInline}> · {errors.amount}</Text>}</Text>
+        <Text style={styles.sectionLabel}>AMOUNT (₱)</Text>
         <View style={styles.presetRow}>
-          {PRESET_AMOUNTS.map((a) => (
-            <TouchableOpacity
-              key={a}
-              style={[styles.presetBtn, amount === String(a) && styles.presetBtnActive]}
-              onPress={() => { setAmount(String(a)); setErrors((e) => ({ ...e, amount: null })); }}
-            >
-              <Text style={[styles.presetText, amount === String(a) && styles.presetTextActive]}>₱{a}</Text>
-            </TouchableOpacity>
-          ))}
+          {PRESET_AMOUNTS.map((a) => {
+            const active = amount === a;
+            return (
+              <TouchableOpacity
+                key={a}
+                style={[styles.presetBox, active && styles.presetBoxActive]}
+                onPress={() => setAmount(a)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.presetText, active && styles.presetTextActive]}>
+                  ₱{a}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-        <Input
-          placeholder="Or enter custom amount"
-          value={amount}
-          onChangeText={(t) => { setAmount(t); setErrors((e) => ({ ...e, amount: null })); }}
-          keyboardType="numeric"
-          icon={<Ionicons name="cash-outline" size={18} color={COLORS.textMuted} />}
-        />
 
-        {/* Payment method */}
-        <Text style={styles.sectionLabel}>PAYMENT METHOD {errors.method && <Text style={styles.errInline}> · {errors.method}</Text>}</Text>
+        {/* Custom amount input */}
+        <View style={styles.customAmountWrap}>
+          <Text style={styles.currencyPrefix}>₱</Text>
+          <TextInput
+            style={styles.customAmountInput}
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType="numeric"
+          />
+        </View>
+
+        {/* Payment Method */}
+        <Text style={styles.sectionLabel}>PAYMENT METHOD</Text>
         <View style={styles.methodGrid}>
-          {PAYMENT_METHODS.map((m) => (
-            <TouchableOpacity
-              key={m}
-              style={[styles.methodCard, method === m && styles.methodCardActive]}
-              onPress={() => { setMethod(m); setErrors((e) => ({ ...e, method: null })); }}
-            >
-              <Ionicons
-                name={m === 'GCash' ? 'phone-portrait-outline' : m === 'Maya' ? 'card-outline' : m === 'Bank Transfer' ? 'business-outline' : 'cash-outline'}
-                size={20}
-                color={method === m ? COLORS.primary : COLORS.textMuted}
-              />
-              <Text style={[styles.methodText, method === m && styles.methodTextActive]}>{m}</Text>
-            </TouchableOpacity>
-          ))}
+          {PAYMENT_METHODS.map((m) => {
+            const active = method === m.id;
+            return (
+              <TouchableOpacity
+                key={m.id}
+                style={[styles.methodCard, active && styles.methodCardActive]}
+                onPress={() => setMethod(m.id)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={m.icon}
+                  size={18}
+                  color={active ? '#206B82' : '#5C4E3A'}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={[styles.methodText, active && styles.methodTextActive]}>
+                  {m.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        <Input
-          label="Reference / Transaction Number"
-          placeholder="e.g. GC20260826001"
-          value={reference}
-          onChangeText={(t) => { setReference(t); setErrors((e) => ({ ...e, reference: null })); }}
-          autoCapitalize="characters"
-          error={errors.reference}
-          icon={<Ionicons name="receipt-outline" size={18} color={COLORS.textMuted} />}
-        />
+        {/* Reference / Transaction Number */}
+        <Text style={styles.sectionLabel}>Reference / Transaction Number</Text>
+        <View style={styles.inputWrap}>
+          <TextInput
+            style={styles.textInput}
+            value={reference}
+            onChangeText={setReference}
+            placeholder="Transaction Reference"
+            placeholderTextColor="#9A8B7A"
+            autoCapitalize="characters"
+          />
+        </View>
 
-        <Input
-          label="Message (optional)"
-          placeholder="Leave a message of support..."
-          value={message}
-          onChangeText={setMessage}
-          multiline
-          numberOfLines={3}
-          autoCapitalize="sentences"
-        />
+        {/* Message (optional) */}
+        <Text style={styles.sectionLabel}>Message (optional)</Text>
+        <View style={[styles.inputWrap, styles.textAreaWrap]}>
+          <TextInput
+            style={[styles.textInput, styles.textArea]}
+            value={message}
+            onChangeText={setMessage}
+            placeholder="Add an encouraging note..."
+            placeholderTextColor="#9A8B7A"
+            multiline
+            numberOfLines={3}
+          />
+        </View>
 
         {/* Proof of payment */}
-        <Text style={styles.sectionLabel}>PROOF OF PAYMENT (optional)</Text>
-        <TouchableOpacity style={styles.proofPicker} onPress={pickProof}>
-          {proof ? (
-            <View style={styles.proofPreviewWrap}>
-              <Image source={{ uri: proof }} style={styles.proofPreview} />
-              <TouchableOpacity style={styles.removeProof} onPress={() => setProof(null)}>
-                <Ionicons name="close-circle" size={24} color={COLORS.danger} />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.proofEmpty}>
-              <Ionicons name="image-outline" size={28} color={COLORS.textMuted} />
-              <Text style={styles.proofHint}>Tap to upload screenshot</Text>
-            </View>
-          )}
+        <Text style={styles.sectionLabel}>PROOF OF PAYMENT (OPTIONAL)</Text>
+        <TouchableOpacity
+          style={styles.proofContainer}
+          onPress={pickProof}
+          activeOpacity={0.85}
+        >
+          <View style={styles.proofInner}>
+            <Ionicons name="camera-outline" size={22} color="#206B82" style={{ marginBottom: 4 }} />
+            <Text style={styles.proofText}>
+              {proof
+                ? typeof proof === 'string' && proof.includes('/')
+                  ? 'Receipt Uploaded (custom)'
+                  : 'Receipt Uploaded (receipt_screenshot.png)'
+                : 'Tap to upload screenshot proof'}
+            </Text>
+          </View>
         </TouchableOpacity>
 
-        <Button
-          title="Submit Donation"
+        {/* Submit Button */}
+        <TouchableOpacity
+          style={[styles.submitBtn, loading && { opacity: 0.8 }]}
           onPress={handleSubmit}
-          loading={loading}
-          style={styles.submitBtn}
-          icon={<Ionicons name="heart" size={18} color="#fff" />}
-        />
+          activeOpacity={0.88}
+          disabled={loading}
+        >
+          <Text style={styles.submitBtnText}>
+            {loading ? 'Processing...' : 'Submit Donation'}
+          </Text>
+        </TouchableOpacity>
 
-        <Text style={styles.disclaimer}>
-          All donations will be verified by the Animal Advocate before being confirmed. Thank you for your support!
+        {/* Disclaimer note */}
+        <Text style={styles.disclaimerText}>
+          All donations are verified by the Animal Advocate before being confirmed.
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -189,70 +243,227 @@ export default function DonateScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: COLORS.background },
+  flex: {
+    flex: 1,
+    backgroundColor: '#F8FAF9',
+  },
   navbar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SIZES.paddingL, paddingTop: Platform.OS === 'ios' ? 52 : 28, paddingBottom: SIZES.paddingM,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 14,
+    backgroundColor: '#FFFFFF',
   },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  navTitle: { fontSize: SIZES.large, fontWeight: '700', color: COLORS.textPrimary },
-  scroll: { paddingHorizontal: SIZES.paddingL, paddingBottom: 40 },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F4F7F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#473018',
+  },
+  scroll: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 40,
+  },
 
-  targetBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: COLORS.advocateBadge, borderRadius: SIZES.radius,
-    padding: SIZES.paddingM, marginBottom: SIZES.paddingL,
-    borderWidth: 1.5, borderColor: COLORS.secondaryLight,
+  donatingForCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5EE',
+    borderWidth: 1.5,
+    borderColor: '#C5E2D2',
+    borderRadius: 22,
+    padding: 16,
+    marginBottom: 20,
   },
-  targetIconWrap: {
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: '#D4EDDA', alignItems: 'center', justifyContent: 'center',
+  giftCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#CCE7D7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
   },
-  targetText: {},
-  targetLabel: { fontSize: SIZES.small, color: COLORS.secondary, fontWeight: '600' },
-  targetName: { fontSize: SIZES.large, fontWeight: '800', color: COLORS.textPrimary, marginTop: 2 },
+  donatingTextCol: {
+    flex: 1,
+  },
+  donatingLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2D9E5F',
+  },
+  donatingName: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#473018',
+    marginTop: 2,
+  },
 
   sectionLabel: {
-    fontSize: SIZES.xsmall, fontWeight: '700', color: COLORS.textSecondary,
-    letterSpacing: 0.8, marginBottom: 10, marginTop: SIZES.paddingS,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#5C4E3A',
+    letterSpacing: 0.6,
+    marginBottom: 10,
   },
-  errInline: { color: COLORS.danger, fontWeight: '600' },
 
-  presetRow: { flexDirection: 'row', gap: 8, marginBottom: SIZES.paddingM },
-  presetBtn: {
-    flex: 1, paddingVertical: 10, borderRadius: SIZES.radius,
-    borderWidth: 1.5, borderColor: COLORS.border, alignItems: 'center',
-    backgroundColor: COLORS.surface,
+  presetRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
   },
-  presetBtnActive: { backgroundColor: COLORS.tagBg, borderColor: COLORS.primary },
-  presetText: { fontSize: SIZES.small, fontWeight: '700', color: COLORS.textSecondary },
-  presetTextActive: { color: COLORS.primary },
+  presetBox: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2ECF0',
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presetBoxActive: {
+    backgroundColor: '#E0F2FA',
+    borderColor: '#85CCE5',
+  },
+  presetText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#473018',
+  },
+  presetTextActive: {
+    color: '#2E7A99',
+    fontWeight: '800',
+  },
 
-  methodGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: SIZES.paddingM },
+  customAmountWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F7F8',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    height: 48,
+    marginBottom: 20,
+  },
+  currencyPrefix: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#473018',
+    marginRight: 6,
+  },
+  customAmountInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#473018',
+  },
+
+  methodGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 20,
+  },
   methodCard: {
-    width: '47%', flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingVertical: 12, paddingHorizontal: 14, borderRadius: SIZES.radius,
-    backgroundColor: COLORS.surface, borderWidth: 1.5, borderColor: COLORS.border,
-    ...SHADOWS.card,
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2ECF0',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
   },
-  methodCardActive: { borderColor: COLORS.primary, backgroundColor: COLORS.tagBg },
-  methodText: { fontSize: SIZES.small, fontWeight: '700', color: COLORS.textSecondary },
-  methodTextActive: { color: COLORS.primary },
-
-  proofPicker: { marginBottom: SIZES.paddingM },
-  proofPreviewWrap: { position: 'relative' },
-  proofPreview: { width: '100%', height: 160, borderRadius: SIZES.radius, resizeMode: 'cover' },
-  removeProof: { position: 'absolute', top: 8, right: 8 },
-  proofEmpty: {
-    height: 120, backgroundColor: COLORS.inputBg, borderRadius: SIZES.radius,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1.5,
-    borderColor: COLORS.border, borderStyle: 'dashed',
+  methodCardActive: {
+    backgroundColor: '#E0F2FA',
+    borderColor: '#85CCE5',
   },
-  proofHint: { fontSize: SIZES.small, color: COLORS.textMuted, marginTop: 6 },
+  methodText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#473018',
+  },
+  methodTextActive: {
+    color: '#2E7A99',
+  },
 
-  submitBtn: { marginTop: SIZES.paddingS, borderRadius: SIZES.radiusFull },
-  disclaimer: {
-    fontSize: SIZES.xsmall, color: COLORS.textMuted, textAlign: 'center',
-    lineHeight: 18, marginTop: SIZES.paddingM,
+  inputWrap: {
+    backgroundColor: '#F3F7F8',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 48,
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  textAreaWrap: {
+    height: 80,
+    paddingVertical: 8,
+  },
+  textInput: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#473018',
+  },
+  textArea: {
+    height: '100%',
+    textAlignVertical: 'top',
+  },
+
+  proofContainer: {
+    height: 72,
+    borderWidth: 1.5,
+    borderColor: '#92CDE5',
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    backgroundColor: '#F0F8FB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  proofInner: {
+    alignItems: 'center',
+  },
+  proofText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2E7A99',
+  },
+
+  submitBtn: {
+    backgroundColor: '#85BBD2',
+    borderRadius: 25,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+    shadowColor: '#2E7A99',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  submitBtnText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+
+  disclaimerText: {
+    fontSize: 11,
+    color: '#8C7D6A',
+    textAlign: 'center',
+    lineHeight: 16,
+    paddingHorizontal: 10,
   },
 });

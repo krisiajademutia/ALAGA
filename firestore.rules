@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdvocate() {
+      return isAuthenticated() && getUserData().role == 'advocate';
+    }
+
+    // ── Users Collection ──────────────────────────────────
+    match /users/{userId} {
+      // Anyone authenticated can view user profiles (for author cards, community info)
+      allow read: if isAuthenticated();
+      // Only the user can create or edit their own profile
+      allow create, update: if isOwner(userId);
+      allow delete: if false;
+
+      // Subcollection: Notifications
+      match /notifications/{notifId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // ── Rescues (Rescue Alerts) Collection ────────────────
+    match /rescues/{rescueId} {
+      // Public / authenticated read for real-time map and feed
+      allow read: if true;
+      // Any authenticated user can report a rescue case
+      allow create: if isAuthenticated() && request.resource.data.reporterId == request.auth.uid;
+      // Rescues can be updated by the reporter, or by advocates responding/rescuing
+      allow update: if isAuthenticated();
+      allow delete: if isAdvocate();
+
+      // Subcollection: Comments
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuthenticated();
+        allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      }
+    }
+
+    // ── Animals Collection ────────────────────────────────
+    match /animals/{animalId} {
+      // All users can view animal profiles for adoption/foster
+      allow read: if true;
+      // Only accredited advocates can create, update, or archive animal listings
+      allow create, update, delete: if isAdvocate();
+    }
+
+    // ── Applications Collection (Adoption / Foster) ───────
+    match /applications/{applicationId} {
+      // Requesters can see their own applications, advocates can see applications for their animals
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.requesterId ||
+        request.auth.uid == resource.data.advocateId ||
+        isAdvocate()
+      );
+      allow create: if isAuthenticated() && request.resource.data.requesterId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.advocateId ||
+        isAdvocate()
+      );
+    }
+
+    // ── Conversations & Messages ──────────────────────────
+    match /conversations/{convId} {
+      allow read, write: if isAuthenticated() && (
+        request.auth.uid in resource.data.participants ||
+        request.auth.uid in request.resource.data.participants
+      );
+
+      match /messages/{msgId} {
+        allow read, create: if isAuthenticated();
+      }
+    }
+
+    // ── Donations Collection ──────────────────────────────
+    match /donations/{donationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.donorId == request.auth.uid;
+      allow update: if isAdvocate();
+    }
+  }
+}

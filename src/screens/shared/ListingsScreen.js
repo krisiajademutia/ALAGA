@@ -8,7 +8,6 @@ import AnimalCard from '../../components/AnimalCard';
 import EmptyState from '../../components/EmptyState';
 
 const SPECIES = ['All', 'Dog', 'Cat', 'Bird', 'Rabbit', 'Other'];
-const SPECIES_EMOJI = { All: '🐾', Dog: '🐶', Cat: '🐱', Bird: '🐦', Rabbit: '🐰', Other: '🐾' };
 const TYPE_FILTERS = [
   { key: 'All',      label: 'All',       icon: 'grid-outline' },
   { key: 'Adoption', label: 'Adopt',     icon: 'home-outline' },
@@ -99,7 +98,7 @@ export default function ListingsScreen({ navigation }) {
                   activeOpacity={0.8}
                 >
                   <Text style={[styles.speciesText, isActive && styles.speciesTextActive]}>
-                    {SPECIES_EMOJI[s]} {speciesLabel}
+                    {speciesLabel}
                   </Text>
                 </TouchableOpacity>
               );

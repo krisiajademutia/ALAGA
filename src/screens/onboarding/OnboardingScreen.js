@@ -1,17 +1,46 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Animated } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  TouchableOpacity,
+  Animated,
+  Image,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES } from '../../constants/theme';
-import Button from '../../components/Button';
 
 const { width: W } = Dimensions.get('window');
 
 const SLIDES = [
-  { id: '1', emoji: '📍', icon: 'alert-circle', color: COLORS.danger,       bg: '#FFF0EE', title: 'Spot an animal\nin need?',          sub: 'Report stray, injured, or abandoned animals with a photo, condition, and GPS location — in seconds.' },
-  { id: '2', emoji: '🛡️', icon: 'shield-checkmark', color: COLORS.secondaryDark, bg: '#EEF8F3', title: 'Advocates\nrespond fast',    sub: 'Verified Animal Advocates receive instant alerts and can claim rescue cases they are willing to assist with.' },
-  { id: '3', emoji: '🏠', icon: 'heart', color: COLORS.primaryDeep,          bg: '#EDF6FB', title: 'Find them a\nforever home',        sub: 'Rescued animals can be listed for adoption or foster care. Apply directly through the app.' },
-  { id: '4', emoji: '🌍', icon: 'people', color: '#6D3FC2',                   bg: '#F3EEFF', title: 'One community,\none mission',     sub: 'Together, we turn individual concern into real rescue action. Every life deserves ALAGA.' },
+  {
+    id: '1',
+    image: require('../../../assets/onboarding-1.png'),
+    title: 'Welcome to Alaga!',
+    sub: 'Where every life deserves alaga.',
+    tagline: 'here in alaga,',
+  },
+  {
+    id: '2',
+    image: require('../../../assets/onboarding-2.png'),
+    title: 'We help an animal in need',
+    sub: 'Report stray, injured, or abandoned animals with a photo, condition, and GPS location – in seconds.',
+  },
+  {
+    id: '3',
+    image: require('../../../assets/onboarding-3.png'),
+    title: 'Advocates respond fast',
+    sub: 'Verified animal advocates receive instant alerts and can claim rescue cases they are willing to assist with.',
+  },
+  {
+    id: '4',
+    image: require('../../../assets/onboarding-4.png'),
+    title: 'Find them a forever home.',
+    sub: 'Rescued animals can be listed for adoption or foster care. Together, we turn individual concern into real rescue action',
+    tagline: 'Every life deserves ALAGA.',
+  },
 ];
 
 export default function OnboardingScreen({ navigation }) {
@@ -31,19 +60,22 @@ export default function OnboardingScreen({ navigation }) {
     <View style={styles.root}>
       <StatusBar style="dark" />
 
+      {/* Skip Button */}
       <TouchableOpacity
         style={styles.skipBtn}
         onPress={() => navigation.replace('Login')}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
       >
         <Text style={styles.skipText}>Skip</Text>
       </TouchableOpacity>
 
+      {/* Slides */}
       <Animated.FlatList
         ref={listRef}
         data={SLIDES}
         keyExtractor={(s) => s.id}
-        horizontal pagingEnabled
+        horizontal
+        pagingEnabled
         showsHorizontalScrollIndicator={false}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
@@ -57,17 +89,17 @@ export default function OnboardingScreen({ navigation }) {
 
       {/* Footer Area */}
       <View style={styles.footerContainer}>
-        {/* Dot indicators */}
+        {/* Dot Indicators */}
         <View style={styles.dots}>
           {SLIDES.map((_, i) => {
             const w = scrollX.interpolate({
               inputRange: [(i - 1) * W, i * W, (i + 1) * W],
-              outputRange: [8, 22, 8],
+              outputRange: [8, 24, 8],
               extrapolate: 'clamp',
             });
             const op = scrollX.interpolate({
               inputRange: [(i - 1) * W, i * W, (i + 1) * W],
-              outputRange: [0.3, 1, 0.3],
+              outputRange: [0.35, 1, 0.35],
               extrapolate: 'clamp',
             });
             return (
@@ -79,34 +111,29 @@ export default function OnboardingScreen({ navigation }) {
           })}
         </View>
 
-        {/* CTA */}
+        {/* Action Button */}
         <View style={styles.footer}>
-          <Button
-            title={idx === SLIDES.length - 1 ? 'Get Started' : 'Next'}
-            onPress={next}
-            fullWidth
+          <TouchableOpacity
             style={styles.btn}
-            icon={
-              <Ionicons
-                name={idx === SLIDES.length - 1 ? 'paw' : 'arrow-forward'}
-                size={17}
-                color="#fff"
-              />
-            }
-          />
-          {idx === SLIDES.length - 1 ? (
-            <TouchableOpacity
-              onPress={() => navigation.replace('Login')}
-              style={styles.loginLink}
-            >
-              <Text style={styles.loginText}>
-                Already have an account?{' '}
-                <Text style={styles.loginBold}>Log in</Text>
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={{ height: 38 }} />
-          )}
+            onPress={next}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="paw" size={18} color="#473018" style={{ marginRight: 8 }} />
+            <Text style={styles.btnText}>
+              {idx === SLIDES.length - 1 ? 'Get Started' : 'Next'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Login Link */}
+          <TouchableOpacity
+            onPress={() => navigation.replace('Login')}
+            style={styles.loginLink}
+          >
+            <Text style={styles.loginText}>
+              Already have an account?{' '}
+              <Text style={styles.loginBold}>Log in.</Text>
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -115,56 +142,89 @@ export default function OnboardingScreen({ navigation }) {
 
 function Slide({ item }) {
   return (
-    <View style={[styles.slide, { backgroundColor: item.bg, width: W }]}>
-      <View style={[styles.iconCircle, { borderColor: item.color + '30' }]}>
-        <View style={[styles.iconInner, { backgroundColor: item.color + '18' }]}>
-          <Text style={styles.slideEmoji}>{item.emoji}</Text>
-        </View>
+    <View style={styles.slide}>
+      {/* Illustration */}
+      <View style={styles.imageWrap}>
+        <Image source={item.image} style={styles.image} resizeMode="contain" />
       </View>
-      <Text style={styles.slideTitle}>{item.title}</Text>
-      <Text style={styles.slideSub}>{item.sub}</Text>
+
+      {/* Text block */}
+      <View style={styles.textContainer}>
+        <Text style={styles.slideTitle}>{item.title}</Text>
+        <Text style={styles.slideSub}>{item.sub}</Text>
+        {item.tagline ? (
+          <Text style={styles.slideTagline}>{item.tagline}</Text>
+        ) : null}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.background },
+  root: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
 
-  skipBtn: { position: 'absolute', top: 52, right: SIZES.lg24, zIndex: 10 },
-  skipText: { fontSize: SIZES.body, color: COLORS.textSecondary, fontWeight: '600' },
+  skipBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 24,
+    zIndex: 10,
+    padding: 6,
+  },
+  skipText: {
+    fontSize: 15,
+    color: '#473018',
+    fontWeight: '600',
+  },
 
   slide: {
+    width: W,
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: SIZES.xl32,
-    paddingTop: SIZES.xl40,
-    paddingBottom: 200, // Make room for footer
+    paddingHorizontal: 32,
+    paddingTop: 40,
+    paddingBottom: 170,
   },
-  iconCircle: {
-    width: 160, height: 160, borderRadius: 80,
-    borderWidth: 2,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: SIZES.xl32,
+  imageWrap: {
+    width: 220,
+    height: 220,
+    marginBottom: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  iconInner: {
-    width: 130, height: 130, borderRadius: 65,
-    alignItems: 'center', justifyContent: 'center',
+  image: {
+    width: 220,
+    height: 220,
   },
-  slideEmoji: { fontSize: 64 },
+
+  textContainer: {
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
   slideTitle: {
-    fontSize: SIZES.xxl,
+    fontSize: 24,
     fontWeight: '800',
-    color: COLORS.brown,
+    color: '#473018',
     textAlign: 'center',
-    lineHeight: 34,
-    marginBottom: SIZES.md16,
+    marginBottom: 12,
   },
   slideSub: {
-    fontSize: SIZES.md,
-    color: COLORS.textSecondary,
+    fontSize: 14,
+    color: '#5C4E3A',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 21,
+    marginBottom: 12,
+  },
+  slideTagline: {
+    fontSize: 16,
+    fontStyle: 'italic',
+    fontWeight: '700',
+    color: '#473018',
+    textAlign: 'center',
+    marginTop: 8,
   },
 
   footerContainer: {
@@ -172,29 +232,56 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingTop: SIZES.xl40, // Fade out gradient can go here if needed
+    backgroundColor: '#FFFFFF',
+    paddingBottom: 24,
   },
 
   dots: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: SIZES.xs4 + 2,
-    paddingVertical: SIZES.sm8,
+    gap: 6,
+    paddingVertical: 12,
   },
   dot: {
-    height: 7,
+    height: 8,
     borderRadius: 4,
-    backgroundColor: COLORS.primaryDeep,
+    backgroundColor: '#473018',
   },
 
   footer: {
-    paddingHorizontal: SIZES.lg24,
-    paddingBottom: SIZES.xl40,
-    paddingTop: SIZES.sm8,
+    paddingHorizontal: 28,
+    paddingTop: 4,
   },
-  btn:       { borderRadius: SIZES.r999 },
-  loginLink: { alignItems: 'center', marginTop: SIZES.md16 },
-  loginText: { fontSize: SIZES.body, color: COLORS.textSecondary },
-  loginBold: { color: COLORS.primaryDeep, fontWeight: '700' },
+  btn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#B8D3C3',
+    borderRadius: 25,
+    paddingVertical: 14,
+    shadowColor: '#473018',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  btnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#473018',
+  },
+  loginLink: {
+    alignItems: 'center',
+    marginTop: 14,
+    paddingVertical: 4,
+  },
+  loginText: {
+    fontSize: 13,
+    color: '#5C4E3A',
+  },
+  loginBold: {
+    color: '#473018',
+    fontWeight: '700',
+  },
 });

@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useApp } from '../context/AppContext';
@@ -44,17 +44,35 @@ import NotificationScreen  from '../screens/shared/NotificationScreen';
 // ─────────────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: COLORS.divider,
-    height: 62,
-    paddingBottom: 8,
+    borderTopColor: '#EBF1F4',
+    height: Platform.OS === 'ios' ? 84 : 64,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
     paddingTop: 6,
-    ...SHADOWS.sm,
+    shadowColor: '#102A38',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 8,
   },
   tabLabel: {
-    fontSize: SIZES.xs,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
+    letterSpacing: 0.1,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+  iconWrap: {
+    width: 44,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  iconWrapActive: {
+    backgroundColor: '#E2F0F4',
   },
 });
 
@@ -62,16 +80,24 @@ const styles = StyleSheet.create({
 const tabScreenOptions = {
   headerShown: false,
   tabBarStyle: styles.tabBar,
-  tabBarActiveTintColor: COLORS.primaryDeep,
-  tabBarInactiveTintColor: COLORS.textMuted,
+  tabBarActiveTintColor: '#206B82',
+  tabBarInactiveTintColor: '#8C9DA6',
   tabBarLabelStyle: styles.tabLabel,
+  tabBarHideOnKeyboard: true,
 };
 
 function tabOptions(label, activeIcon, inactiveIcon) {
   return {
     title: label,
+    tabBarLabel: label,
     tabBarIcon: ({ focused, color }) => (
-      <Ionicons name={focused ? activeIcon : inactiveIcon} size={22} color={color} />
+      <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+        <Ionicons
+          name={focused ? activeIcon : inactiveIcon}
+          size={20}
+          color={focused ? '#206B82' : '#8C9DA6'}
+        />
+      </View>
     ),
   };
 }
@@ -86,7 +112,7 @@ function CommunityTabs() {
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home"     component={CommunityHomeScreen} options={tabOptions('Home',     'home',         'home-outline')} />
-      <Tab.Screen name="Listings" component={ListingsScreen}      options={tabOptions('Adopt',    'heart',        'heart-outline')} />
+      <Tab.Screen name="Listings" component={ListingsScreen}      options={tabOptions('Adopt',    'paw',          'paw-outline')} />
       <Tab.Screen name="Messages" component={MessagesScreen}      options={tabOptions('Messages', 'chatbubbles',  'chatbubbles-outline')} />
       <Tab.Screen name="Activity" component={ActivityScreen}      options={tabOptions('Activity', 'time',         'time-outline')} />
       <Tab.Screen name="Profile"  component={ProfileScreen}       options={tabOptions('Profile',  'person',       'person-outline')} />

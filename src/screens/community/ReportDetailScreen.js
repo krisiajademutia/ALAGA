@@ -11,7 +11,7 @@ import MapCard from '../../components/MapCard';
 import { URGENCY_LEVELS } from '../../data/mockData';
 
 export default function ReportDetailScreen({ route, navigation }) {
-  const { reportId } = route.params;
+  const { reportId } = route.params || {};
   const { rescueReports, currentUser, addComment, respondToReport, markRescued } = useApp();
   const report = rescueReports.find((r) => r.id === reportId);
   const [commentText, setCommentText] = useState('');
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: COLORS.divider,
   },
   navBtn:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  navTitle: { fontSize: SIZES.large, fontWeight: '700', color: COLORS.brown },
+  navTitle: { fontSize: SIZES.large, fontWeight: '700', color: COLORS.brown, fontFamily: 'PlusJakartaSans_700Bold' },
 
   scroll: { padding: SIZES.paddingL, paddingBottom: 20 },
 
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     height: 160, backgroundColor: COLORS.tagBg, borderRadius: SIZES.radiusLg,
     alignItems: 'center', justifyContent: 'center', marginBottom: SIZES.paddingM,
   },
-  photoHint: { color: COLORS.textMuted, fontSize: SIZES.small, marginTop: 8 },
+  photoHint: { color: COLORS.textMuted, fontSize: SIZES.small, marginTop: 8, fontFamily: 'PlusJakartaSans_500Medium' },
 
   pillRow: { flexDirection: 'row', gap: 8, marginBottom: SIZES.paddingM },
   urgencyPill: {
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: SIZES.radiusFull,
   },
   urgencyDot:  { width: 8, height: 8, borderRadius: 4 },
-  urgencyText: { fontSize: SIZES.xsmall, fontWeight: '700' },
+  urgencyText: { fontSize: SIZES.xsmall, fontWeight: '700', fontFamily: 'PlusJakartaSans_700Bold' },
 
   card: {
     backgroundColor: COLORS.surface, borderRadius: SIZES.radiusLg,
@@ -307,6 +307,8 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: SIZES.body, fontWeight: '800',
     color: COLORS.brown, marginBottom: 12,
+    letterSpacing: -0.2,
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
   mapCard: { borderRadius: SIZES.radius, overflow: 'hidden' },
@@ -317,27 +319,30 @@ const styles = StyleSheet.create({
   infoLabel:  {
     fontSize: SIZES.xsmall, color: COLORS.textMuted,
     fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6,
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
-  infoValue:  { fontSize: SIZES.body, color: COLORS.brown, marginTop: 3, lineHeight: 20 },
+  infoValue:  { fontSize: SIZES.body, color: COLORS.brown, marginTop: 3, lineHeight: 20, fontFamily: 'PlusJakartaSans_500Medium' },
 
   userRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   userInfo: { flex: 1 },
-  userName: { fontSize: SIZES.body, fontWeight: '700', color: COLORS.brown },
-  userSub:  { fontSize: SIZES.small, color: COLORS.textMuted, marginTop: 2 },
+  userName: { fontSize: SIZES.body, fontWeight: '700', color: COLORS.brown, fontFamily: 'PlusJakartaSans_700Bold' },
+  userSub:  { fontSize: SIZES.small, color: COLORS.textMuted, marginTop: 2, fontFamily: 'PlusJakartaSans_500Medium' },
 
   responderCard: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: COLORS.advocateBadge,
   },
-  responderText: { flex: 1, fontSize: SIZES.body, color: COLORS.secondaryDark, fontWeight: '600' },
+  responderText: { flex: 1, fontSize: SIZES.body, color: COLORS.secondaryDark, fontWeight: '600', fontFamily: 'PlusJakartaSans_600SemiBold' },
 
   actionBtn: { marginBottom: SIZES.paddingM, borderRadius: SIZES.radiusFull },
 
   commentsTitle: {
     fontSize: SIZES.medium, fontWeight: '800',
     color: COLORS.brown, marginBottom: SIZES.paddingM,
+    letterSpacing: -0.2,
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
-  noComments: { fontSize: SIZES.body, color: COLORS.textMuted, marginBottom: SIZES.paddingM },
+  noComments: { fontSize: SIZES.body, color: COLORS.textMuted, marginBottom: SIZES.paddingM, fontFamily: 'PlusJakartaSans_400Regular' },
 
   commentNodeWrap: { marginBottom: 8 },
   replyIndent: {
@@ -357,19 +362,19 @@ const styles = StyleSheet.create({
   commentBubbleReply: {
     backgroundColor: COLORS.inputBg,
   },
-  commentUser: { fontSize: SIZES.small, fontWeight: '700', color: COLORS.brown },
-  commentText: { fontSize: SIZES.body, color: COLORS.textSecondary, marginTop: 2, lineHeight: 20 },
+  commentUser: { fontSize: SIZES.small, fontWeight: '700', color: COLORS.brown, fontFamily: 'PlusJakartaSans_700Bold' },
+  commentText: { fontSize: SIZES.body, color: COLORS.textSecondary, marginTop: 2, lineHeight: 20, fontFamily: 'PlusJakartaSans_400Regular' },
   commentMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
-  commentTime: { fontSize: SIZES.xsmall, color: COLORS.textMuted },
+  commentTime: { fontSize: SIZES.xsmall, color: COLORS.textMuted, fontFamily: 'PlusJakartaSans_500Medium' },
   replyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 2 },
-  replyBtnText: { fontSize: SIZES.xsmall, fontWeight: '700', color: COLORS.primaryDeep },
+  replyBtnText: { fontSize: SIZES.xsmall, fontWeight: '700', color: COLORS.primaryDeep, fontFamily: 'PlusJakartaSans_700Bold' },
 
   replyBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SIZES.paddingL, paddingVertical: 8,
     backgroundColor: COLORS.tagBg, borderTopWidth: 1, borderTopColor: COLORS.divider,
   },
-  replyBannerText: { fontSize: SIZES.small, color: COLORS.primaryDeep },
+  replyBannerText: { fontSize: SIZES.small, color: COLORS.primaryDeep, fontFamily: 'PlusJakartaSans_600SemiBold' },
 
   inputBar: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -382,6 +387,7 @@ const styles = StyleSheet.create({
     borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8,
     fontSize: SIZES.body, color: COLORS.brown,
     borderWidth: 1.5, borderColor: COLORS.border,
+    fontFamily: 'PlusJakartaSans_500Medium',
   },
   sendBtn:         { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled: { opacity: 0.35 },

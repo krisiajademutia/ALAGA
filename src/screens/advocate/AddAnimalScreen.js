@@ -8,6 +8,7 @@ import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import { ANIMAL_SPECIES, FOSTER_DURATIONS } from '../../data/mockData';
+import { uploadImageToImgBB } from '../../services/storageService';
 
 const GENDERS       = ['Male', 'Female', 'Unknown'];
 const LISTING_TYPES = [
@@ -78,42 +79,45 @@ export default function AddAnimalScreen({ route, navigation }) {
     return !Object.keys(e).length;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validate()) return;
     setLoading(true);
     
-    setTimeout(() => {
-      try {
-        const tags = tagsText.split(',').map((t) => t.trim()).filter(Boolean);
-        addAnimal({
-          name: name.trim(),
-          species:  species === 'Other' ? otherSpecies.trim() : species,
-          breed:    breed.trim()    || 'Unknown',
-          age:      age.trim()      || 'Unknown',
-          size,
-          gender,
-          color:    color.trim()    || 'Unknown',
-          condition:condition.trim()|| 'Healthy',
-          specialNeeds: specialNeeds.trim() || null,
-          description: description.trim(),
-          status: readiness,
-          listingType,
-          fosterDuration: needsFosterDuration ? fosterDuration || null : null,
-          vaccinated,
-          neutered,
-          photo,
-          tags,
-          rescueReportId: selectedRescueId,
-        });
-        
-        setLoading(false);
-        // Cleanly switch to Advocates' "My Animals" tab
-        navigation.navigate('MainTabs', { screen: 'MyAnimals' });
-      } catch (err) {
-        setLoading(false);
-        Alert.alert('Error', 'An error occurred while saving: ' + err.message);
+    try {
+      let finalPhoto = photo;
+      if (photo && !photo.startsWith('http')) {
+        finalPhoto = await uploadImageToImgBB(photo);
       }
-    }, 500);
+
+      const tags = tagsText.split(',').map((t) => t.trim()).filter(Boolean);
+      addAnimal({
+        name: name.trim(),
+        species:  species === 'Other' ? otherSpecies.trim() : species,
+        breed:    breed.trim()    || 'Unknown',
+        age:      age.trim()      || 'Unknown',
+        size,
+        gender,
+        color:    color.trim()    || 'Unknown',
+        condition:condition.trim()|| 'Healthy',
+        specialNeeds: specialNeeds.trim() || null,
+        description: description.trim(),
+        status: readiness,
+        listingType,
+        fosterDuration: needsFosterDuration ? fosterDuration || null : null,
+        vaccinated,
+        neutered,
+        photo: finalPhoto,
+        tags,
+        rescueReportId: selectedRescueId,
+      });
+      
+      setLoading(false);
+      // Cleanly switch to Advocates' "My Animals" tab
+      navigation.navigate('MainTabs', { screen: 'MyAnimals' });
+    } catch (err) {
+      setLoading(false);
+      Alert.alert('Error', 'An error occurred while saving: ' + err.message);
+    }
   };
 
   return (
@@ -169,7 +173,7 @@ export default function AddAnimalScreen({ route, navigation }) {
         {/* ── Basic info ─────────────────────────────────────── */}
         <Input
           label="Animal Name"
-          placeholder="e.g. Bantay, Mimi"
+          placeholder="e.g. Meg, Kareena, Kriska, Trisha"
           value={name}
           onChangeText={(t) => { setName(t); setErrors((e) => ({ ...e, name: null })); }}
           autoCapitalize="words"
@@ -193,7 +197,7 @@ export default function AddAnimalScreen({ route, navigation }) {
         )}
 
         <Input label="Breed (optional)" placeholder="e.g. Aspin, Puspin" value={breed} onChangeText={setBreed} autoCapitalize="words" />
-        <Input label="Estimated Age"   placeholder="e.g. ~2 years, 3 months" value={age} onChangeText={setAge} />
+        <Input label="Estimated Age"   placeholder="e.g. 2 years, 3 months" value={age} onChangeText={setAge} />
 
         <Label text="GENDER" error={errors.gender} />
         <View style={styles.scrollRow}>

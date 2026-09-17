@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.r999,
   },
   urgencyDot:   { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.85)' },
-  urgencyLabel: { fontSize: SIZES.xs, fontWeight: '800', color: '#fff' },
+  urgencyLabel: { fontSize: SIZES.xs, fontWeight: '800', color: '#fff', fontFamily: 'PlusJakartaSans_700Bold' },
   statusPos:    { position: 'absolute', top: SIZES.sm8, right: SIZES.sm8 },
 
   // Body
@@ -142,9 +142,10 @@ const styles = StyleSheet.create({
   reporterName: {
     fontSize: SIZES.sm, fontWeight: '700',
     color: COLORS.textPrimary, flexShrink: 1,
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
   dot:    { fontSize: SIZES.xs, color: COLORS.textMuted },
-  timeAgo:{ fontSize: SIZES.xs, color: COLORS.textMuted },
+  timeAgo:{ fontSize: SIZES.xs, color: COLORS.textMuted, fontFamily: 'PlusJakartaSans_500Medium' },
   spacer: { flex: 1 },
 
   animalChip: {
@@ -153,20 +154,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZES.sm8, paddingVertical: 2,
     borderRadius: SIZES.r999,
   },
-  animalChipText: { fontSize: SIZES.xs, fontWeight: '700', color: COLORS.primaryDeep },
+  animalChipText: { fontSize: SIZES.xs, fontWeight: '700', color: COLORS.primaryDeep, fontFamily: 'PlusJakartaSans_700Bold' },
 
   desc: {
-    fontSize: SIZES.body,
+    fontSize: 13.5,
     color: COLORS.textPrimary,
     lineHeight: 20,
     marginBottom: SIZES.xs4 + 2,
+    fontFamily: 'PlusJakartaSans_400Regular',
   },
 
   locRow: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     marginBottom: SIZES.sm8,
   },
-  locText: { fontSize: SIZES.xs, color: COLORS.textSecondary, flex: 1 },
+  locText: { fontSize: SIZES.xs, color: COLORS.textSecondary, flex: 1, fontFamily: 'PlusJakartaSans_500Medium' },
 
   footer: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -174,7 +176,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: COLORS.divider,
   },
   commentRow:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  commentText: { fontSize: SIZES.xs, color: COLORS.textMuted },
+  commentText: { fontSize: SIZES.xs, color: COLORS.textMuted, fontFamily: 'PlusJakartaSans_500Medium' },
   viewRow:     { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  viewLabel:   { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.primaryDeep },
+  viewLabel:   { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.primaryDeep, fontFamily: 'PlusJakartaSans_700Bold' },
 });

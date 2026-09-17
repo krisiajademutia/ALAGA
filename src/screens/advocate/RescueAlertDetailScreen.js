@@ -1,464 +1,648 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
-import StatusPill from '../../components/StatusPill';
 import Avatar from '../../components/Avatar';
-import Button from '../../components/Button';
-import MapCard from '../../components/MapCard';
-import { URGENCY_LEVELS } from '../../data/mockData';
 
 export default function RescueAlertDetailScreen({ route, navigation }) {
-  const { reportId } = route.params;
+  const { reportId } = route.params || {};
   const {
-    rescueReports, currentUser, addComment,
-    respondToReport, markRescued, startConversation,
+    rescueReports,
+    currentUser,
+    addComment,
+    respondToReport,
+    startConversation,
   } = useApp();
 
-  const report = rescueReports.find((r) => r.id === reportId);
+  const report = rescueReports.find((r) => r.id === reportId) || rescueReports[0];
   const [commentText, setCommentText] = useState('');
-  const [replyTarget, setReplyTarget] = useState(null); // { id, name }
+  const [isFav, setIsFav] = useState(false);
 
   if (!report) return null;
 
-  const urgency        = URGENCY_LEVELS.find((u) => u.label === report.urgency) || URGENCY_LEVELS[2];
-  const isResponder    = currentUser?.id === report.responderId;
-  const canRespond     = report.status === 'Open';
-  const canMarkRescued = isResponder && report.status === 'Responded';
-  const canAddAnimal   = isResponder && report.status === 'Rescued';
-
   const handleRespond = () => {
+    respondToReport(report.id);
     Alert.alert(
-      'Respond to Rescue',
-      'You are about to claim this rescue case. Other advocates will see it is being handled.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: "I'll Help",
-          onPress: () => {
-            respondToReport(reportId);
-            Alert.alert(
-              'Responded!',
-              'You have claimed this rescue case. Please assist the animal as soon as possible.'
-            );
-          },
-        },
-      ]
+      'Responded',
+      'You have claimed to assist this rescue case. Other advocates can see you responded.'
     );
   };
 
-  const handleMarkRescued = () => {
-    Alert.alert(
-      'Mark as Rescued',
-      'Confirm that you have successfully rescued this animal.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: () => {
-            markRescued(reportId);
-            Alert.alert(
-              'Rescue Complete! 🎉',
-              'Great work! You can now create an animal profile for this rescue.',
-              [
-                {
-                  text: 'Create Animal Profile',
-                  onPress: () => navigation.navigate('AddAnimal', { rescueReportId: reportId }),
-                },
-                { text: 'Later', style: 'cancel' },
-              ]
-            );
-          },
-        },
-      ]
-    );
-  };
-
-  const handleMessageReporter = () => {
+  const handleMessageAdvocate = () => {
     const convId = startConversation(
       report.reporterId,
       report.reporterName,
-      `Hi! I saw your rescue report for the ${report.animalType} at ${report.location?.address}. I can help!`
+      `Hi! I saw the rescue alert for ${report.title || report.animalType}. I can help!`
     );
-    navigation.navigate('Chat', { conversationId: convId, otherName: report.reporterName });
+    navigation.navigate('Chat', {
+      conversationId: convId,
+      otherName: report.reporterName,
+    });
   };
 
-  const handleComment = () => {
+  const handleSendComment = () => {
     if (!commentText.trim()) return;
-    addComment(reportId, commentText.trim(), replyTarget?.id || null);
+    addComment(report.id, commentText.trim());
     setCommentText('');
-    setReplyTarget(null);
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={80}
     >
-      <StatusBar style="dark" />
-
-      {/* Navbar */}
-      <View style={styles.navbar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.navBtn}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.brown} />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>Rescue Alert</Text>
-        <View style={{ width: 36 }} />
-      </View>
+      <StatusBar style="light" />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Photo */}
-        {report.photo ? (
-          <Image source={{ uri: report.photo }} style={styles.photo} />
-        ) : (
-          <View style={styles.photoPlaceholder}>
-            <Ionicons name="paw" size={48} color={COLORS.primaryLight} />
-            <Text style={styles.photoHint}>No photo attached</Text>
-          </View>
-        )}
+        {/* ── Top Hero Image & Floating Buttons ──────────────── */}
+        <View style={styles.heroWrap}>
+          {report.photo ? (
+            <Image source={{ uri: report.photo }} style={styles.heroImage} resizeMode="cover" />
+          ) : (
+            <View style={styles.placeholderWrap}>
+              <Ionicons name="paw" size={64} color="#92CDE5" />
+            </View>
+          )}
 
-        {/* Status + Urgency pills */}
-        <View style={styles.pillRow}>
-          <StatusPill status={report.status} />
-          <View style={[styles.urgencyPill, { backgroundColor: urgency.bg }]}>
-            <View style={[styles.urgencyDot, { backgroundColor: urgency.color }]} />
-            <Text style={[styles.urgencyText, { color: urgency.color }]}>
-              {report.urgency} Urgency
+          {/* Floating Back */}
+          <TouchableOpacity
+            style={styles.floatingBack}
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="arrow-back" size={20} color="#473018" />
+          </TouchableOpacity>
+
+          {/* Floating Heart */}
+          <TouchableOpacity
+            style={styles.floatingHeart}
+            onPress={() => setIsFav(!isFav)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={isFav ? 'heart' : 'heart-outline'}
+              size={20}
+              color={isFav ? '#D94F4F' : '#D94F4F'}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Sheet Body ────────────────────────────────────── */}
+        <View style={styles.sheetBody}>
+          <View style={styles.sheetHandle} />
+
+          {/* Rescue Case Title */}
+          <Text style={styles.detailTitle}>
+            {report.title || `${report.animalType || 'Animal'} Rescue Alert`}
+          </Text>
+
+          {/* Location & Date */}
+          <View style={styles.locRow}>
+            <Ionicons name="location-sharp" size={15} color="#D94F4F" style={{ marginRight: 4 }} />
+            <Text style={styles.locText}>
+              {report.location?.address || 'Pasig City (1.2 km away)'} • {report.dateDisplay || 'August 26, 2026'}
             </Text>
           </View>
-        </View>
 
-        {/* Animal details */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Animal Details</Text>
-          <InfoRow icon="paw-outline"           label="Type"        value={report.animalType} />
-          <InfoRow icon="medical-outline"        label="Condition"   value={report.condition} />
-          <InfoRow icon="document-text-outline"  label="Description" value={report.description} />
-        </View>
+          {/* 3 Stats Cards */}
+          <View style={styles.statsRow}>
+            <View style={[styles.statCard, styles.statGreen]}>
+              <Text style={styles.statLabel}>Gender</Text>
+              <Text style={styles.statVal}>{report.gender || 'Male'}</Text>
+            </View>
+            <View style={[styles.statCard, styles.statYellow]}>
+              <Text style={styles.statLabel}>Type</Text>
+              <Text style={styles.statVal}>{report.animalType || 'Dog'}</Text>
+            </View>
+            <View style={[styles.statCard, styles.statBlue]}>
+              <Text style={styles.statLabel}>Condition</Text>
+              <Text style={styles.statVal}>{report.condition || 'Injured'}</Text>
+            </View>
+          </View>
 
-        {/* ── Location card with interactive map ─────────────── */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Location</Text>
-          <MapCard
-            location={report.location}
-            title={`${report.animalType} reported here`}
-            style={styles.mapCard}
-          />
-        </View>
-
-        {/* Reporter card — tappable → PublicProfile */}
-        <View style={styles.card}>
-          <View style={styles.reporterHeader}>
-            <Text style={styles.cardTitle}>Reported By</Text>
-            <TouchableOpacity style={styles.msgBtn} onPress={handleMessageReporter}>
-              <Ionicons name="chatbubble-ellipses" size={15} color={COLORS.primaryDeep} />
-              <Text style={styles.msgBtnText}>Message</Text>
+          {/* Advocate Card */}
+          <View style={styles.advocateCard}>
+            <View style={styles.advocateLeft}>
+              <Avatar name={report.reporterName || 'Elena Ramos'} size={42} />
+              <View style={styles.advocateTextCol}>
+                <Text style={styles.advocateName}>{report.reporterName || 'Elena Ramos'}</Text>
+                <Text style={styles.advocateRole}>
+                  Verified Community Foster Advocate
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.chatBtn}
+              onPress={handleMessageAdvocate}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="chatbubble" size={14} color="#473018" style={{ marginRight: 4 }} />
+              <Text style={styles.chatBtnText}>Chat</Text>
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={styles.userRow}
-            onPress={() => navigation.navigate('PublicProfile', { userId: report.reporterId })}
-            activeOpacity={0.8}
-          >
-            <Avatar name={report.reporterName} size={42} />
-            <View style={styles.userInfo}>
-              <Text style={styles.userName}>{report.reporterName}</Text>
-              <Text style={styles.userSub}>
-                {new Date(report.createdAt).toLocaleDateString('en-PH', { dateStyle: 'medium' })}
-              </Text>
+          {/* Description */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Description</Text>
+            <Text style={styles.descText}>{report.description}</Text>
+
+            {/* Badges */}
+            <View style={styles.badgesRow}>
+              {(report.tags || ['Injured', 'Aggressive', 'Needs help', 'Scared']).map(
+                (tag, idx) => (
+                  <View
+                    key={tag}
+                    style={[
+                      styles.tagPill,
+                      idx === 0 && styles.tagPillGreen,
+                      idx === 1 && styles.tagPillYellow,
+                      idx === 2 && styles.tagPillBlue,
+                      idx === 3 && styles.tagPillTeal,
+                    ]}
+                  >
+                    <Text style={styles.tagText}>{tag}</Text>
+                  </View>
+                )
+              )}
             </View>
-            <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Responder status */}
-        {isResponder && report.status === 'Responded' && (
-          <View style={styles.activeCaseBanner}>
-            <Ionicons name="shield-checkmark" size={18} color={COLORS.secondaryDark} />
-            <Text style={styles.activeCaseText}>You are actively handling this case</Text>
           </View>
-        )}
 
-        {/* Advocate action buttons */}
-        {canRespond && (
-          <Button
-            title="Respond — I'll Help!"
-            onPress={handleRespond}
-            variant="secondary"
-            style={styles.actionBtn}
-            icon={<Ionicons name="shield-checkmark-outline" size={18} color="#fff" />}
-          />
-        )}
-        {canMarkRescued && (
-          <Button
-            title="Mark Animal as Rescued"
-            onPress={handleMarkRescued}
-            style={styles.actionBtn}
-            icon={<Ionicons name="checkmark-circle-outline" size={18} color="#fff" />}
-          />
-        )}
-        {canAddAnimal && (
-          <Button
-            title="Create Animal Profile"
-            onPress={() => navigation.navigate('AddAnimal', { rescueReportId: reportId })}
-            variant="outline"
-            style={styles.actionBtn}
-            icon={<Ionicons name="paw-outline" size={18} color={COLORS.primaryDeep} />}
-          />
-        )}
-
-        {/* Comments */}
-        <Text style={styles.commentsTitle}>
-          Comments ({countComments(report.comments)})
-        </Text>
-        {(!report.comments || report.comments.length === 0) && (
-          <Text style={styles.noComments}>No comments yet.</Text>
-        )}
-        {report.comments?.map((c) => (
-          <CommentNode
-            key={c.id}
-            comment={c}
-            onReply={(target) => {
-              setReplyTarget({ id: target.id, name: target.userName });
-            }}
-            onUserPress={(userId) => navigation.navigate('PublicProfile', { userId })}
-          />
-        ))}
-      </ScrollView>
-
-      {/* Replying Banner */}
-      {replyTarget && (
-        <View style={styles.replyBanner}>
-          <Text style={styles.replyBannerText}>
-            Replying to <Text style={{ fontWeight: '700' }}>{replyTarget.name}</Text>
-          </Text>
-          <TouchableOpacity onPress={() => setReplyTarget(null)}>
-            <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+          {/* Map Preview Card */}
+          <TouchableOpacity
+            style={styles.mapCard}
+            onPress={() => navigation.navigate('RescueAlerts')}
+            activeOpacity={0.9}
+          >
+            <View style={styles.mapPlaceholder}>
+              <Ionicons name="location" size={32} color="#D94F4F" />
+              <Text style={styles.mapNotice}>Interactive Map View</Text>
+            </View>
+            <View style={styles.mapFooter}>
+              <View style={styles.mapFooterLeft}>
+                <Ionicons name="location-outline" size={16} color="#473018" />
+                <Text style={styles.mapFooterText}>
+                  {report.location?.landmark || 'Near Bantay Hayop Clinic, Pasig Blvd'}
+                </Text>
+              </View>
+              <Text style={styles.mapFooterLink}>Click to view full map</Text>
+            </View>
           </TouchableOpacity>
-        </View>
-      )}
 
-      {/* Comment input */}
-      <View style={styles.inputBar}>
-        <Avatar name={currentUser?.name} size={34} />
-        <TextInput
-          style={styles.commentInput}
-          placeholder={replyTarget ? `Reply to ${replyTarget.name}...` : "Write a comment..."}
-          placeholderTextColor={COLORS.textMuted}
-          value={commentText}
-          onChangeText={setCommentText}
-          returnKeyType="send"
-          onSubmitEditing={handleComment}
-        />
-        <TouchableOpacity
-          style={[styles.sendBtn, !commentText.trim() && styles.sendBtnDisabled]}
-          onPress={handleComment}
-          disabled={!commentText.trim()}
-        >
-          <Ionicons
-            name="send"
-            size={18}
-            color={commentText.trim() ? COLORS.primaryDeep : COLORS.textMuted}
-          />
-        </TouchableOpacity>
-      </View>
+          {/* Respond Button */}
+          <TouchableOpacity
+            style={styles.respondBtn}
+            onPress={handleRespond}
+            activeOpacity={0.88}
+          >
+            <Text style={styles.respondBtnText}>Respond (I’ll help!)</Text>
+          </TouchableOpacity>
+
+          {/* Comments Section */}
+          <View style={styles.commentsSection}>
+            <Text style={styles.commentsTitle}>
+              Comments ({report.comments?.length || 1})
+            </Text>
+
+            {(report.comments && report.comments.length > 0
+              ? report.comments
+              : [
+                  {
+                    id: 'c1',
+                    userName: 'Juan Dela Cruz',
+                    text: 'Hello po willing to help po! I sent a message',
+                    createdAt: 'Aug 27, 2026 3:50 PM',
+                  },
+                ]
+            ).map((c) => (
+              <View key={c.id} style={styles.commentItem}>
+                <Avatar name={c.userName} size={36} />
+                <View style={styles.commentBubble}>
+                  <Text style={styles.commentUser}>{c.userName}</Text>
+                  <Text style={styles.commentContent}>{c.text}</Text>
+                  <View style={styles.commentBottomRow}>
+                    <Text style={styles.commentTime}>{c.createdAt}</Text>
+                    <TouchableOpacity style={styles.replyBtn}>
+                      <Ionicons name="chatbubble-outline" size={12} color="#2E7A99" />
+                      <Text style={styles.replyBtnText}>Reply</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            ))}
+
+            {/* Write comment input */}
+            <View style={styles.writeCommentRow}>
+              <Avatar name={currentUser?.name || 'Kareena Jane'} size={34} />
+              <View style={styles.commentInputWrap}>
+                <TextInput
+                  style={styles.commentInput}
+                  placeholder="Write a comment..."
+                  placeholderTextColor="#8C7D6A"
+                  value={commentText}
+                  onChangeText={setCommentText}
+                />
+              </View>
+              <TouchableOpacity
+                style={styles.sendIconBtn}
+                onPress={handleSendComment}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="paper-plane-outline" size={22} color="#2E7A99" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-function countComments(comments = []) {
-  let count = 0;
-  comments.forEach((c) => {
-    count += 1;
-    if (c.replies) count += countComments(c.replies);
-  });
-  return count;
-}
-
-function CommentNode({ comment, onReply, onUserPress, depth = 0 }) {
-  const isReply = depth > 0;
-  return (
-    <View style={[styles.commentNodeWrap, isReply && styles.replyIndent]}>
-      <View style={styles.commentItem}>
-        <TouchableOpacity onPress={() => onUserPress(comment.userId)} style={{ marginTop: 2 }}>
-          <Avatar name={comment.userName} size={isReply ? 26 : 32} />
-        </TouchableOpacity>
-        <View style={[styles.commentBubble, isReply && styles.commentBubbleReply]}>
-          <Text style={styles.commentUser}>{comment.userName}</Text>
-          <Text style={styles.commentText}>{comment.text}</Text>
-          <View style={styles.commentMeta}>
-            <Text style={styles.commentTime}>
-              {new Date(comment.createdAt).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}
-            </Text>
-            <TouchableOpacity onPress={() => onReply(comment)} style={styles.replyBtn}>
-              <Ionicons name="chatbubble-outline" size={13} color={COLORS.primaryDeep} />
-              <Text style={styles.replyBtnText}>Reply</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-      {comment.replies && comment.replies.length > 0 && (
-        <View style={styles.repliesList}>
-          {comment.replies.map((r) => (
-            <CommentNode key={r.id} comment={r} onReply={onReply} onUserPress={onUserPress} depth={Math.min(depth + 1, 2)} />
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
-
-function InfoRow({ icon, label, value }) {
-  return (
-    <View style={styles.infoRow}>
-      <Ionicons name={icon} size={15} color={COLORS.textMuted} style={styles.infoIcon} />
-      <View style={styles.infoContent}>
-        <Text style={styles.infoLabel}>{label}</Text>
-        <Text style={styles.infoValue}>{value}</Text>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: COLORS.background },
-
-  navbar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SIZES.paddingL, paddingTop: Platform.OS === 'ios' ? 52 : 28, paddingBottom: SIZES.paddingM,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1, borderBottomColor: COLORS.divider,
+  flex: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
   },
-  navBtn:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  navTitle: { fontSize: SIZES.large, fontWeight: '700', color: COLORS.brown },
-
-  scroll: { padding: SIZES.paddingL, paddingBottom: 20 },
-
-  photo: {
-    width: '100%', height: 220, borderRadius: SIZES.radiusLg,
-    marginBottom: SIZES.paddingM, resizeMode: 'cover',
-  },
-  photoPlaceholder: {
-    height: 160, backgroundColor: COLORS.tagBg, borderRadius: SIZES.radiusLg,
-    alignItems: 'center', justifyContent: 'center', marginBottom: SIZES.paddingM,
-  },
-  photoHint: { color: COLORS.textMuted, fontSize: SIZES.small, marginTop: 8 },
-
-  pillRow: { flexDirection: 'row', gap: 8, marginBottom: SIZES.paddingM },
-  urgencyPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: SIZES.radiusFull,
-  },
-  urgencyDot:  { width: 8, height: 8, borderRadius: 4 },
-  urgencyText: { fontSize: SIZES.xsmall, fontWeight: '700' },
-
-  card: {
-    backgroundColor: COLORS.surface, borderRadius: SIZES.radiusLg,
-    padding: SIZES.paddingM, marginBottom: SIZES.paddingM, ...SHADOWS.card,
-  },
-  cardTitle: {
-    fontSize: SIZES.body, fontWeight: '800',
-    color: COLORS.brown, marginBottom: 12,
+  scroll: {
+    paddingBottom: 40,
   },
 
-  mapCard: { borderRadius: SIZES.radius, overflow: 'hidden' },
-
-  infoRow:     { flexDirection: 'row', marginBottom: 10 },
-  infoIcon:    { marginRight: 10, marginTop: 2 },
-  infoContent: { flex: 1 },
-  infoLabel: {
-    fontSize: SIZES.xsmall, color: COLORS.textMuted,
-    fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6,
+  heroWrap: {
+    position: 'relative',
+    height: 240,
+    backgroundColor: '#E8F2F6',
   },
-  infoValue: { fontSize: SIZES.body, color: COLORS.brown, marginTop: 3, lineHeight: 20 },
-
-  reporterHeader: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 12,
+  heroImage: {
+    width: '100%',
+    height: '100%',
   },
-  msgBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 12, paddingVertical: 7,
-    borderRadius: SIZES.radiusFull,
-    backgroundColor: COLORS.tagBg,
-    borderWidth: 1.5, borderColor: COLORS.primaryLight,
+  placeholderWrap: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E8F2F6',
   },
-  msgBtnText: { fontSize: SIZES.small, fontWeight: '700', color: COLORS.primaryDeep },
-
-  userRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  userInfo: { flex: 1 },
-  userName: { fontSize: SIZES.body, fontWeight: '700', color: COLORS.brown },
-  userSub:  { fontSize: SIZES.small, color: COLORS.textMuted, marginTop: 2 },
-
-  activeCaseBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: COLORS.advocateBadge,
-    borderRadius: SIZES.radius,
-    padding: SIZES.paddingM,
-    marginBottom: SIZES.paddingM,
+  floatingBack: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 32,
+    left: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.card,
   },
-  activeCaseText: { fontSize: SIZES.body, color: COLORS.secondaryDark, fontWeight: '700', flex: 1 },
+  floatingHeart: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 32,
+    right: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.card,
+  },
 
-  actionBtn: { marginBottom: SIZES.paddingM, borderRadius: SIZES.radiusFull },
+  sheetBody: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -24,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+  },
+  sheetHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#D6D3D1',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
 
+  detailTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#241408',
+    letterSpacing: -0.3,
+    marginBottom: 6,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  locRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  locText: {
+    fontSize: 13,
+    color: '#5C4E3A',
+    fontWeight: '500',
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 18,
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+  },
+  statGreen: {
+    backgroundColor: '#E8F5EE',
+  },
+  statYellow: {
+    backgroundColor: '#FEF8DE',
+  },
+  statBlue: {
+    backgroundColor: '#E0F2FA',
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#8C7D6A',
+    fontWeight: '600',
+    marginBottom: 4,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+  statVal: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+
+  advocateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E3EFF6',
+    borderRadius: 20,
+    padding: 14,
+    marginBottom: 20,
+    ...SHADOWS.sm,
+  },
+  advocateLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  advocateTextCol: {
+    flex: 1,
+  },
+  advocateName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  advocateRole: {
+    fontSize: 11,
+    color: '#8C7D6A',
+    marginTop: 2,
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  chatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FBEEAC',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 18,
+  },
+  chatBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#473018',
+    marginBottom: 8,
+    letterSpacing: -0.2,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  descText: {
+    fontSize: 13.5,
+    color: '#4B3F33',
+    lineHeight: 21,
+    fontWeight: '400',
+    marginBottom: 12,
+    fontFamily: 'PlusJakartaSans_400Regular',
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tagPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  tagPillGreen: {
+    backgroundColor: '#E8F5EE',
+  },
+  tagPillYellow: {
+    backgroundColor: '#FEF8DE',
+  },
+  tagPillBlue: {
+    backgroundColor: '#E0F2FA',
+  },
+  tagPillTeal: {
+    backgroundColor: '#D8EDE4',
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+
+  // Map Card
+  mapCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#CCE3EE',
+    overflow: 'hidden',
+    marginBottom: 20,
+    backgroundColor: '#FFFFFF',
+    ...SHADOWS.sm,
+  },
+  mapPlaceholder: {
+    height: 120,
+    backgroundColor: '#F5F9F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapNotice: {
+    fontSize: 12,
+    color: '#8C7D6A',
+    marginTop: 4,
+    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+  mapFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#EEF7FA',
+  },
+  mapFooterLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  mapFooterText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  mapFooterLink: {
+    fontSize: 11,
+    color: '#8C7D6A',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+
+  respondBtn: {
+    backgroundColor: '#2E7A99',
+    borderRadius: 25,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    shadowColor: '#2E7A99',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  respondBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+
+  commentsSection: {
+    marginTop: 4,
+  },
   commentsTitle: {
-    fontSize: SIZES.medium, fontWeight: '800',
-    color: COLORS.brown, marginBottom: SIZES.paddingM,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#473018',
+    marginBottom: 12,
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
-  noComments: { fontSize: SIZES.body, color: COLORS.textMuted, marginBottom: SIZES.paddingM },
-
-  commentNodeWrap: { marginBottom: 8 },
-  replyIndent: {
-    marginLeft: 14,
-    paddingLeft: 8,
-    borderLeftWidth: 2,
-    borderLeftColor: COLORS.border,
-    marginTop: 6,
+  commentItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 14,
   },
-  repliesList: { marginTop: 4 },
-  commentItem: { flexDirection: 'row', alignItems: 'flex-start' },
   commentBubble: {
-    flex: 1, marginLeft: 8, backgroundColor: COLORS.surface,
-    borderRadius: SIZES.r12, paddingHorizontal: 12, paddingVertical: 10,
-    borderWidth: 1, borderColor: COLORS.border,
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CCE3EE',
+    borderRadius: 16,
+    padding: 12,
   },
-  commentBubbleReply: {
-    backgroundColor: COLORS.inputBg,
+  commentUser: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#473018',
+    marginBottom: 3,
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
-  commentUser: { fontSize: SIZES.small, fontWeight: '700', color: COLORS.brown },
-  commentText: { fontSize: SIZES.body, color: COLORS.textSecondary, marginTop: 2, lineHeight: 20 },
-  commentMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
-  commentTime: { fontSize: SIZES.xsmall, color: COLORS.textMuted },
-  replyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 2 },
-  replyBtnText: { fontSize: SIZES.xsmall, fontWeight: '700', color: COLORS.primaryDeep },
+  commentContent: {
+    fontSize: 13,
+    color: '#473018',
+    lineHeight: 18,
+    marginBottom: 6,
+    fontFamily: 'PlusJakartaSans_400Regular',
+  },
+  commentBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  commentTime: {
+    fontSize: 10,
+    color: '#8C7D6A',
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  replyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  replyBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2E7A99',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
 
-  replyBanner: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SIZES.paddingL, paddingVertical: 8,
-    backgroundColor: COLORS.tagBg, borderTopWidth: 1, borderTopColor: COLORS.divider,
+  writeCommentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 10,
   },
-  replyBannerText: { fontSize: SIZES.small, color: COLORS.primaryDeep },
-
-  inputBar: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: SIZES.paddingL, paddingVertical: 12,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-    backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.divider,
+  commentInputWrap: {
+    flex: 1,
+    backgroundColor: '#F8FAF9',
+    borderWidth: 1,
+    borderColor: '#CCE3EE',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    height: 40,
+    justifyContent: 'center',
   },
   commentInput: {
-    flex: 1, minHeight: 40, backgroundColor: COLORS.inputBg,
-    borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8,
-    fontSize: SIZES.body, color: COLORS.brown,
-    borderWidth: 1.5, borderColor: COLORS.border,
+    fontSize: 13,
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_500Medium',
   },
-  sendBtn:         { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  sendBtnDisabled: { opacity: 0.35 },
+  sendIconBtn: {
+    padding: 4,
+  },
 });

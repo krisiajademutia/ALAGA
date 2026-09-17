@@ -22,3 +22,11 @@ pnpm-debug.log*
 .env
 
 fix_*.cjs
+
+# Documentation & doc generators
+*.docx
+ALAGA_Final_Documentation.md
+generate_diagrams.py
+generate_docx.py
+assets/docs/
+scratch/

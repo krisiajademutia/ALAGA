@@ -25,11 +25,13 @@ const styles = StyleSheet.create({
     fontSize: SIZES.md,
     fontWeight: '800',
     color: COLORS.textPrimary,
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
   action: {
     fontSize: SIZES.sm,
     fontWeight: '700',
     color: COLORS.primaryDeep,
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 });
