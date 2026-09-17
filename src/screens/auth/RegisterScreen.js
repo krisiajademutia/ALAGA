@@ -134,8 +134,8 @@ export default function RegisterScreen({ navigation }) {
         if (res.needsConfig) {
           showDialog({
             type: 'warning',
-            title: 'Brevo Key Needed',
-            message: `Brevo is not configured yet in src/config/brevoConfig.js.\n\nFor testing, your generated OTP is: ${res.fallbackOtp}`,
+            title: 'Brevo Notice (Test Code)',
+            message: `${res.message || 'Brevo API is not active'}\n\nYour test verification code is: ${res.fallbackOtp}`,
           });
         } else {
           showDialog({
@@ -173,8 +173,8 @@ export default function RegisterScreen({ navigation }) {
         if (res.needsConfig) {
           showDialog({
             type: 'warning',
-            title: 'Brevo Key Needed',
-            message: `Your new test OTP code is: ${res.fallbackOtp}`,
+            title: 'Brevo Notice (Test Code)',
+            message: `Your new test verification code is: ${res.fallbackOtp}`,
           });
         } else {
           showDialog({

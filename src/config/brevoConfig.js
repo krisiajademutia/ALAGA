@@ -1,18 +1,23 @@
 // ALAGA Brevo (Sendinblue) Transactional Email Configuration
-// To get your Brevo API Key:
-// 1. Log in to https://app.brevo.com
-// 2. Click your account name (top right) -> "SMTP & API" -> "API Keys" tab
-// 3. Click "Generate a new API key", name it "ALAGA", and paste it below:
+// To prevent API keys from being leaked or revoked by GitHub Secret Scanner,
+// your actual API key is loaded from src/config/brevoConfig.local.js (which is ignored by Git).
+
+let localConfig = {};
+try {
+  localConfig = require('./brevoConfig.local').brevoConfig || {};
+} catch (e) {
+  localConfig = {};
+}
 
 export const brevoConfig = {
-  // Paste your Brevo API key here (starts with xkeysib-...)
-  apiKey: "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",
+  // Loaded from untracked brevoConfig.local.js:
+  apiKey: localConfig.apiKey || "",
 
-  // The email address registered / verified as a Sender in your Brevo account
-  senderEmail: "mutiakrisiaj@gmail.com",
+  // The email address registered / verified as a Sender in your Brevo account:
+  senderEmail: localConfig.senderEmail || "mutiakrisiaj@gmail.com",
 
-  // The display name that appears in the user's Gmail inbox
-  senderName: "ALAGA Animal Care",
+  // The display name that appears in the user's Gmail inbox:
+  senderName: localConfig.senderName || "ALAGA Animal Care",
 };
 
 export const isBrevoConfigured = () => {

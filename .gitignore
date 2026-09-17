@@ -20,6 +20,8 @@ pnpm-debug.log*
 # local env files
 .env*.local
 .env
+src/config/brevoConfig.local.js
+brevoConfig.local.js
 
 fix_*.cjs
 

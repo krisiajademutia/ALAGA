@@ -153,18 +153,19 @@ export async function requestRegistrationOtp(email, name) {
     return { success: true, sent: true };
   }
 
-  // If Brevo is not configured yet, return fallback info so user is not blocked
-  if (sendResult.needsConfig) {
-    return {
-      success: true,
-      sent: false,
-      needsConfig: true,
-      fallbackOtp: otp,
-      message: 'Brevo is not configured yet. Paste your key in src/config/brevoConfig.js.',
-    };
-  }
-
-  return { success: false, error: sendResult.error };
+  // If Brevo fails (e.g., API key not enabled, rate limited, network error),
+  // return fallback test OTP so developers/testers are not blocked from registering.
+  console.warn(`[otpService] Brevo send failed (${sendResult.error}). Fallback OTP for ${cleanEmail}: ${otp}`);
+  return {
+    success: true,
+    sent: false,
+    needsConfig: true,
+    fallbackOtp: otp,
+    error: sendResult.error,
+    message: sendResult.needsConfig
+      ? 'Brevo is not configured yet. Paste your key in src/config/brevoConfig.js.'
+      : `Brevo Notice: ${sendResult.error}`,
+  };
 }
 
 /**
