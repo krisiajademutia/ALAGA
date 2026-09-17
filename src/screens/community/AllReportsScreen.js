@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import EmptyState from '../../components/EmptyState';
+import Header from '../../components/Header';
 
 const FILTERS = ['All', 'Open', 'Responded', 'Rescued'];
 
@@ -44,14 +45,11 @@ export default function AllReportsScreen({ navigation }) {
     <View style={styles.container}>
       <StatusBar style="dark" />
       
-      {/* ── Navbar ─────────────────────────────────────────── */}
-      <View style={styles.navbar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color="#473018" />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>Community Rescue Reports</Text>
-        <View style={{ width: 36 }} />
-      </View>
+      <Header
+        title="Rescue Reports"
+        onBack={() => navigation.goBack()}
+        borderBottom={false}
+      />
 
       {/* ── Search & Filter ────────────────────────────────── */}
       <View style={styles.header}>
@@ -147,27 +145,7 @@ export default function AllReportsScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAF9',
-  },
-  navbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 52 : 24,
-    paddingBottom: 8,
-    backgroundColor: '#F8FAF9',
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#473018',
+    backgroundColor: COLORS.background,
   },
   header: {
     paddingHorizontal: 16,

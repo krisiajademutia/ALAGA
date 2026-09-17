@@ -7,8 +7,10 @@ import {
   TouchableOpacity,
   TextInput,
   Platform,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
@@ -33,10 +35,13 @@ export default function MessagesScreen({ navigation }) {
     return otherName.includes(q) || lastMsg.includes(q);
   });
 
+  const insets = useSafeAreaInsets();
+  const safeTopPadding = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
+
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: safeTopPadding }]}>
         <Text style={styles.title}>Messages</Text>
         <Text style={styles.subtitle}>Direct conversations with advocates & community</Text>
 
@@ -130,13 +135,12 @@ function formatTime(isoString) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAF9',
+    backgroundColor: COLORS.background,
   },
   header: {
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 52 : 24,
     paddingBottom: 10,
-    backgroundColor: '#F8FAF9',
+    backgroundColor: COLORS.background,
   },
   title: {
     fontSize: 24,

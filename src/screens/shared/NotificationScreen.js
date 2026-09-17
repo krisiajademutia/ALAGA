@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
+import Header from '../../components/Header';
 
 export default function NotificationScreen({ navigation }) {
   const {
@@ -42,32 +43,27 @@ export default function NotificationScreen({ navigation }) {
     <View style={styles.root}>
       <StatusBar style="dark" />
 
-      {/* Navbar */}
-      <View style={styles.navbar}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="chevron-back" size={22} color="#473018" />
-        </TouchableOpacity>
-
-        <View style={styles.navCenter}>
-          <Text style={styles.navTitle}>Notifications</Text>
-          {unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
-            </View>
-          )}
-        </View>
-
-        <TouchableOpacity
-          onPress={markAllNotificationsRead}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text style={styles.markAllBtn}>Mark all read</Text>
-        </TouchableOpacity>
-      </View>
+      <Header
+        onBack={() => navigation.goBack()}
+        centerComponent={
+          <View style={styles.navCenter}>
+            <Text style={styles.navTitle}>Notifications</Text>
+            {unreadCount > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+              </View>
+            )}
+          </View>
+        }
+        rightComponent={
+          <TouchableOpacity
+            onPress={markAllNotificationsRead}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.markAllBtn}>Mark all read</Text>
+          </TouchableOpacity>
+        }
+      />
 
       <FlatList
         data={listData}
@@ -123,26 +119,7 @@ export default function NotificationScreen({ navigation }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F8FAF9',
-  },
-  navbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingTop: 50,
-    paddingBottom: 14,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEF4F7',
-  },
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#F4F7F5',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: COLORS.background,
   },
   navCenter: {
     flexDirection: 'row',

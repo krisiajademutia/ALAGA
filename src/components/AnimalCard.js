@@ -14,11 +14,11 @@ export default function AnimalCard({ animal, onPress, style, horizontal = false 
   if (horizontal) {
     const isFoster = animal.fosterNeeded || animal.listingType === 'Foster';
     const bgColors = {
-      Cat: '#E0F2FA',
-      Dog: '#FEF8DE',
+      Cat: '#ABD7E2',
+      Dog: '#FBEEAC',
       Rabbit: '#B8E4E5',
     };
-    const avatarBg = animal.avatarBg || bgColors[animal.species] || '#D8EDE4';
+    const avatarBg = animal.avatarBg || bgColors[animal.species] || '#B8D3C3';
 
     return (
       <TouchableOpacity style={[styles.gridCard, style]} onPress={onPress} activeOpacity={0.88}>
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   adoptTag: {
-    backgroundColor: COLORS.inputBg,
+    backgroundColor: '#92CDE5',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -291,10 +291,10 @@ const styles = StyleSheet.create({
   adoptTagText: {
     ...FONTS.badge,
     fontSize: 10,
-    color: COLORS.primaryDeep,
+    color: '#473018',
   },
   fosterTag: {
-    backgroundColor: '#FEF8DE',
+    backgroundColor: '#FBEEAC',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   fosterTagText: {
     ...FONTS.badge,
     fontSize: 10,
-    color: '#92400E',
+    color: '#473018',
   },
 
   // Full-width card mode
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#EBF1F4',
+    borderColor: COLORS.borderLight,
     marginBottom: 16,
     ...SHADOWS.card,
   },
@@ -395,11 +395,11 @@ const styles = StyleSheet.create({
   },
   cardMetaText: {
     ...FONTS.meta,
-    color: '#706050',
+    color: COLORS.textSecondary,
   },
   cardDescText: {
     ...FONTS.bodyRegular,
-    color: '#4B3F33',
+    color: COLORS.textPrimary,
     lineHeight: 19,
     marginBottom: 12,
   },
@@ -410,9 +410,9 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   tagPill: {
-    backgroundColor: COLORS.inputBg,
+    backgroundColor: '#EBF4EF',
     borderWidth: 1,
-    borderColor: '#D4EAF2',
+    borderColor: '#B8D3C3',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
   tagPillText: {
     ...FONTS.badge,
     fontSize: 10,
-    color: COLORS.primaryDarkest,
+    color: '#473018',
   },
   cardFooter: {
     flexDirection: 'row',
@@ -432,27 +432,27 @@ const styles = StyleSheet.create({
   },
   ageBadgeText: {
     ...FONTS.meta,
-    color: '#706050',
+    color: COLORS.textSecondary,
   },
   actionPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F8FB',
+    backgroundColor: '#EBF7F7',
     borderWidth: 1.2,
-    borderColor: COLORS.border,
+    borderColor: '#B8E4E5',
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 16,
   },
   actionPillFoster: {
     backgroundColor: COLORS.accent,
-    borderColor: '#F5E38C',
+    borderColor: '#E8DEC5',
   },
   actionPillText: {
     ...FONTS.badge,
-    color: COLORS.primaryDarkest,
+    color: '#473018',
   },
   actionPillTextFoster: {
-    color: COLORS.brown,
+    color: '#473018',
   },
 });

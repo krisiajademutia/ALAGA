@@ -10,8 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
@@ -30,6 +32,13 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
   const report = rescueReports.find((r) => r.id === reportId) || rescueReports[0];
   const [commentText, setCommentText] = useState('');
   const [isFav, setIsFav] = useState(false);
+
+  const insets = useSafeAreaInsets();
+  const safeTop =
+    Math.max(
+      insets.top,
+      Platform.OS === 'android' ? RNStatusBar.currentHeight || 0 : 12
+    ) + 6;
 
   if (!report) return null;
 
@@ -83,7 +92,7 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
 
           {/* Floating Back */}
           <TouchableOpacity
-            style={styles.floatingBack}
+            style={[styles.floatingBack, { top: safeTop }]}
             onPress={() => navigation.goBack()}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -92,7 +101,7 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
 
           {/* Floating Heart */}
           <TouchableOpacity
-            style={styles.floatingHeart}
+            style={[styles.floatingHeart, { top: safeTop }]}
             onPress={() => setIsFav(!isFav)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -344,7 +353,7 @@ const styles = StyleSheet.create({
   detailTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#241408',
+    color: COLORS.brown,
     letterSpacing: -0.3,
     marginBottom: 6,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
@@ -629,9 +638,9 @@ const styles = StyleSheet.create({
   },
   commentInputWrap: {
     flex: 1,
-    backgroundColor: '#F8FAF9',
+    backgroundColor: COLORS.inputBg,
     borderWidth: 1,
-    borderColor: '#CCE3EE',
+    borderColor: COLORS.border,
     borderRadius: 20,
     paddingHorizontal: 14,
     height: 40,

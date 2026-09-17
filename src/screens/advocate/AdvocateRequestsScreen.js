@@ -7,6 +7,7 @@ import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import StatusPill from '../../components/StatusPill';
 import Avatar from '../../components/Avatar';
 import EmptyState from '../../components/EmptyState';
+import Header from '../../components/Header';
 
 const FILTERS = ['Pending', 'Approved', 'Rejected', 'All'];
 
@@ -68,14 +69,10 @@ export default function AdvocateRequestsScreen({ navigation }) {
     <View style={styles.root}>
       <StatusBar style="dark" />
 
-      {/* Navbar */}
-      <View style={styles.navbar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.brown} />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>Requests</Text>
-        <View style={{ width: 36 }} />
-      </View>
+      <Header
+        title="Requests"
+        onBack={() => navigation.goBack()}
+      />
 
       {/* Filter tabs */}
       <View style={styles.filterRow}>
@@ -206,13 +203,6 @@ function RequestCard({ request, onApprove, onReject, onMessage }) {
 
 const styles = StyleSheet.create({
   root:  { flex: 1, backgroundColor: COLORS.background },
-  navbar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SIZES.lg24, paddingTop: Platform.OS === 'ios' ? 52 : 28, paddingBottom: SIZES.md16,
-    backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.divider,
-  },
-  backBtn:  { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  navTitle: { fontSize: SIZES.lg, fontWeight: '700', color: COLORS.brown },
 
   filterRow: {
     flexDirection: 'row', paddingHorizontal: SIZES.lg24,

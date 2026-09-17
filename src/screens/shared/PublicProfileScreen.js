@@ -7,6 +7,7 @@ import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import AnimalCard from '../../components/AnimalCard';
 import EmptyState from '../../components/EmptyState';
 import StatusPill from '../../components/StatusPill';
+import Header from '../../components/Header';
 
 export default function PublicProfileScreen({ route, navigation }) {
   const { userId } = route.params || {};
@@ -43,14 +44,10 @@ export default function PublicProfileScreen({ route, navigation }) {
     <View style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* ── Navbar ──────────────────────────────────────────── */}
-      <View style={styles.navbar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.navBtn}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.brown} />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>Profile</Text>
-        <View style={{ width: 36 }} />
-      </View>
+      <Header
+        title="Profile"
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
@@ -265,14 +262,6 @@ function StatItem({ icon, label, value, color }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-
-  navbar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SIZES.paddingL, paddingTop: Platform.OS === 'ios' ? 52 : 28, paddingBottom: SIZES.paddingM,
-    backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.divider,
-  },
-  navBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  navTitle: { fontSize: SIZES.large, fontWeight: '700', color: COLORS.brown },
 
   scroll: { paddingBottom: 80 },
 

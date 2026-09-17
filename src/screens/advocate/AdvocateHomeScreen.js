@@ -7,8 +7,11 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
+  Platform,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
@@ -31,6 +34,8 @@ export default function AdvocateHomeScreen({ navigation }) {
   const [favorites, setFavorites] = useState({});
 
   const unreadNotifs = getUnreadCount();
+  const insets = useSafeAreaInsets();
+  const safeTopPadding = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
 
   const toggleFavorite = (id) => {
     setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -58,18 +63,14 @@ export default function AdvocateHomeScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
       >
-        {/* ── Top Location Header ───────────────────────────── */}
-        <View style={styles.header}>
-          <View style={styles.locationContainer}>
-            <View style={styles.locIconWrap}>
-              <Ionicons name="location-sharp" size={20} color="#2E7A99" />
-            </View>
-            <View>
-              <Text style={styles.locLabel}>Your Location</Text>
-              <Text style={styles.locValue}>
-                {currentUser?.location || 'San Antonio, Pasig'}
-              </Text>
-            </View>
+        {/* ── Top Header with ALAGA Brand ───────────────────── */}
+        <View style={[styles.header, { paddingTop: safeTopPadding }]}>
+          <View style={styles.brandContainer}>
+            <Image
+              source={require('../../../assets/alaga-logo.png')}
+              style={styles.headerLogo}
+              resizeMode="contain"
+            />
           </View>
 
           <View style={styles.headerActions}>
@@ -327,7 +328,7 @@ export default function AdvocateHomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F8FAF9',
+    backgroundColor: COLORS.background,
   },
   scroll: {
     paddingBottom: 90,
@@ -338,33 +339,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 14,
+    paddingBottom: 10,
   },
-  locationContainer: {
+  brandContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
   },
-  locIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#D9EEF6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  locLabel: {
-    fontSize: 11,
-    color: '#8C7D6A',
-    fontWeight: '500',
-    fontFamily: 'PlusJakartaSans_500Medium',
-  },
-  locValue: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#473018',
-    fontFamily: 'PlusJakartaSans_700Bold',
+  headerLogo: {
+    width: 120,
+    height: 40,
   },
   headerActions: {
     flexDirection: 'row',

@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import Avatar from '../../components/Avatar';
+import Header from '../../components/Header';
 
 export default function ChatScreen({ route, navigation }) {
   const { conversationId, otherName } = route.params || {};
@@ -47,31 +48,23 @@ export default function ChatScreen({ route, navigation }) {
     >
       <StatusBar style="dark" />
 
-      {/* ── Top Navbar ────────────────────────────────────── */}
-      <View style={styles.navbar}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="chevron-back" size={22} color="#473018" />
-        </TouchableOpacity>
-
-        <View style={styles.navCenter}>
-          <View style={styles.avatarCircle}>
-            <Avatar name={name} size={36} />
-          </View>
-          <View style={styles.navTextWrap}>
-            <Text style={styles.navName}>{name}</Text>
-            <View style={styles.statusRow}>
-              <View style={styles.onlineDot} />
-              <Text style={styles.navSub}>Online · ALAGA Advocate</Text>
+      <Header
+        onBack={() => navigation.goBack()}
+        centerComponent={
+          <View style={styles.navCenter}>
+            <View style={styles.avatarCircle}>
+              <Avatar name={name} size={36} />
+            </View>
+            <View style={styles.navTextWrap}>
+              <Text style={styles.navName}>{name}</Text>
+              <View style={styles.statusRow}>
+                <View style={styles.onlineDot} />
+                <Text style={styles.navSub}>Online · ALAGA Advocate</Text>
+              </View>
             </View>
           </View>
-        </View>
-
-        <View style={{ width: 40 }} />
-      </View>
+        }
+      />
 
       {/* ── Messages List ─────────────────────────────────── */}
       <FlatList
@@ -147,26 +140,7 @@ export default function ChatScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: '#F8FAF9',
-  },
-  navbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingTop: 50,
-    paddingBottom: 14,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEF4F7',
-  },
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#F4F7F5',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: COLORS.background,
   },
   navCenter: {
     flexDirection: 'row',
@@ -242,13 +216,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   bubbleMine: {
-    backgroundColor: '#85CCE5',
+    backgroundColor: '#92CDE5',
     borderTopRightRadius: 4,
   },
   bubbleTheirs: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E3EFF6',
+    borderColor: '#E8DEC5',
     borderTopLeftRadius: 4,
   },
   bubbleText: {
@@ -256,8 +230,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   bubbleTextMine: {
-    color: '#1C3A47',
-    fontWeight: '500',
+    color: '#473018',
+    fontWeight: '600',
   },
   bubbleTextTheirs: {
     color: '#473018',

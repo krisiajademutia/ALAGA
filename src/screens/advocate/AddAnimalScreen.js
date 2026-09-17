@@ -7,6 +7,7 @@ import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
+import Header from '../../components/Header';
 import { ANIMAL_SPECIES, FOSTER_DURATIONS } from '../../data/mockData';
 import { uploadImageToImgBB } from '../../services/storageService';
 
@@ -124,13 +125,10 @@ export default function AddAnimalScreen({ route, navigation }) {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <StatusBar style="dark" />
 
-      <View style={styles.navbar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.brown} />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>New Animal Profile</Text>
-        <View style={{ width: 36 }} />
-      </View>
+      <Header
+        title="New Animal Profile"
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
@@ -355,13 +353,6 @@ const tr = StyleSheet.create({
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: COLORS.background },
-  navbar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SIZES.lg24, paddingTop: Platform.OS === 'ios' ? 52 : 28, paddingBottom: SIZES.md16,
-    backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.divider,
-  },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  navTitle:{ fontSize: SIZES.lg, fontWeight: '700', color: COLORS.brown },
   scroll:  { paddingHorizontal: SIZES.lg24, paddingTop: SIZES.md16, paddingBottom: 48 },
 
   rescueBanner: {

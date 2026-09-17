@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SHADOWS } from '../../constants/theme';
+import Header from '../../components/Header';
 
 const PRESET_AMOUNTS = ['100', '250', '500', '1,000'];
 const PAYMENT_METHODS = [
@@ -89,18 +90,10 @@ export default function DonateScreen({ route, navigation }) {
     >
       <StatusBar style="dark" />
 
-      {/* Navbar */}
-      <View style={styles.navbar}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="chevron-back" size={22} color="#473018" />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>Donate</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <Header
+        title="Donate"
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -245,29 +238,7 @@ export default function DonateScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: '#F8FAF9',
-  },
-  navbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 14,
-    backgroundColor: '#FFFFFF',
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F4F7F5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#473018',
+    backgroundColor: COLORS.background,
   },
   scroll: {
     paddingHorizontal: 20,
@@ -326,15 +297,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#E2ECF0',
+    borderColor: COLORS.border,
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   presetBoxActive: {
-    backgroundColor: '#E0F2FA',
-    borderColor: '#85CCE5',
+    backgroundColor: '#B8E4E5',
+    borderColor: '#92CDE5',
   },
   presetText: {
     fontSize: 14,
@@ -342,14 +313,16 @@ const styles = StyleSheet.create({
     color: '#473018',
   },
   presetTextActive: {
-    color: '#2E7A99',
+    color: '#473018',
     fontWeight: '800',
   },
 
   customAmountWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F7F8',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
     borderRadius: 14,
     paddingHorizontal: 16,
     height: 48,
@@ -380,14 +353,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#E2ECF0',
+    borderColor: COLORS.border,
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 14,
   },
   methodCardActive: {
-    backgroundColor: '#E0F2FA',
-    borderColor: '#85CCE5',
+    backgroundColor: '#B8E4E5',
+    borderColor: '#92CDE5',
   },
   methodText: {
     fontSize: 13,
@@ -395,7 +368,7 @@ const styles = StyleSheet.create({
     color: '#473018',
   },
   methodTextActive: {
-    color: '#2E7A99',
+    color: '#473018',
   },
 
   inputWrap: {

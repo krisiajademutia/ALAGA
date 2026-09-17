@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Dimensions, Platform, Modal, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Dimensions, Platform, Modal, ScrollView, StatusBar as RNStatusBar } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
@@ -89,12 +90,15 @@ export default function ActivityScreen({ route, navigation }) {
     return null;
   };
 
+  const insets = useSafeAreaInsets();
+  const safeTopPadding = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
+
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
 
       {/* ── Header ──────────────────────────────────────────── */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: safeTopPadding }]}>
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.headerTitle}>Activity Dashboard</Text>
@@ -406,9 +410,8 @@ const styles = StyleSheet.create({
   // Header
   header: {
     paddingHorizontal: SIZES.lg24,
-    paddingTop: Platform.OS === 'ios' ? 52 : 28,
     paddingBottom: SIZES.sm8,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.background,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.divider,
   },

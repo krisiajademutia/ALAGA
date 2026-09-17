@@ -46,22 +46,22 @@ const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#EBF1F4',
+    borderTopColor: '#E8DEC5',
     height: Platform.OS === 'ios' ? 84 : 64,
     paddingBottom: Platform.OS === 'ios' ? 24 : 8,
     paddingTop: 6,
-    shadowColor: '#102A38',
+    shadowColor: '#473018',
     shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 8,
   },
   tabLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
     marginTop: 1,
     letterSpacing: 0.1,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
   iconWrap: {
     width: 44,
@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   iconWrapActive: {
-    backgroundColor: '#E2F0F4',
+    backgroundColor: '#B8E4E5',
   },
 });
 
@@ -80,8 +80,8 @@ const styles = StyleSheet.create({
 const tabScreenOptions = {
   headerShown: false,
   tabBarStyle: styles.tabBar,
-  tabBarActiveTintColor: '#206B82',
-  tabBarInactiveTintColor: '#8C9DA6',
+  tabBarActiveTintColor: '#473018',
+  tabBarInactiveTintColor: '#947E68',
   tabBarLabelStyle: styles.tabLabel,
   tabBarHideOnKeyboard: true,
 };
@@ -90,12 +90,12 @@ function tabOptions(label, activeIcon, inactiveIcon) {
   return {
     title: label,
     tabBarLabel: label,
-    tabBarIcon: ({ focused, color }) => (
+    tabBarIcon: ({ focused }) => (
       <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
         <Ionicons
           name={focused ? activeIcon : inactiveIcon}
           size={20}
-          color={focused ? '#206B82' : '#8C9DA6'}
+          color={focused ? '#473018' : '#947E68'}
         />
       </View>
     ),

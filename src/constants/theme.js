@@ -3,59 +3,66 @@
 // Legacy tokens are kept for compatibility (deprecated).
 
 export const COLORS = {
-  // Brand
-  primary: '#2E7A99',
-  primaryDark: '#1E586E',
-  primaryDarkest: '#143C4B',
-  primaryDeep: '#2E7A99',
-  primaryLight: '#C8E8F4',
-  primaryBg: '#F0F7FA',
+  // Brand & Master Palette
+  primary: '#92CDE5',        // Sky Blue (#92CDE5)
+  primaryDark: '#5BA8C7',    // Medium sky blue
+  primaryDarkest: '#1E586E', // Deep sky blue
+  primaryDeep: '#2E7A99',    // High-contrast primary for buttons/icons
+  primaryLight: '#DDF1F8',   // Light tint of #92CDE5
+  primaryBg: '#F0F8FB',      // Subtle sky background tint
 
-  secondary: '#5A9478',
-  secondaryDark: '#3D6D56',
-  secondaryLight: '#D8EDE4',
+  secondary: '#B8D3C3',      // Soft Sage Green (#B8D3C3)
+  secondaryDark: '#528367',  // Deeper sage green
+  secondaryLight: '#EBF4EF', // Pale sage wash
 
-  accent: '#FBEEAC',
-  accentDark: '#C9AB20',
+  accent: '#FBEEAC',         // Warm Pastel Yellow / Butter (#FBEEAC)
+  accentDark: '#C9AB20',     // Golden amber
+  accentLight: '#FCF8E8',    // Pale butter tint of #FBEEAC
 
-  teal: '#B8E4E5',
-  tealDark: '#4DAFB1',
-  sky: '#ABD7E2',
-  brown: '#473018',
+  teal: '#B8E4E5',           // Pastel Teal / Aqua (#B8E4E5)
+  tealDark: '#3D9496',
+  tealLight: '#EBF7F7',
+
+  sky: '#ABD7E2',            // Soft Sky Blue (#ABD7E2)
+  skyLight: '#EDF6F9',
+
+  sage: '#B8D3C3',           // Sage (#B8D3C3)
+  brown: '#473018',          // Deep Warm Brown for fonts (#473018)
 
   danger: '#D94F4F',
   warning: '#D97706',
   success: '#2D9E5F',
   info: '#3A8BAA',
 
-  // Neutrals
+  // Neutrals & Warm Palette
   white: '#FFFFFF',
-  black: '#2D1F12',
-  gray100: '#F2F8FB',
-  gray200: '#EEF7FA',
-  gray300: '#CCE3EE',
-  gray400: '#8C7D6A',
-  gray500: '#5C4E3A',
+  black: '#473018',
+  gray100: '#FAF5E8',
+  gray200: '#F5EED8',
+  gray300: '#E8DFC8',
+  gray400: '#947E68',
+  gray500: '#685038',
 
-  // Surfaces & App Layout
-  background: '#F2F8FB',
+  // Surfaces & App Layout (Pale lighter tint of #FBEEAC)
+  background: '#FCF8E8',     // Pale, lighter tint of #FBEEAC
   surface: '#FFFFFF',
   cardBg: '#FFFFFF',
-  inputBg: '#EEF7FA',
-  border: '#CCE3EE',
-  borderLight: '#E3EFF6',
-  divider: '#E3EFF6',
+  inputBg: '#FFFDF6',
+  border: '#E8DEC5',
+  borderLight: '#F4EDE0',
+  divider: '#F4EDE0',
 
-  textPrimary: '#2D1F12',
-  textSecondary: '#5C4E3A',
-  textMuted: '#8C7D6A',
+  // Typography (Requested #473018 font)
+  textPrimary: '#473018',    // Primary font color: #473018
+  textSecondary: '#685038',  // Warm medium brown
+  textMuted: '#947E68',      // Warm soft brown for captions
   textOnPrimary: '#FFFFFF',
   textOnSecondary: '#473018',
 
-  tagBg: '#E0F2FA',
-  tagText: '#2E7A99',
-  advocateBadge: '#D4EDE1',
-  advocateBadgeText: '#2A7050',
+  tagBg: '#EBF4EF',          // Sage soft tint
+  tagText: '#306B4D',
+  advocateBadge: '#EBF4EF',  // Uses #B8D3C3 tint
+  advocateBadgeText: '#306B4D',
 };
 
 // Standardized Spacing (x4 base)
@@ -196,58 +203,67 @@ export const FONTS = {
   bold:      { fontFamily: 'PlusJakartaSans_700Bold' },
   extraBold: { fontFamily: 'PlusJakartaSans_800ExtraBold' },
 
-  heading:    { fontFamily: 'PlusJakartaSans_700Bold' },
-  subheading: { fontFamily: 'PlusJakartaSans_600SemiBold' },
-  body:       { fontFamily: 'PlusJakartaSans_400Regular' },
+  heading:    { fontFamily: 'PlusJakartaSans_700Bold', color: '#473018' },
+  subheading: { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#473018' },
+  body:       { fontFamily: 'PlusJakartaSans_400Regular', color: '#473018' },
 
   titleXl: {
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     fontSize: 24,
     lineHeight: 30,
     letterSpacing: -0.5,
+    color: '#473018',
   },
   titleLg: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 20,
     lineHeight: 26,
     letterSpacing: -0.4,
+    color: '#473018',
   },
   titleMd: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 18,
     lineHeight: 24,
     letterSpacing: -0.3,
+    color: '#473018',
   },
   subtitle: {
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 13,
     lineHeight: 18,
+    color: '#685038',
   },
   bodyRegular: {
     fontFamily: 'PlusJakartaSans_400Regular',
     fontSize: 13.5,
     lineHeight: 20,
+    color: '#473018',
   },
   bodyMedium: {
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 13.5,
     lineHeight: 20,
+    color: '#473018',
   },
   meta: {
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 12,
     lineHeight: 16,
     letterSpacing: 0.1,
+    color: '#685038',
   },
   caption: {
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 11,
     lineHeight: 15,
+    color: '#947E68',
   },
   badge: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 11,
     letterSpacing: 0.2,
+    color: '#473018',
   },
   button: {
     fontFamily: 'PlusJakartaSans_700Bold',

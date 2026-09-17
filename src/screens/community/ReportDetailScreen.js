@@ -8,6 +8,7 @@ import StatusPill from '../../components/StatusPill';
 import Avatar from '../../components/Avatar';
 import Button from '../../components/Button';
 import MapCard from '../../components/MapCard';
+import Header from '../../components/Header';
 import { URGENCY_LEVELS } from '../../data/mockData';
 
 export default function ReportDetailScreen({ route, navigation }) {
@@ -54,14 +55,10 @@ export default function ReportDetailScreen({ route, navigation }) {
     >
       <StatusBar style="dark" />
 
-      {/* Navbar */}
-      <View style={styles.navbar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.navBtn}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.brown} />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>Rescue Report</Text>
-        <View style={{ width: 36 }} />
-      </View>
+      <Header
+        title="Rescue Report"
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -270,15 +267,6 @@ function InfoRow({ icon, label, value }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: COLORS.background },
-
-  navbar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SIZES.paddingL, paddingTop: Platform.OS === 'ios' ? 52 : 28, paddingBottom: SIZES.paddingM,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1, borderBottomColor: COLORS.divider,
-  },
-  navBtn:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  navTitle: { fontSize: SIZES.large, fontWeight: '700', color: COLORS.brown, fontFamily: 'PlusJakartaSans_700Bold' },
 
   scroll: { padding: SIZES.paddingL, paddingBottom: 20 },
 

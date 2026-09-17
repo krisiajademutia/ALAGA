@@ -6,9 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  Image,
   Platform,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
@@ -31,6 +34,8 @@ export default function CommunityHomeScreen({ navigation }) {
   const [activeSegment, setActiveSegment] = useState('All Pets');
 
   const unreadNotifs = getUnreadCount();
+  const insets = useSafeAreaInsets();
+  const safeTopPadding = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
 
   const filteredAnimals = animals.filter((a) => {
     if (activeCategory === 'cats' && a.species !== 'Cat') return false;
@@ -54,18 +59,14 @@ export default function CommunityHomeScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
       >
-        {/* ── Top Location Header ───────────────────────────── */}
-        <View style={styles.header}>
-          <View style={styles.locationContainer}>
-            <View style={styles.locIconWrap}>
-              <Ionicons name="location-sharp" size={20} color={COLORS.primaryDeep} />
-            </View>
-            <View>
-              <Text style={styles.locLabel}>Your Location</Text>
-              <Text style={styles.locValue}>
-                {currentUser?.location || 'San Antonio, Pasig'}
-              </Text>
-            </View>
+        {/* ── Top Header with ALAGA Brand ───────────────────── */}
+        <View style={[styles.header, { paddingTop: safeTopPadding }]}>
+          <View style={styles.brandContainer}>
+            <Image
+              source={require('../../../assets/alaga-logo.png')}
+              style={styles.headerLogo}
+              resizeMode="contain"
+            />
           </View>
 
           <View style={styles.headerActions}>
@@ -229,30 +230,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 50 : 32,
-    paddingBottom: 14,
+    paddingBottom: 10,
   },
-  locationContainer: {
+  brandContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
   },
-  locIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  locLabel: {
-    ...FONTS.caption,
-    color: COLORS.textMuted,
-  },
-  locValue: {
-    ...FONTS.subheading,
-    fontSize: 15,
-    color: COLORS.brown,
+  headerLogo: {
+    width: 120,
+    height: 40,
   },
   headerActions: {
     flexDirection: 'row',

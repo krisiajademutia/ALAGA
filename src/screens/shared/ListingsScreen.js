@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Platform, StatusBar as RNStatusBar } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
@@ -36,12 +37,15 @@ export default function ListingsScreen({ navigation }) {
     rows.push([filtered[i], filtered[i + 1] || null]);
   }
 
+  const insets = useSafeAreaInsets();
+  const safeTopPadding = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
+
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: safeTopPadding }]}>
         <View style={styles.titleRow}>
           <View>
             <Text style={styles.title}>Find a Companion</Text>
@@ -162,11 +166,9 @@ export default function ListingsScreen({ navigation }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
   header: {
-    backgroundColor: COLORS.surface,
-    paddingTop: Platform.OS === 'ios' ? 52 : 28,
+    backgroundColor: COLORS.background,
     paddingBottom: SIZES.sm8,
     borderBottomWidth: 1, borderBottomColor: COLORS.divider,
-    ...SHADOWS.sm,
   },
   titleRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

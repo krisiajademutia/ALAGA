@@ -11,8 +11,10 @@ import {
   Platform,
   Dimensions,
   ScrollView,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../../context/AppContext';
@@ -32,6 +34,9 @@ export default function ReportRescueScreen({ navigation }) {
   const [photo, setPhoto] = useState(null);
   const [locationDesc, setLocationDesc] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const insets = useSafeAreaInsets();
+  const safeTop = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
 
   const pickPhoto = async () => {
     Alert.alert('Upload Photo', 'Choose photo source:', [
@@ -146,7 +151,7 @@ export default function ReportRescueScreen({ navigation }) {
       </View>
 
       {/* ── Top Header Bar ────────────────────────────────── */}
-      <View style={styles.topHeader}>
+      <View style={[styles.topHeader, { paddingTop: safeTop }]}>
         <View style={styles.navRow}>
           <TouchableOpacity
             style={styles.backCircle}
@@ -384,7 +389,6 @@ const styles = StyleSheet.create({
 
   // Top Header
   topHeader: {
-    paddingTop: 50,
     paddingHorizontal: 18,
   },
   navRow: {
@@ -552,7 +556,7 @@ const styles = StyleSheet.create({
     borderColor: '#CCE3EE',
     borderStyle: 'dashed',
     borderRadius: 16,
-    backgroundColor: '#F8FAF9',
+    backgroundColor: COLORS.inputBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -570,7 +574,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#CCE3EE',
+    backgroundColor: '#B8E4E5',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
@@ -582,10 +586,10 @@ const styles = StyleSheet.create({
   },
 
   inputWrap: {
-    backgroundColor: '#F8FAF9',
+    backgroundColor: COLORS.inputBg,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#CCE3EE',
+    borderColor: COLORS.border,
     paddingHorizontal: 14,
     height: 46,
     justifyContent: 'center',

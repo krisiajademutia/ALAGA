@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image,
-  ActivityIndicator, Platform, Modal, TextInput, KeyboardAvoidingView
+  ActivityIndicator, Platform, Modal, TextInput, KeyboardAvoidingView,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../../context/AppContext';
@@ -101,14 +103,17 @@ export default function ProfileScreen({ navigation }) {
     ]);
   };
 
+  const insets = useSafeAreaInsets();
+  const safeTopPadding = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
+
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
         {/* ── Hero Banner Card ──────────────────────────────── */}
         <View style={styles.heroCard}>
-          <View style={styles.heroBannerBg}>
+          <View style={[styles.heroBannerBg, { height: 90 + safeTopPadding }]}>
             <View style={styles.decorCircle1} />
             <View style={styles.decorCircle2} />
           </View>

@@ -10,8 +10,10 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
@@ -37,6 +39,13 @@ export default function AnimalDetailScreen({ route, navigation }) {
   const [requestType, setRequestType] = useState('Adoption');
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const insets = useSafeAreaInsets();
+  const safeTop =
+    Math.max(
+      insets.top,
+      Platform.OS === 'android' ? RNStatusBar.currentHeight || 0 : 12
+    ) + 6;
 
   // ── Role-Based Access Control (RBAC) ───────────────────────────
   const isOwner = Boolean(
@@ -172,7 +181,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
 
           {/* Floating Back Button */}
           <TouchableOpacity
-            style={styles.floatingBack}
+            style={[styles.floatingBack, { top: safeTop }]}
             onPress={() => navigation.goBack()}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -181,7 +190,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
 
           {/* Floating Favorite Button */}
           <TouchableOpacity
-            style={styles.floatingHeart}
+            style={[styles.floatingHeart, { top: safeTop }]}
             onPress={() => setIsFav(!isFav)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -874,28 +883,28 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   statusAvailableBg: {
-    backgroundColor: '#E0F2FA',
+    backgroundColor: '#ABD7E2',
   },
   statusAvailableText: {
     fontSize: 12,
     fontWeight: '700',
-    color: COLORS.primaryDarkest,
+    color: '#473018',
   },
   statusFosteredBg: {
-    backgroundColor: '#FEF3DC',
+    backgroundColor: '#FBEEAC',
   },
   statusFosteredText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#B45309',
+    color: '#473018',
   },
   statusAdoptedBg: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: '#B8D3C3',
   },
   statusAdoptedText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#15803D',
+    color: '#473018',
   },
   ownerStatusPillText: {
     ...FONTS.caption,
@@ -986,24 +995,24 @@ const styles = StyleSheet.create({
   alreadyAdoptedNotice: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#DCFCE7',
+    backgroundColor: '#EBF4EF',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 16,
     width: '100%',
     borderWidth: 1,
-    borderColor: '#BBF7D0',
+    borderColor: '#B8D3C3',
   },
   alreadyAdoptedTitle: {
     ...FONTS.label,
     fontSize: 14,
-    color: '#15803D',
+    color: '#473018',
     fontWeight: '700',
   },
   alreadyAdoptedSub: {
     ...FONTS.caption,
     fontSize: 11,
-    color: '#166534',
+    color: '#685038',
     marginTop: 2,
   },
 });

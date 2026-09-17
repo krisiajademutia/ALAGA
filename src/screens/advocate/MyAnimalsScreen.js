@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity, Image, Alert, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity, TextInput, Image, Alert, Modal, Platform, StatusBar as RNStatusBar } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
@@ -12,12 +13,24 @@ const STATUS_FILTERS = ['All', 'Available', 'Being Fostered', 'Under Care', 'Ado
 export default function MyAnimalsScreen({ navigation }) {
   const { getAdvocateAnimals, returnAnimalToListings, markAnimalAdopted, updateAnimal, rescueReports } = useApp();
   const [filterStatus, setFilterStatus] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const [actionAnimal, setActionAnimal] = useState(null); // animal for the action modal
 
   const animals  = getAdvocateAnimals();
-  const filtered = filterStatus === 'All'
-    ? animals
-    : animals.filter((a) => a.status === filterStatus);
+  const filtered = animals.filter((a) => {
+    if (filterStatus !== 'All' && a.status !== filterStatus) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return (
+        a.name?.toLowerCase().includes(q) ||
+        a.breed?.toLowerCase().includes(q) ||
+        a.species?.toLowerCase().includes(q) ||
+        a.location?.toLowerCase().includes(q) ||
+        a.story?.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
 
   const handleReturn = (animal) => {
     Alert.alert(
@@ -53,40 +66,69 @@ export default function MyAnimalsScreen({ navigation }) {
     );
   };
 
+  const insets = useSafeAreaInsets();
+  const safeTopPadding = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
+
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
 
-      {/* Navbar */}
-      <View style={styles.navbar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.brown} />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>My Animals</Text>
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={() => navigation.navigate('AddAnimal', {})}
-        >
-          <Ionicons name="add" size={22} color={COLORS.primaryDeep} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Status filter */}
-      <View style={styles.filterContainer}>
-        <View style={styles.filterRow}>
-          {STATUS_FILTERS.map((s) => (
-            <TouchableOpacity
-              key={s}
-              style={[styles.filterTab, filterStatus === s && styles.filterTabOn]}
-              onPress={() => setFilterStatus(s)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.filterText, filterStatus === s && styles.filterTextOn]}>
-                {s}
-              </Text>
-            </TouchableOpacity>
-          ))}
+      {/* ── Header ─────────────────────────────────────────── */}
+      <View style={[styles.header, { paddingTop: safeTopPadding }]}>
+        <View style={styles.headerTopRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>My Animals</Text>
+            <Text style={styles.headerSub}>Manage your rescued pets & active listings</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.addAnimalBtn}
+            onPress={() => navigation.navigate('AddAnimal', {})}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+            <Text style={styles.addAnimalBtnText}>Add Pet</Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Search Bar */}
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={20} color="#8C7D6A" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search your animals by name, breed, or location..."
+            placeholderTextColor="#8C7D6A"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={18} color="#8C7D6A" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {/* Status filter scroll */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScroll}
+        >
+          {STATUS_FILTERS.map((s) => {
+            const isActive = filterStatus === s;
+            return (
+              <TouchableOpacity
+                key={s}
+                style={[styles.filterChip, isActive ? styles.filterChipActive : styles.filterChipInactive]}
+                onPress={() => setFilterStatus(s)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.filterChipText, isActive ? styles.filterChipTextActive : styles.filterChipTextInactive]}>
+                  {s}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <FlatList
@@ -97,8 +139,8 @@ export default function MyAnimalsScreen({ navigation }) {
         ListEmptyComponent={
           <EmptyState
             icon="paw-outline"
-            title="No animals here"
-            subtitle="Add a rescued animal to get started."
+            title="No animals found"
+            subtitle={searchQuery ? "No animals match your search query." : "Add a rescued animal to get started."}
           />
         }
         renderItem={({ item }) => (
@@ -340,36 +382,98 @@ function AnimalManageCard({ animal, onPress, onActions }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
 
-  navbar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SIZES.lg24, paddingTop: Platform.OS === 'ios' ? 52 : 28, paddingBottom: SIZES.md16,
-    backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.divider,
+  header: {
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    backgroundColor: COLORS.background,
   },
-  backBtn:  { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  navTitle: { fontSize: SIZES.lg, fontWeight: '700', color: COLORS.brown },
-  addBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: COLORS.tagBg, alignItems: 'center', justifyContent: 'center',
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-
-  filterContainer: {
-    paddingVertical: SIZES.sm8,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1, borderBottomColor: COLORS.divider,
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#473018',
+    letterSpacing: -0.4,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
-  filterRow: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
-    paddingHorizontal: SIZES.lg24,
+  headerSub: {
+    fontSize: 13,
+    color: '#6B5E4C',
+    marginTop: 2,
+    fontFamily: 'PlusJakartaSans_500Medium',
   },
-  filterTab: {
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: SIZES.r999, backgroundColor: COLORS.inputBg,
-    borderWidth: 1, borderColor: COLORS.border,
+  addAnimalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#473018',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    ...SHADOWS.sm,
   },
-  filterTabOn:  { backgroundColor: COLORS.primaryDeep, borderColor: COLORS.primaryDeep },
-  filterText:   { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.textSecondary },
-  filterTextOn: { color: '#fff' },
-
+  addAnimalBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CCE3EE',
+    borderRadius: 25,
+    paddingHorizontal: 16,
+    height: 48,
+    marginBottom: 12,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  filterScroll: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CCE3EE',
+  },
+  filterChipActive: {
+    backgroundColor: '#92CDE5',
+    borderColor: '#92CDE5',
+  },
+  filterChipInactive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#CCE3EE',
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+  },
+  filterChipTextInactive: {
+    color: '#473018',
+  },
   list: { padding: SIZES.md16, paddingBottom: 110 },
 
   // Animal card
