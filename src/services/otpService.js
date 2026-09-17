@@ -84,7 +84,7 @@ export async function sendOtpViaBrevo({ email, name, otpCode }) {
                 <tr>
                   <td style="background-color: #FAFCFD; padding: 16px 20px; text-align: center; border-top: 1px solid #E2ECF0;">
                     <p style="color: #A0B2AA; font-size: 11px; margin: 0;">
-                      © ${new Date().getFullYear()} ALAGA App · Alert · Respond · Alaga
+                      © ${new Date().getFullYear()} ALAGA App · Where every life deserves alaga
                     </p>
                   </td>
                 </tr>

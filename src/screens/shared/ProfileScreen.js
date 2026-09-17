@@ -254,7 +254,7 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.logoutCardText}>Log Out Account</Text>
         </TouchableOpacity>
 
-        <Text style={styles.appFooter}>ALAGA · Alert. Respond. Alaga. · v1.0</Text>
+        <Text style={styles.appFooter}>ALAGA · Where every life deserves alaga · v1.0</Text>
       </ScrollView>
 
       {/* ── Edit Profile Modal ───────────────────────────────── */}

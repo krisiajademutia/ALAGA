@@ -35,11 +35,6 @@ export default function SplashScreen({ navigation }) {
           resizeMode="contain"
         />
       </Animated.View>
-
-      <Animated.View style={[styles.textBlock, { opacity: textOp }]}>
-        <Text style={styles.tagline}>Alert · Respond · Alaga</Text>
-        <Text style={styles.subtext}>Where every life deserves ALAGA</Text>
-      </Animated.View>
     </View>
   );
 }

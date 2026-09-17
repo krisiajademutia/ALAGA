@@ -86,7 +86,7 @@ export default function LoginScreen({ navigation }) {
             style={styles.logoImage}
             resizeMode="contain"
           />
-          <Text style={styles.tagline}>Alert · Respond · Alaga</Text>
+          <Text style={styles.tagline}>Where every life deserves alaga</Text>
         </View>
 
         {/* Clean White Form Card */}

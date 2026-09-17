@@ -24,7 +24,7 @@ const READINESS = [
 export default function AddAnimalScreen({ route, navigation }) {
   const { addAnimal, getAdvocateRescuedCases } = useApp();
   const rescueReportId = route.params?.rescueReportId || null;
-  const rescuedCases = getAdvocateRescuedCases();
+  const rescuedCases = (getAdvocateRescuedCases ? getAdvocateRescuedCases() : []) || [];
 
   const [name, setName]               = useState('');
   const [species, setSpecies]         = useState('');
@@ -182,7 +182,7 @@ export default function AddAnimalScreen({ route, navigation }) {
 
         <Label text="SPECIES" error={errors.species} />
         <View style={styles.scrollRow}>
-          {ANIMAL_SPECIES.map((s) => (
+          {(ANIMAL_SPECIES || ['Dog', 'Cat', 'Other']).map((s) => (
             <Chip key={s} label={s} active={species === s}
               onPress={() => {
                 setSpecies((prev) => prev === s ? '' : s);
@@ -257,7 +257,7 @@ export default function AddAnimalScreen({ route, navigation }) {
           <>
             <Label text="SUGGESTED FOSTER DURATION" />
             <View style={styles.scrollRow}>
-              {FOSTER_DURATIONS.map((d) => (
+              {(FOSTER_DURATIONS || ['1 month', '2 months', '3 months', 'Flexible']).map((d) => (
                 <Chip
                   key={d} label={d}
                   active={fosterDuration === d}
@@ -572,7 +572,7 @@ function LinkToRescueSection({ rescuedCases, selectedRescueId, onSelectRescue, s
               <Text style={styles.rescueSelectorCancel}>Cancel</Text>
             </TouchableOpacity>
           </View>
-          {rescuedCases.map((rescue) => (
+          {(rescuedCases || []).map((rescue) => (
             <TouchableOpacity
               key={rescue.id}
               style={styles.rescueOption}
@@ -621,7 +621,7 @@ function LinkToRescueSection({ rescuedCases, selectedRescueId, onSelectRescue, s
           <View>
             <Text style={styles.rescueLinkTitle}>Link to rescue case</Text>
             <Text style={styles.rescueLinkSub}>
-              Connect this profile to a rescue you completed ({rescuedCases.length} available)
+              Connect this profile to a rescue you completed ({(rescuedCases || []).length} available)
             </Text>
           </View>
         </View>
