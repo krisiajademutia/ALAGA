@@ -21,7 +21,15 @@ import Button from '../../components/Button';
 
 export default function AnimalDetailScreen({ route, navigation }) {
   const { animalId } = route.params || {};
-  const { animals, currentUser, submitRequest, requests, startConversation } = useApp();
+  const {
+    animals,
+    currentUser,
+    submitRequest,
+    requests,
+    startConversation,
+    markAnimalAdopted,
+    returnAnimalToListings,
+  } = useApp();
   const animal = animals.find((a) => a.id === animalId) || animals[0];
 
   const [isFav, setIsFav] = useState(false);
@@ -30,9 +38,63 @@ export default function AnimalDetailScreen({ route, navigation }) {
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const isOwner = currentUser?.id === animal.advocateId;
+  // ── Role-Based Access Control (RBAC) ───────────────────────────
+  const isOwner = Boolean(
+    currentUser &&
+    animal &&
+    (
+      (currentUser.id && animal.advocateId && currentUser.id === animal.advocateId) ||
+      (currentUser.uid && animal.advocateId && currentUser.uid === animal.advocateId) ||
+      (currentUser.email && animal.advocateEmail && currentUser.email.toLowerCase() === animal.advocateEmail.toLowerCase()) ||
+      (currentUser.name && animal.advocateName && currentUser.role === 'advocate' && currentUser.name.trim().toLowerCase() === animal.advocateName.trim().toLowerCase())
+    )
+  );
+  const isAdvocate = currentUser?.role === 'advocate';
+  const isCommunity = currentUser?.role === 'community' || !currentUser?.role;
+
+  const handleMarkAdopted = () => {
+    Alert.alert(
+      'Mark as Adopted',
+      `Confirm that ${animal.name} has found their forever home and been adopted?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm Adopted',
+          onPress: () => {
+            markAnimalAdopted(animal.id);
+            Alert.alert('Success 🎉', `${animal.name} is now marked as Adopted!`);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleReturnToListings = () => {
+    Alert.alert(
+      'Return to Available Listings',
+      `Make ${animal.name} available for adoption and temporary foster care again?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Return to Available',
+          onPress: () => {
+            returnAnimalToListings(animal.id);
+            Alert.alert('Updated', `${animal.name} is now back in available listings.`);
+          },
+        },
+      ]
+    );
+  };
 
   const openModal = (type) => {
+    if (isOwner) {
+      Alert.alert('Listing Owner', 'You are the advocate managing this listing.');
+      return;
+    }
+    if (!isCommunity) {
+      Alert.alert('Advocate Role', 'Advocate accounts coordinate rescues. Please message the advocate directly to collaborate.');
+      return;
+    }
     setRequestType(type);
     setMessage('');
     setModalVisible(true);
@@ -74,6 +136,21 @@ export default function AnimalDetailScreen({ route, navigation }) {
       otherName: animal.advocateName,
     });
   };
+
+  if (!animal) {
+    return (
+      <View style={[styles.flex, { alignItems: 'center', justifyContent: 'center', padding: 24 }]}>
+        <Ionicons name="paw-outline" size={48} color={COLORS.textMuted} />
+        <Text style={{ ...FONTS.titleMd, marginTop: 12, color: COLORS.textPrimary }}>Animal Not Found</Text>
+        <TouchableOpacity
+          style={{ marginTop: 16, paddingVertical: 10, paddingHorizontal: 20, backgroundColor: COLORS.primaryDark, borderRadius: 20 }}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={{ color: COLORS.surface, fontWeight: '700' }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.flex}>
@@ -164,7 +241,12 @@ export default function AnimalDetailScreen({ route, navigation }) {
                 </Text>
               </View>
             </View>
-            {!isOwner && (
+            {isOwner ? (
+              <View style={styles.ownerBadgePill}>
+                <Ionicons name="person" size={12} color={COLORS.primaryDeep} style={{ marginRight: 3 }} />
+                <Text style={styles.ownerBadgePillText}>You</Text>
+              </View>
+            ) : (
               <TouchableOpacity
                 style={styles.chatBtn}
                 onPress={handleMessageAdvocate}
@@ -217,40 +299,155 @@ export default function AnimalDetailScreen({ route, navigation }) {
             ))}
           </View>
 
-          {/* Donate shortcut */}
-          <TouchableOpacity
-            style={styles.donateBanner}
-            onPress={() => navigation.navigate('Donate', { animalId: animal.id, animalName: animal.name })}
-          >
-            <Ionicons name="gift-outline" size={18} color={COLORS.primaryDeep} />
-            <Text style={styles.donateBannerText}>
-              Want to support {animal.name}'s food & vet care? Donate here
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={COLORS.primaryDeep} />
-          </TouchableOpacity>
+          {/* Donate shortcut — Community Supporters only (RBAC) */}
+          {!isOwner && isCommunity && animal.status !== 'Adopted' && (
+            <TouchableOpacity
+              style={styles.donateBanner}
+              onPress={() => navigation.navigate('Donate', { animalId: animal.id, animalName: animal.name })}
+            >
+              <Ionicons name="gift-outline" size={18} color={COLORS.primaryDeep} />
+              <Text style={styles.donateBannerText}>
+                Want to support {animal.name}'s food & vet care? Donate here
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={COLORS.primaryDeep} />
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 
-      {/* ── Fixed Bottom Actions ────────────────────────────── */}
-      <View style={styles.bottomBar}>
-        <Button
-          title={`Adopt ${animal.name}`}
-          onPress={() => openModal('Adoption')}
-          fullWidth
-          style={styles.mainAdoptBtn}
-          textStyle={styles.mainAdoptBtnText}
-        />
+      {/* ── Fixed Bottom Actions with RBAC ────────────────────────────── */}
+      {isOwner ? (
+        <View style={styles.bottomBarOwner}>
+          <View style={styles.ownerHeaderRow}>
+            <View
+              style={[
+                styles.ownerStatusPill,
+                animal.status === 'Adopted'
+                  ? styles.statusAdoptedBg
+                  : animal.status === 'Fostered'
+                  ? styles.statusFosteredBg
+                  : styles.statusAvailableBg,
+              ]}
+            >
+              <Ionicons
+                name={
+                  animal.status === 'Adopted'
+                    ? 'checkmark-circle'
+                    : animal.status === 'Fostered'
+                    ? 'heart'
+                    : 'paw'
+                }
+                size={13}
+                color={
+                  animal.status === 'Adopted'
+                    ? '#15803D'
+                    : animal.status === 'Fostered'
+                    ? '#B45309'
+                    : COLORS.primaryDeep
+                }
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={[
+                  styles.ownerStatusPillText,
+                  animal.status === 'Adopted'
+                    ? styles.statusAdoptedText
+                    : animal.status === 'Fostered'
+                    ? styles.statusFosteredText
+                    : styles.statusAvailableText,
+                ]}
+              >
+                {animal.status === 'Adopted'
+                  ? 'Adopted'
+                  : animal.status === 'Fostered'
+                  ? 'Currently Fostered'
+                  : 'Active Listing'}
+              </Text>
+            </View>
+            <View style={styles.ownerBadgeWrap}>
+              <Ionicons name="shield-checkmark" size={13} color={COLORS.textMuted} style={{ marginRight: 3 }} />
+              <Text style={styles.ownerBadgeNotice}>You listed this pet</Text>
+            </View>
+          </View>
 
-        <TouchableOpacity
-          onPress={() => openModal('Foster')}
-          style={styles.fosterLink}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={styles.fosterLinkText}>
-            Or apply as temporary foster guardian
+          <View style={styles.ownerActionRow}>
+            {animal.status !== 'Adopted' ? (
+              <TouchableOpacity
+                style={styles.markAdoptedBtn}
+                onPress={handleMarkAdopted}
+                activeOpacity={0.88}
+              >
+                <Ionicons name="checkmark-done-circle" size={18} color={COLORS.surface} style={{ marginRight: 6 }} />
+                <Text style={styles.markAdoptedBtnText}>Mark as Adopted</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.relistBtn}
+                onPress={handleReturnToListings}
+                activeOpacity={0.88}
+              >
+                <Ionicons name="refresh" size={17} color={COLORS.primaryDeep} style={{ marginRight: 6 }} />
+                <Text style={styles.relistBtnText}>Return to Available</Text>
+              </TouchableOpacity>
+            )}
+
+            {animal.status === 'Fostered' && (
+              <TouchableOpacity
+                style={styles.relistBtn}
+                onPress={handleReturnToListings}
+                activeOpacity={0.88}
+              >
+                <Ionicons name="return-up-back" size={17} color={COLORS.primaryDeep} style={{ marginRight: 4 }} />
+                <Text style={styles.relistBtnText}>End Foster</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      ) : isAdvocate ? (
+        <View style={styles.bottomBar}>
+          <TouchableOpacity
+            style={styles.collabAdvocateBtn}
+            onPress={handleMessageAdvocate}
+            activeOpacity={0.88}
+          >
+            <Ionicons name="chatbubbles" size={18} color={COLORS.surface} style={{ marginRight: 8 }} />
+            <Text style={styles.collabAdvocateBtnText}>Message {animal.advocateName}</Text>
+          </TouchableOpacity>
+          <Text style={styles.collabAdvocateSub}>
+            Advocate collaboration & rescue coordination
           </Text>
-        </TouchableOpacity>
-      </View>
+        </View>
+      ) : animal.status === 'Adopted' ? (
+        <View style={styles.bottomBar}>
+          <View style={styles.alreadyAdoptedNotice}>
+            <Ionicons name="heart-circle" size={24} color={COLORS.success} style={{ marginRight: 10 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.alreadyAdoptedTitle}>{animal.name} has been Adopted! 🎉</Text>
+              <Text style={styles.alreadyAdoptedSub}>This rescue has successfully found their forever family.</Text>
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.bottomBar}>
+          <Button
+            title={`Adopt ${animal.name}`}
+            onPress={() => openModal('Adoption')}
+            fullWidth
+            style={styles.mainAdoptBtn}
+            textStyle={styles.mainAdoptBtnText}
+          />
+
+          <TouchableOpacity
+            onPress={() => openModal('Foster')}
+            style={styles.fosterLink}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.fosterLinkText}>
+              Or apply as temporary foster guardian
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* ── Apply Modal ────────────────────────────────────── */}
       <Modal visible={modalVisible} animationType="slide" transparent>
@@ -647,6 +844,167 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginTop: 14,
+  },
+
+  // ── RBAC & Owner Management Styles ───────────────────
+  bottomBarOwner: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 1,
+    borderTopColor: '#ECECEC',
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    ...SHADOWS.card,
+  },
+  ownerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  ownerStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  statusAvailableBg: {
+    backgroundColor: '#E0F2FA',
+  },
+  statusAvailableText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primaryDarkest,
+  },
+  statusFosteredBg: {
+    backgroundColor: '#FEF3DC',
+  },
+  statusFosteredText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  statusAdoptedBg: {
+    backgroundColor: '#DCFCE7',
+  },
+  statusAdoptedText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  ownerStatusPillText: {
+    ...FONTS.caption,
+  },
+  ownerBadgeWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ownerBadgeNotice: {
+    ...FONTS.caption,
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+  },
+  ownerActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  markAdoptedBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#15803D',
+    paddingVertical: 14,
+    borderRadius: SIZES.r24 + 1,
+    ...SHADOWS.button,
+  },
+  markAdoptedBtnText: {
+    ...FONTS.button,
+    fontSize: 15,
+    color: COLORS.surface,
+  },
+  relistBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surface,
+    borderWidth: 1.5,
+    borderColor: COLORS.primaryDeep,
+    paddingVertical: 13,
+    borderRadius: SIZES.r24 + 1,
+  },
+  relistBtnText: {
+    ...FONTS.button,
+    fontSize: 14,
+    color: COLORS.primaryDeep,
+  },
+  ownerBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.primaryMid,
+  },
+  ownerBadgePillText: {
+    ...FONTS.caption,
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primaryDeep,
+  },
+  collabAdvocateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primaryDark,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: SIZES.r24 + 1,
+    width: '100%',
+    ...SHADOWS.button,
+  },
+  collabAdvocateBtnText: {
+    ...FONTS.button,
+    fontSize: 15,
+    color: COLORS.surface,
+  },
+  collabAdvocateSub: {
+    ...FONTS.caption,
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 6,
+  },
+  alreadyAdoptedNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  alreadyAdoptedTitle: {
+    ...FONTS.label,
+    fontSize: 14,
+    color: '#15803D',
+    fontWeight: '700',
+  },
+  alreadyAdoptedSub: {
+    ...FONTS.caption,
+    fontSize: 11,
+    color: '#166534',
+    marginTop: 2,
   },
 });
 

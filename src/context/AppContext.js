@@ -241,8 +241,9 @@ export function AppProvider({ children }) {
   const addAnimal = (animalData) => {
     const newAnimal = {
       id: `a${Date.now()}`,
-      advocateId: currentUser?.id || 'u2',
+      advocateId: currentUser?.id || currentUser?.uid || 'u2',
       advocateName: currentUser?.name || 'Elena Ramos',
+      advocateEmail: currentUser?.email || null,
       createdAt: new Date().toISOString(),
       fosterId: null,
       fosterName: null,
@@ -403,7 +404,12 @@ export function AppProvider({ children }) {
     requests.filter((r) => r.advocateId === currentUser?.id);
 
   const getAdvocateAnimals = () =>
-    animals.filter((a) => a.advocateId === currentUser?.id);
+    animals.filter((a) =>
+      (currentUser?.id && a.advocateId === currentUser.id) ||
+      (currentUser?.uid && a.advocateId === currentUser.uid) ||
+      (currentUser?.email && a.advocateEmail && currentUser.email.toLowerCase() === a.advocateEmail.toLowerCase()) ||
+      (currentUser?.name && a.advocateName && currentUser.name.trim().toLowerCase() === a.advocateName.trim().toLowerCase())
+    );
 
   const getAnimalsByAdvocate = (userId) =>
     animals.filter((a) => a.advocateId === userId);
