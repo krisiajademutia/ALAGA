@@ -33,7 +33,8 @@
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "POST_NOTIFICATIONS"
       ]
     },
     "plugins": [
@@ -50,7 +51,8 @@
           "locationWhenInUsePermission": "ALAGA uses your location to tag the rescue location."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-video"
     ]
   }
 }

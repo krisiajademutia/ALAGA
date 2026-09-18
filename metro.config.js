@@ -8,4 +8,7 @@ const config = getDefaultConfig(__dirname);
 config.resolver.sourceExts.push('cjs');
 config.resolver.unstable_enablePackageExports = true;
 
+// Prevent JavaScript heap out-of-memory during bundle transformation
+config.maxWorkers = 2;
+
 module.exports = config;

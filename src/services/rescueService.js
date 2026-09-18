@@ -67,10 +67,12 @@ export async function createRescueReportFirebase(reportData) {
       timestamp: serverTimestamp(),
     };
 
-    const docRef = await addDoc(collection(db, RESCUES_COLLECTION), payload);
-    return { success: true, id: docRef.id, report: { id: docRef.id, ...payload } };
+    const docId = reportData?.id || `r${Date.now()}`;
+    const docRef = doc(db, RESCUES_COLLECTION, docId);
+    await setDoc(docRef, { ...payload, id: docId });
+    return { success: true, id: docId, report: { id: docId, ...payload } };
   } catch (error) {
-    console.error('[rescueService] Create report error:', error);
+    console.warn('[rescueService] Create report warning:', error.message);
     return { success: false, error: error.message };
   }
 }
@@ -79,7 +81,7 @@ export async function createRescueReportFirebase(reportData) {
  * Advocate responds to / claims a rescue report
  */
 export async function claimRescueReportFirebase(reportId, advocateId, advocateName) {
-  if (isMockFirebase() || !db) return;
+  if (isMockFirebase() || !db) return { isMock: true };
 
   try {
     const reportRef = doc(db, RESCUES_COLLECTION, reportId);
@@ -91,7 +93,7 @@ export async function claimRescueReportFirebase(reportId, advocateId, advocateNa
     });
     return { success: true };
   } catch (error) {
-    console.error('[rescueService] Claim error:', error);
+    console.warn('[rescueService] Claim sync notice:', error.message);
     return { success: false, error: error.message };
   }
 }
@@ -100,7 +102,7 @@ export async function claimRescueReportFirebase(reportId, advocateId, advocateNa
  * Mark a rescue case as safely rescued
  */
 export async function markReportRescuedFirebase(reportId) {
-  if (isMockFirebase() || !db) return;
+  if (isMockFirebase() || !db) return { isMock: true };
 
   try {
     const reportRef = doc(db, RESCUES_COLLECTION, reportId);
@@ -110,7 +112,7 @@ export async function markReportRescuedFirebase(reportId) {
     });
     return { success: true };
   } catch (error) {
-    console.error('[rescueService] Mark rescued error:', error);
+    console.warn('[rescueService] Mark rescued sync notice:', error.message);
     return { success: false, error: error.message };
   }
 }
@@ -119,7 +121,7 @@ export async function markReportRescuedFirebase(reportId) {
  * Add a comment to the rescue subcollection
  */
 export async function addRescueCommentFirebase(reportId, commentData) {
-  if (isMockFirebase() || !db) return;
+  if (isMockFirebase() || !db) return { isMock: true };
 
   try {
     const commentsRef = collection(db, RESCUES_COLLECTION, reportId, 'comments');
@@ -131,7 +133,7 @@ export async function addRescueCommentFirebase(reportId, commentData) {
     const docRef = await addDoc(commentsRef, newComment);
     return { success: true, id: docRef.id };
   } catch (error) {
-    console.error('[rescueService] Add comment error:', error);
+    console.warn('[rescueService] Add comment warning:', error.message);
     return { success: false, error: error.message };
   }
 }

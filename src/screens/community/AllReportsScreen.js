@@ -36,7 +36,7 @@ export default function AllReportsScreen({ navigation }) {
   });
 
   const formatDate = (dateStr) => {
-    if (!dateStr) return 'Aug 25, 2026';
+    if (!dateStr) return 'Recently';
     const d = new Date(dateStr);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };

@@ -17,6 +17,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SHADOWS } from '../../constants/theme';
 import Header from '../../components/Header';
+import AlertModal from '../../components/AlertModal';
+import PhotoPickerModal from '../../components/PhotoPickerModal';
 
 const PRESET_AMOUNTS = ['100', '250', '500', '1,000'];
 const PAYMENT_METHODS = [
@@ -38,28 +40,30 @@ export default function DonateScreen({ route, navigation }) {
   const [proof, setProof] = useState('receipt_screenshot.png');
   const [loading, setLoading] = useState(false);
 
-  const pickProof = async () => {
-    Alert.alert('Upload Receipt', 'Attach proof of transaction:', [
-      {
-        text: 'Camera',
-        onPress: async () => {
-          const { status } = await ImagePicker.requestCameraPermissionsAsync();
-          if (status !== 'granted') return;
-          const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
-          if (!result.canceled) setProof(result.assets[0].uri);
-        },
-      },
-      {
-        text: 'Gallery',
-        onPress: async () => {
-          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (status !== 'granted') return;
-          const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7 });
-          if (!result.canceled) setProof(result.assets[0].uri);
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+  const [photoPickerVisible, setPhotoPickerVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+    primaryText: 'OK',
+    onPrimaryPress: null,
+  });
+
+  const pickProofCamera = async () => {
+    setPhotoPickerVisible(false);
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+    if (!result.canceled) setProof(result.assets[0].uri);
+  };
+
+  const pickProofGallery = async () => {
+    setPhotoPickerVisible(false);
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7 });
+    if (!result.canceled) setProof(result.assets[0].uri);
   };
 
   const handleSubmit = () => {
@@ -75,11 +79,17 @@ export default function DonateScreen({ route, navigation }) {
         message: message.trim() || 'For orthopedic follow-up and treats!',
       });
       setLoading(false);
-      Alert.alert(
-        'Donation Submitted',
-        `Thank you! Your donation for ${targetName} is submitted and will be verified by the advocate.`,
-        [{ text: 'View Activity', onPress: () => navigation.navigate('Activity', { tab: 'donations' }) }]
-      );
+      setAlertConfig({
+        visible: true,
+        type: 'success',
+        title: 'Donation Submitted',
+        message: `Thank you! Your donation for ${targetName} has been submitted and will be verified by the advocate.`,
+        primaryText: 'View Activity',
+        onPrimaryPress: () => {
+          setAlertConfig((prev) => ({ ...prev, visible: false }));
+          navigation.navigate('Activity', { tab: 'donations' });
+        },
+      });
     }, 700);
   };
 
@@ -199,7 +209,7 @@ export default function DonateScreen({ route, navigation }) {
         <Text style={styles.sectionLabel}>PROOF OF PAYMENT (OPTIONAL)</Text>
         <TouchableOpacity
           style={styles.proofContainer}
-          onPress={pickProof}
+          onPress={() => setPhotoPickerVisible(true)}
           activeOpacity={0.85}
         >
           <View style={styles.proofInner}>
@@ -231,6 +241,27 @@ export default function DonateScreen({ route, navigation }) {
           All donations are verified by the Animal Advocate before being confirmed.
         </Text>
       </ScrollView>
+
+      {/* ── Branded Photo Picker Modal ───────────────────────── */}
+      <PhotoPickerModal
+        visible={photoPickerVisible}
+        onClose={() => setPhotoPickerVisible(false)}
+        onSelectCamera={pickProofCamera}
+        onSelectGallery={pickProofGallery}
+        title="Upload Receipt"
+        subtitle="Attach proof of transfer or transaction"
+      />
+
+      {/* ── Branded Alert Modal ──────────────────────────────── */}
+      <AlertModal
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        primaryText={alertConfig.primaryText}
+        onPrimaryPress={alertConfig.onPrimaryPress}
+        onClose={() => setAlertConfig((prev) => ({ ...prev, visible: false }))}
+      />
     </KeyboardAvoidingView>
   );
 }

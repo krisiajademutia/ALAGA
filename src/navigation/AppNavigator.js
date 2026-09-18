@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StyleSheet, Platform, View } from 'react-native';
@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useApp } from '../context/AppContext';
 import { COLORS, SHADOWS, SIZES } from '../constants/theme';
+import { navigationRef, navigate } from './navigationRef';
+export { navigationRef, navigate };
 
 // ── Auth / Onboarding ─────────────────────────────────────────────────────────
 import SplashScreen     from '../screens/onboarding/SplashScreen';
@@ -86,10 +88,21 @@ const tabScreenOptions = {
   tabBarHideOnKeyboard: true,
 };
 
-function tabOptions(label, activeIcon, inactiveIcon) {
+function tabOptions(label, activeIcon, inactiveIcon, badge) {
   return {
     title: label,
     tabBarLabel: label,
+    tabBarBadge: badge > 0 ? badge : undefined,
+    tabBarBadgeStyle: {
+      backgroundColor: '#E8622A',
+      color: '#FFFFFF',
+      fontSize: 10,
+      fontWeight: '800',
+      minWidth: 18,
+      height: 18,
+      borderRadius: 9,
+      lineHeight: 16,
+    },
     tabBarIcon: ({ focused }) => (
       <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
         <Ionicons
@@ -109,11 +122,14 @@ const Tab   = createBottomTabNavigator();
 // Community Tab Navigator
 // ─────────────────────────────────────────────────────────────────────────────
 function CommunityTabs() {
+  const { getUnreadMessagesCount } = useApp();
+  const unreadCount = getUnreadMessagesCount();
+
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home"     component={CommunityHomeScreen} options={tabOptions('Home',     'home',         'home-outline')} />
       <Tab.Screen name="Listings" component={ListingsScreen}      options={tabOptions('Adopt',    'paw',          'paw-outline')} />
-      <Tab.Screen name="Messages" component={MessagesScreen}      options={tabOptions('Messages', 'chatbubbles',  'chatbubbles-outline')} />
+      <Tab.Screen name="Messages" component={MessagesScreen}      options={tabOptions('Messages', 'chatbubbles',  'chatbubbles-outline', unreadCount)} />
       <Tab.Screen name="Activity" component={ActivityScreen}      options={tabOptions('Activity', 'time',         'time-outline')} />
       <Tab.Screen name="Profile"  component={ProfileScreen}       options={tabOptions('Profile',  'person',       'person-outline')} />
     </Tab.Navigator>
@@ -124,12 +140,16 @@ function CommunityTabs() {
 // Advocate Tab Navigator
 // ─────────────────────────────────────────────────────────────────────────────
 function AdvocateTabs() {
+  const { getUnreadMessagesCount, getOpenAlertsCount } = useApp();
+  const unreadCount = getUnreadMessagesCount();
+  const alertsCount = getOpenAlertsCount ? getOpenAlertsCount() : 0;
+
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home"         component={AdvocateHomeScreen}  options={tabOptions('Home',     'home',          'home-outline')} />
-      <Tab.Screen name="RescueAlerts" component={RescueAlertsScreen}  options={tabOptions('Alerts',   'notifications', 'notifications-outline')} />
+      <Tab.Screen name="RescueAlerts" component={RescueAlertsScreen}  options={tabOptions('Alerts',   'notifications', 'notifications-outline', alertsCount)} />
       <Tab.Screen name="MyAnimals"    component={MyAnimalsScreen}     options={tabOptions('Animals',  'paw',           'paw-outline')} />
-      <Tab.Screen name="Messages"     component={MessagesScreen}      options={tabOptions('Messages', 'chatbubbles',   'chatbubbles-outline')} />
+      <Tab.Screen name="Messages"     component={MessagesScreen}      options={tabOptions('Messages', 'chatbubbles',   'chatbubbles-outline', unreadCount)} />
       <Tab.Screen name="Profile"      component={ProfileScreen}       options={tabOptions('Profile',  'person',        'person-outline')} />
     </Tab.Navigator>
   );
@@ -191,7 +211,7 @@ function AuthStack() {
 export default function AppNavigator() {
   const { currentUser } = useApp();
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       {currentUser ? <RootStack /> : <AuthStack />}
     </NavigationContainer>
   );

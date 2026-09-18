@@ -76,7 +76,13 @@ export default function CommunityHomeScreen({ navigation }) {
               activeOpacity={0.8}
             >
               <Ionicons name="notifications-outline" size={22} color={COLORS.brown} />
-              {unreadNotifs > 0 && <View style={styles.notifBadge} />}
+              {unreadNotifs > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>
+                    {unreadNotifs > 99 ? '99+' : unreadNotifs}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -258,12 +264,24 @@ const styles = StyleSheet.create({
   },
   notifBadge: {
     position: 'absolute',
-    top: 9,
-    right: 9,
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: COLORS.danger,
+    top: -3,
+    right: -3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#E8622A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  notifBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '800',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    lineHeight: 12,
   },
   avatarWrap: {
     ...SHADOWS.sm,
@@ -423,32 +441,46 @@ const styles = StyleSheet.create({
   // Segment Tabs
   segmentContainer: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: SIZES.r24 + 1,
+    borderColor: '#E8DEC5',
+    borderRadius: 16,
     marginHorizontal: 20,
-    padding: 3,
+    padding: 4,
     marginBottom: 18,
+    shadowColor: '#473018',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
   segBtn: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: SIZES.r20,
+    borderRadius: 12,
   },
   segBtnActive: {
-    backgroundColor: COLORS.secondaryLight,
+    backgroundColor: '#92CDE5',
+    shadowColor: '#2E7A99',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   segText: {
-    ...FONTS.bodyMedium,
     fontSize: 12,
-    color: COLORS.textSecondary,
+    fontWeight: '600',
+    color: '#685038',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    textAlign: 'center',
   },
   segTextActive: {
-    ...FONTS.subheading,
-    color: COLORS.brown,
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
   // Section Header

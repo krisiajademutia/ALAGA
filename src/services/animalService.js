@@ -106,15 +106,11 @@ export function subscribeToApplications(user, onUpdate, onError) {
   try {
     let q;
     if (user?.role === 'advocate') {
-      q = query(
-        collection(db, APPLICATIONS_COLLECTION),
-        orderBy('createdAt', 'desc')
-      );
+      q = query(collection(db, APPLICATIONS_COLLECTION));
     } else {
       q = query(
         collection(db, APPLICATIONS_COLLECTION),
-        where('requesterId', '==', currentUid),
-        orderBy('createdAt', 'desc')
+        where('requesterId', '==', currentUid)
       );
     }
 
@@ -128,6 +124,7 @@ export function subscribeToApplications(user, onUpdate, onError) {
             ...docSnap.data(),
           });
         });
+        apps.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
         if (onUpdate) onUpdate(apps);
       },
       (error) => {

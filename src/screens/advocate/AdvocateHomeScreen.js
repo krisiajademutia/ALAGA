@@ -80,7 +80,13 @@ export default function AdvocateHomeScreen({ navigation }) {
               activeOpacity={0.8}
             >
               <Ionicons name="notifications-outline" size={22} color="#473018" />
-              {unreadNotifs > 0 && <View style={styles.notifBadge} />}
+              {unreadNotifs > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>
+                    {unreadNotifs > 99 ? '99+' : unreadNotifs}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -247,12 +253,14 @@ export default function AdvocateHomeScreen({ navigation }) {
                     </Text>
                   </View>
 
-                  {/* Top-Right Distance & Favorite */}
+                  {/* Top-Right Favorite & Optional Distance */}
                   <View style={styles.topRightOverlay}>
-                    <View style={styles.distancePill}>
-                      <Ionicons name="location-sharp" size={11} color="#206B82" style={{ marginRight: 2 }} />
-                      <Text style={styles.distancePillText}>1.2 km</Text>
-                    </View>
+                    {Boolean(r.distance) && (
+                      <View style={styles.distancePill}>
+                        <Ionicons name="location-sharp" size={11} color="#206B82" style={{ marginRight: 2 }} />
+                        <Text style={styles.distancePillText}>{r.distance}</Text>
+                      </View>
+                    )}
                     <TouchableOpacity
                       style={styles.heartCircle}
                       onPress={() => toggleFavorite(r.id)}
@@ -275,11 +283,11 @@ export default function AdvocateHomeScreen({ navigation }) {
                     </Text>
                   </View>
 
-                  {/* Location & Breed */}
+                  {/* Location */}
                   <View style={styles.cardMetaRow}>
                     <Ionicons name="location-outline" size={13} color="#8C7D6A" style={{ marginRight: 4 }} />
                     <Text style={styles.cardMetaText} numberOfLines={1}>
-                      {r.location?.address || 'Pasig City'} · {breedName}
+                      {r.location?.address || 'Reported Location'}
                     </Text>
                   </View>
 
@@ -308,7 +316,7 @@ export default function AdvocateHomeScreen({ navigation }) {
                   {/* Card Footer */}
                   <View style={styles.cardFooter}>
                     <Text style={styles.cardDateText}>
-                      {r.dateDisplay || 'Aug 25, 2026'}
+                      {r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent'}
                     </Text>
                     <View style={styles.actionPill}>
                       <Text style={styles.actionPillText}>View Details</Text>
@@ -367,12 +375,24 @@ const styles = StyleSheet.create({
   },
   notifBadge: {
     position: 'absolute',
-    top: 9,
-    right: 9,
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#D94F4F',
+    top: -3,
+    right: -3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#E8622A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  notifBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '800',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    lineHeight: 12,
   },
   avatarWrap: {
     ...SHADOWS.sm,
@@ -534,30 +554,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#CCE3EE',
-    borderRadius: 25,
+    borderColor: '#E8DEC5',
+    borderRadius: 16,
     marginHorizontal: 20,
-    padding: 3,
+    padding: 4,
     marginBottom: 18,
+    shadowColor: '#473018',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
   segBtn: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 20,
+    borderRadius: 12,
   },
   segBtnActive: {
-    backgroundColor: '#D8EDE4',
+    backgroundColor: '#92CDE5',
+    shadowColor: '#2E7A99',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   segText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#5C4E3A',
+    color: '#685038',
     fontFamily: 'PlusJakartaSans_600SemiBold',
+    textAlign: 'center',
   },
   segTextActive: {
-    color: '#473018',
+    color: '#FFFFFF',
     fontWeight: '700',
     fontFamily: 'PlusJakartaSans_700Bold',
   },

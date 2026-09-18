@@ -1,10 +1,34 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Platform } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
-import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import Header from '../../components/Header';
+
+function formatTimeAgo(isoString) {
+  if (!isoString) return 'Just now';
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'Just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+}
+
+const FILTER_TABS = [
+  { key: 'all', label: 'All' },
+  { key: 'unread', label: 'Unread' },
+  { key: 'rescue', label: 'Alerts' },
+  { key: 'updates', label: 'Updates' },
+];
 
 export default function NotificationScreen({ navigation }) {
   const {
@@ -15,39 +39,109 @@ export default function NotificationScreen({ navigation }) {
     markAllNotificationsRead,
   } = useApp();
 
-  const notifs = getUserNotifications();
-  const unreadCount = getUnreadCount() || 2;
+  const [activeFilter, setActiveFilter] = useState('all');
+
+  const notifs = getUserNotifications ? getUserNotifications() : [];
+  const unreadCount = getUnreadCount ? getUnreadCount() : 0;
+
+  // Filter items based on active tab
+  const filteredNotifs = useMemo(() => {
+    return notifs.filter((n) => {
+      if (activeFilter === 'unread') return !n.read;
+      if (activeFilter === 'rescue') return n.type === 'rescue';
+      if (activeFilter === 'updates') return n.type !== 'rescue';
+      return true;
+    });
+  }, [notifs, activeFilter]);
 
   // Group into TODAY and EARLIER
-  const todayNotifs = notifs.filter((n) => n.section === 'TODAY' || !n.read);
-  const earlierNotifs = notifs.filter((n) => n.section === 'EARLIER' && n.read);
+  const listData = useMemo(() => {
+    const today = [];
+    const earlier = [];
 
-  const listData = [];
-  if (todayNotifs.length > 0) {
-    listData.push({ type: 'header', label: 'TODAY' });
-    todayNotifs.forEach((n) => listData.push({ type: 'item', ...n }));
-  }
-  if (earlierNotifs.length > 0) {
-    listData.push({ type: 'header', label: 'EARLIER' });
-    earlierNotifs.forEach((n) => listData.push({ type: 'item', ...n }));
-  }
+    filteredNotifs.forEach((n) => {
+      const isToday =
+        !n.createdAt ||
+        (Date.now() - new Date(n.createdAt).getTime()) / (1000 * 60 * 60) < 24;
+
+      if (isToday) {
+        today.push(n);
+      } else {
+        earlier.push(n);
+      }
+    });
+
+    const sections = [];
+    if (today.length > 0) {
+      sections.push({ type: 'header', label: 'TODAY' });
+      today.forEach((item) => sections.push({ type: 'item', ...item }));
+    }
+    if (earlier.length > 0) {
+      sections.push({ type: 'header', label: 'EARLIER' });
+      earlier.forEach((item) => sections.push({ type: 'item', ...item }));
+    }
+
+    if (sections.length === 0 && filteredNotifs.length > 0) {
+      filteredNotifs.forEach((item) => sections.push({ type: 'item', ...item }));
+    }
+
+    return sections;
+  }, [filteredNotifs]);
 
   const handleTap = (item) => {
     markNotificationRead(item.id);
+
     if (item.navTarget?.screen) {
       navigation.navigate(item.navTarget.screen, item.navTarget.params || {});
+    } else if (item.reportId) {
+      navigation.navigate(
+        currentUser?.role === 'advocate' ? 'RescueAlertDetail' : 'ReportDetail',
+        { reportId: item.reportId }
+      );
+    } else if (item.conversationId) {
+      navigation.navigate('Chat', {
+        conversationId: item.conversationId,
+        userName: item.senderName || 'Advocate',
+      });
     }
+  };
+
+  const renderIcon = (type, iconName, iconColor, iconBg) => {
+    let name = iconName || 'notifications-outline';
+    let color = iconColor || '#2E7A99';
+    let bg = iconBg || '#EBF4F8';
+
+    if (type === 'rescue') {
+      name = 'shield-alert-outline';
+      color = '#C23E3E';
+      bg = '#FDF0ED';
+    } else if (type === 'chat') {
+      name = 'chatbubble-outline';
+      color = '#2A728F';
+      bg = '#EBF4F8';
+    } else if (type === 'adoption') {
+      name = 'paw-outline';
+      color = '#2B8259';
+      bg = '#EDF6F1';
+    }
+
+    return (
+      <View style={[styles.iconContainer, { backgroundColor: bg }]}>
+        <Ionicons name={name} size={18} color={color} />
+      </View>
+    );
   };
 
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
 
+      {/* Header */}
       <Header
         onBack={() => navigation.goBack()}
         centerComponent={
-          <View style={styles.navCenter}>
-            <Text style={styles.navTitle}>Notifications</Text>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>Notifications</Text>
             {unreadCount > 0 && (
               <View style={styles.unreadBadge}>
                 <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
@@ -56,20 +150,81 @@ export default function NotificationScreen({ navigation }) {
           </View>
         }
         rightComponent={
-          <TouchableOpacity
-            onPress={markAllNotificationsRead}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={styles.markAllBtn}>Mark all read</Text>
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            {unreadCount > 0 && (
+              <TouchableOpacity
+                onPress={markAllNotificationsRead}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.markReadText}>Mark all read</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         }
       />
 
+      {/* Filter Tabs */}
+      <View style={styles.filterRow}>
+        {FILTER_TABS.map((tab) => {
+          const isActive = activeFilter === tab.key;
+          const showCount = tab.key === 'unread' && unreadCount > 0;
+
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.filterChip, isActive && styles.filterChipActive]}
+              onPress={() => setActiveFilter(tab.key)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  isActive && styles.filterChipTextActive,
+                ]}
+              >
+                {tab.label}
+              </Text>
+              {showCount && (
+                <View
+                  style={[
+                    styles.chipBadge,
+                    isActive ? styles.chipBadgeActive : styles.chipBadgeInactive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipBadgeText,
+                      isActive ? styles.chipBadgeTextActive : styles.chipBadgeTextInactive,
+                    ]}
+                  >
+                    {unreadCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Notification Stream (Unified Continuous Surface) */}
       <FlatList
         data={listData}
-        keyExtractor={(item, i) => item.id || `h-${i}`}
-        contentContainerStyle={styles.list}
+        keyExtractor={(item, index) => item.id || `h-${index}`}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="notifications-outline" size={34} color="#8C7D6A" />
+            </View>
+            <Text style={styles.emptyTitle}>No notifications</Text>
+            <Text style={styles.emptyDesc}>
+              {activeFilter === 'unread'
+                ? 'All notifications have been reviewed.'
+                : 'Alerts, community updates, and messages will appear here.'}
+            </Text>
+          </View>
+        }
         renderItem={({ item }) => {
           if (item.type === 'header') {
             return (
@@ -79,35 +234,40 @@ export default function NotificationScreen({ navigation }) {
             );
           }
 
-          const hasBlueStrip = !item.read;
+          const isUnread = !item.read;
 
           return (
             <TouchableOpacity
-              style={[
-                styles.notifCard,
-                hasBlueStrip && styles.notifCardActive,
-              ]}
+              style={[styles.rowItem, isUnread && styles.rowItemUnread]}
               onPress={() => handleTap(item)}
-              activeOpacity={0.88}
+              activeOpacity={0.75}
             >
-              {/* Blue strip indicator */}
-              {hasBlueStrip && <View style={styles.activeStrip} />}
-
-              {/* Icon */}
-              <View style={[styles.iconBox, { backgroundColor: item.iconBg || '#E0F2FA' }]}>
-                <Ionicons name={item.icon || 'notifications'} size={20} color="#206B82" />
+              {/* Refined Status Indicator Dot */}
+              <View style={styles.dotSlot}>
+                {isUnread && <View style={styles.unreadDot} />}
               </View>
 
-              {/* Text content */}
-              <View style={styles.textBox}>
-                <Text style={styles.itemTitle}>{item.title}</Text>
-                <Text style={styles.itemBody} numberOfLines={2}>
-                  {item.body}
+              {/* Minimal Icon Badge */}
+              {renderIcon(item.type, item.icon, item.iconColor, item.iconBg)}
+
+              {/* Textual Details */}
+              <View style={styles.contentWrap}>
+                <View style={styles.titleRow}>
+                  <Text
+                    style={[styles.titleText, isUnread && styles.titleTextUnread]}
+                    numberOfLines={1}
+                  >
+                    {item.title}
+                  </Text>
+                  <Text style={styles.timeText}>
+                    {item.timeAgo || formatTimeAgo(item.createdAt)}
+                  </Text>
+                </View>
+
+                <Text style={styles.bodyText} numberOfLines={2}>
+                  {item.body || item.message || ''}
                 </Text>
-                <Text style={styles.itemTime}>{item.timeAgo || '25m ago'}</Text>
               </View>
-
-              <Ionicons name="chevron-forward" size={16} color="#8C7D6A" />
             </TouchableOpacity>
           );
         }}
@@ -119,104 +279,216 @@ export default function NotificationScreen({ navigation }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#FCF8E8',
   },
-  navCenter: {
+  headerCenter: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  navTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
     color: '#473018',
+    letterSpacing: -0.2,
   },
   unreadBadge: {
-    backgroundColor: '#D94F4F',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    backgroundColor: '#C23E3E',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 5,
   },
   unreadBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 10.5,
+    fontWeight: '700',
     color: '#FFFFFF',
   },
-  markAllBtn: {
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  markReadText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#2E7A99',
   },
 
-  list: {
+  // Filter Row
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 40,
+    paddingVertical: 10,
+    backgroundColor: '#FCF8E8',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E8DFC8',
+    gap: 8,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#FAF5E8',
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
+  },
+  filterChipActive: {
+    backgroundColor: '#2E7A99',
+    borderColor: '#2E7A99',
+  },
+  filterChipText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#685038',
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  chipBadge: {
+    marginLeft: 6,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  chipBadgeActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  chipBadgeInactive: {
+    backgroundColor: '#E8DFC8',
+  },
+  chipBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  chipBadgeTextActive: {
+    color: '#FFFFFF',
+  },
+  chipBadgeTextInactive: {
+    color: '#685038',
+  },
+
+  // Stream List
+  listContent: {
+    flexGrow: 1,
+    paddingBottom: 32,
   },
   sectionHeader: {
-    marginTop: 10,
-    marginBottom: 10,
-    paddingHorizontal: 4,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 6,
+    backgroundColor: '#FCF8E8',
   },
   sectionLabel: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#8C7D6A',
-    letterSpacing: 0.6,
+    fontWeight: '700',
+    color: '#947E68',
+    letterSpacing: 0.8,
   },
 
-  notifCard: {
+  // Continuous Row Items (Clean & Professional, No Heavy Box Cards)
+  rowItem: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    backgroundColor: '#FCF8E8',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EDE5DC',
+  },
+  rowItemUnread: {
+    backgroundColor: '#F5FAF7',
+  },
+  dotSlot: {
+    width: 10,
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E8F2F6',
-    overflow: 'hidden',
-    position: 'relative',
-    ...SHADOWS.sm,
+    paddingTop: 11,
+    marginRight: 4,
   },
-  notifCardActive: {
-    backgroundColor: '#F3F9FC',
-  },
-  activeStrip: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 5,
+  unreadDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#2E7A99',
   },
-  iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+
+  // Icon Badge
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
+    marginRight: 12,
+    marginTop: 2,
   },
-  textBox: {
+
+  // Content Details
+  contentWrap: {
     flex: 1,
-    marginRight: 6,
   },
-  itemTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#473018',
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 3,
   },
-  itemBody: {
-    fontSize: 12,
-    color: '#5C4E3A',
-    lineHeight: 16,
-    marginBottom: 4,
+  titleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#473018',
+    flex: 1,
+    marginRight: 8,
   },
-  itemTime: {
-    fontSize: 11,
+  titleTextUnread: {
+    fontWeight: '700',
+    color: '#261B0E',
+  },
+  timeText: {
+    fontSize: 11.5,
+    color: '#947E68',
+  },
+  bodyText: {
+    fontSize: 12.5,
+    color: '#685038',
+    lineHeight: 17,
+  },
+
+  // Empty State (Professional & Subtle)
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingTop: 90,
+  },
+  emptyIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FAF5E8',
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#473018',
+    marginBottom: 6,
+  },
+  emptyDesc: {
+    fontSize: 13,
     color: '#8C7D6A',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
   },
 });

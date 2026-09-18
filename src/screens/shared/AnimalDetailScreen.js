@@ -10,6 +10,8 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  TextInput,
+  ActivityIndicator,
   StatusBar as RNStatusBar,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -31,6 +33,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
     startConversation,
     markAnimalAdopted,
     returnAnimalToListings,
+    showAlert,
   } = useApp();
   const animal = animals.find((a) => a.id === animalId) || animals[0];
 
@@ -39,6 +42,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
   const [requestType, setRequestType] = useState('Adoption');
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [activePreviewIndex, setActivePreviewIndex] = useState(null);
 
   const insets = useSafeAreaInsets();
   const safeTop =
@@ -47,14 +51,12 @@ export default function AnimalDetailScreen({ route, navigation }) {
       Platform.OS === 'android' ? RNStatusBar.currentHeight || 0 : 12
     ) + 6;
 
-  // ── Role-Based Access Control (RBAC) ───────────────────────────
+  if (!animal) return null;
+
+  // Real owner check: matches ID or matches name if advocate
   const isOwner = Boolean(
-    currentUser &&
-    animal &&
-    (
-      (currentUser.id && animal.advocateId && currentUser.id === animal.advocateId) ||
-      (currentUser.uid && animal.advocateId && currentUser.uid === animal.advocateId) ||
-      (currentUser.email && animal.advocateEmail && currentUser.email.toLowerCase() === animal.advocateEmail.toLowerCase()) ||
+    currentUser && (
+      currentUser.id === animal.advocateId ||
       (currentUser.name && animal.advocateName && currentUser.role === 'advocate' && currentUser.name.trim().toLowerCase() === animal.advocateName.trim().toLowerCase())
     )
   );
@@ -62,46 +64,66 @@ export default function AnimalDetailScreen({ route, navigation }) {
   const isCommunity = currentUser?.role === 'community' || !currentUser?.role;
 
   const handleMarkAdopted = () => {
-    Alert.alert(
-      'Mark as Adopted',
-      `Confirm that ${animal.name} has found their forever home and been adopted?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm Adopted',
-          onPress: () => {
-            markAnimalAdopted(animal.id);
-            Alert.alert('Success 🎉', `${animal.name} is now marked as Adopted!`);
-          },
-        },
-      ]
-    );
+    showAlert({
+      title: 'Mark as Adopted',
+      message: `Confirm that ${animal.name} has found their forever home and been adopted?`,
+      type: 'warning',
+      customIcon: 'paw',
+      secondaryText: 'Cancel',
+      primaryText: 'Confirm Adopted',
+      onPrimaryPress: () => {
+        markAnimalAdopted(animal.id);
+        setTimeout(() => {
+          showAlert({
+            title: 'Success 🎉',
+            message: `${animal.name} is now marked as Adopted!`,
+            type: 'success',
+            customIcon: 'paw',
+            primaryText: 'Great!',
+          });
+        }, 300);
+      },
+    });
   };
 
   const handleReturnToListings = () => {
-    Alert.alert(
-      'Return to Available Listings',
-      `Make ${animal.name} available for adoption and temporary foster care again?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Return to Available',
-          onPress: () => {
-            returnAnimalToListings(animal.id);
-            Alert.alert('Updated', `${animal.name} is now back in available listings.`);
-          },
-        },
-      ]
-    );
+    showAlert({
+      title: 'Return to Available Listings',
+      message: `Make ${animal.name} available for adoption and temporary foster care again?`,
+      type: 'info',
+      customIcon: 'paw',
+      secondaryText: 'Cancel',
+      primaryText: 'Return to Available',
+      onPrimaryPress: () => {
+        returnAnimalToListings(animal.id);
+        setTimeout(() => {
+          showAlert({
+            title: 'Updated',
+            message: `${animal.name} is now back in available listings.`,
+            type: 'success',
+            customIcon: 'paw',
+            primaryText: 'OK',
+          });
+        }, 300);
+      },
+    });
   };
 
   const openModal = (type) => {
     if (isOwner) {
-      Alert.alert('Listing Owner', 'You are the advocate managing this listing.');
+      showAlert({
+        title: 'Listing Owner',
+        message: 'You are the advocate managing this listing.',
+        type: 'info',
+      });
       return;
     }
     if (!isCommunity) {
-      Alert.alert('Advocate Role', 'Advocate accounts coordinate rescues. Please message the advocate directly to collaborate.');
+      showAlert({
+        title: 'Advocate Role',
+        message: 'Advocate accounts coordinate rescues. Please message the advocate directly to collaborate.',
+        type: 'info',
+      });
       return;
     }
     setRequestType(type);
@@ -111,7 +133,11 @@ export default function AnimalDetailScreen({ route, navigation }) {
 
   const handleSubmit = () => {
     if (!message.trim()) {
-      Alert.alert('Add a message', 'Please introduce yourself and share a bit about your home.');
+      showAlert({
+        title: 'Add a message',
+        message: 'Please introduce yourself and share a bit about your home.',
+        type: 'warning',
+      });
       return;
     }
     setSubmitting(true);
@@ -126,23 +152,28 @@ export default function AnimalDetailScreen({ route, navigation }) {
       });
       setSubmitting(false);
       setModalVisible(false);
-      Alert.alert(
-        requestType === 'Adoption' ? 'Adoption Request Sent' : 'Foster Request Sent',
-        `Your request for ${animal.name} has been sent to ${animal.advocateName}. They will review it and get back to you soon.`,
-        [{ text: 'Got it!' }]
-      );
+      setTimeout(() => {
+        showAlert({
+          title: requestType === 'Adoption' ? 'Adoption Request Sent' : 'Foster Request Sent',
+          message: `Your request for ${animal.name} has been sent to ${animal.advocateName}. They will review it and get back to you soon.`,
+          type: 'success',
+          customIcon: 'paw',
+          primaryText: 'Got it!',
+        });
+      }, 300);
     }, 700);
   };
 
   const handleMessageAdvocate = () => {
     const convId = startConversation(
       animal.advocateId,
-      animal.advocateName,
-      `Hi! I'm interested in ${animal.name}. Can you tell me more?`
+      animal.advocateName
     );
     navigation.navigate('Chat', {
       conversationId: convId,
       otherName: animal.advocateName,
+      otherId: animal.advocateId,
+      initialDraft: `Hi! I'm interested in ${animal.name}. Can you tell me more?`,
     });
   };
 
@@ -206,20 +237,17 @@ export default function AnimalDetailScreen({ route, navigation }) {
         <View style={styles.sheetBody}>
           <View style={styles.sheetHandle} />
 
-          {/* Pet Name & Verified Row */}
+          {/* Pet Name */}
           <View style={styles.nameRow}>
             <Text style={styles.petName}>{animal.name}</Text>
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark" size={12} color={COLORS.surface} />
-            </View>
-            <Text style={styles.petBreed}>{animal.breed}</Text>
+            {Boolean(animal.breed) && <Text style={styles.petBreed}>· {animal.breed}</Text>}
           </View>
 
-          {/* Location & Rescue Tagline */}
+          {/* Location */}
           <View style={styles.locationRow}>
             <Ionicons name="location-sharp" size={15} color={COLORS.danger} style={{ marginRight: 4 }} />
             <Text style={styles.locationText}>
-              {animal.rescueNote || `${animal.location} • Rescued 3 months ago (1.2 km away)`}
+              {animal.rescueNote || animal.location || 'Location upon request'}
             </Text>
           </View>
 
@@ -231,11 +259,11 @@ export default function AnimalDetailScreen({ route, navigation }) {
             </View>
             <View style={[styles.statCard, styles.statYellow]}>
               <Text style={styles.statLabel}>Age</Text>
-              <Text style={styles.statVal}>{animal.age || '2 Years'}</Text>
+              <Text style={styles.statVal}>{animal.age || 'Not specified'}</Text>
             </View>
             <View style={[styles.statCard, styles.statBlue]}>
               <Text style={styles.statLabel}>Weight</Text>
-              <Text style={styles.statVal}>{animal.weight || '3.8 kg'}</Text>
+              <Text style={styles.statVal}>{animal.weight || 'Not specified'}</Text>
             </View>
           </View>
 
@@ -246,7 +274,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
               <View style={styles.advocateTextCol}>
                 <Text style={styles.advocateName}>{animal.advocateName}</Text>
                 <Text style={styles.advocateRole}>
-                  {animal.advocateRole || 'Verified Community Foster Advocate'}
+                  {animal.advocateRole || 'Animal Advocate'}
                 </Text>
               </View>
             </View>
@@ -472,13 +500,13 @@ export default function AnimalDetailScreen({ route, navigation }) {
               <View
                 style={[
                   styles.modalIconWrap,
-                  { backgroundColor: requestType === 'Adoption' ? COLORS.primaryLight : COLORS.accent },
+                  { backgroundColor: requestType === 'Adoption' ? '#EBF7FA' : '#FEF8DE' },
                 ]}
               >
                 <Ionicons
                   name={requestType === 'Adoption' ? 'home' : 'heart'}
-                  size={24}
-                  color={requestType === 'Adoption' ? COLORS.primaryDeep : COLORS.accentDark}
+                  size={22}
+                  color={requestType === 'Adoption' ? '#2E7A99' : '#C9AB20'}
                 />
               </View>
               <View style={{ flex: 1 }}>
@@ -487,34 +515,49 @@ export default function AnimalDetailScreen({ route, navigation }) {
                 </Text>
                 <Text style={styles.modalSub}>
                   {requestType === 'Adoption'
-                    ? `Permanent adoption application to ${animal.advocateName}`
-                    : `Temporary foster care application to ${animal.advocateName}`}
+                    ? `Adoption application for ${animal.advocateName}`
+                    : `Foster care application for ${animal.advocateName}`}
                 </Text>
               </View>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={20} color="#8C7D6A" />
+              </TouchableOpacity>
             </View>
 
-            <Input
-              label="Your message / background"
-              placeholder={`Tell ${animal.advocateName} about your living setup, experience with pets, and readiness to care for ${animal.name}...`}
-              value={message}
-              onChangeText={setMessage}
-              multiline
-              numberOfLines={4}
-            />
+            <View style={styles.modalInputWrap}>
+              <Text style={styles.modalInputLabel}>MESSAGE / APPLICANT BACKGROUND</Text>
+              <TextInput
+                style={styles.modalTextInput}
+                placeholder={`Tell ${animal.advocateName} about your living setup, experience with pets, and readiness to care for ${animal.name}...`}
+                placeholderTextColor="#947E68"
+                value={message}
+                onChangeText={setMessage}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+            </View>
 
             <View style={styles.modalActions}>
-              <Button
-                title="Cancel"
-                variant="outline"
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
                 onPress={() => setModalVisible(false)}
-                style={{ flex: 1 }}
-              />
-              <Button
-                title="Submit Application"
+                activeOpacity={0.75}
+              >
+                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmitBtn, submitting && { opacity: 0.7 }]}
                 onPress={handleSubmit}
-                loading={submitting}
-                style={{ flex: 2, backgroundColor: COLORS.primaryDeep }}
-              />
+                disabled={submitting}
+                activeOpacity={0.85}
+              >
+                {submitting ? (
+                  <ActivityIndicator size="small" color="#473018" />
+                ) : (
+                  <Text style={styles.modalSubmitBtnText}>Submit Application</Text>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -815,44 +858,107 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(45, 31, 18, 0.4)',
   },
   overlayDismiss: {
     flex: 1,
   },
   sheetModal: {
-    backgroundColor: COLORS.surface,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 44 : 24,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 22,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === 'ios' ? 38 : 24,
+    borderTopWidth: 1,
+    borderColor: '#E8DFC8',
+  },
+  sheetHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E8DFC8',
+    alignSelf: 'center',
+    marginBottom: 16,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
     marginBottom: 16,
   },
   modalIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalTitle: {
-    ...FONTS.titleMd,
-    color: COLORS.brown,
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#473018',
   },
   modalSub: {
-    ...FONTS.caption,
-    color: COLORS.textMuted,
+    fontSize: 12,
+    color: '#685038',
     marginTop: 2,
+  },
+  modalCloseBtn: {
+    padding: 4,
+  },
+  modalInputWrap: {
+    marginBottom: 16,
+  },
+  modalInputLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#8C7D6A',
+    letterSpacing: 0.6,
+    marginBottom: 6,
+  },
+  modalTextInput: {
+    backgroundColor: '#FFFDF6',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
+    padding: 12,
+    fontSize: 13,
+    color: '#473018',
+    minHeight: 90,
   },
   modalActions: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 14,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#FAF5E8',
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#685038',
+  },
+  modalSubmitBtn: {
+    flex: 2,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#92CDE5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.sm,
+  },
+  modalSubmitBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#473018',
   },
 
   // ── RBAC & Owner Management Styles ───────────────────

@@ -1,8 +1,17 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image,
-  ActivityIndicator, Platform, Modal, TextInput, KeyboardAvoidingView,
-  StatusBar as RNStatusBar,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  Image,
+  ActivityIndicator,
+  Platform,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,80 +19,211 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
+import AlertModal from '../../components/AlertModal';
+import PhotoPickerModal from '../../components/PhotoPickerModal';
+import { uploadImageToImgBB } from '../../services/storageService';
 
 export default function ProfileScreen({ navigation }) {
   const {
-    currentUser, logout, updateUser,
-    getUserReports, getAdvocateResponses,
-    getAdvocateAnimals, getUserRequests, getAdvocateRequests, getUserDonations,
+    currentUser,
+    logout,
+    updateUser,
+    getUserReports,
+    getAdvocateResponses,
+    getAdvocateAnimals,
+    getUserRequests,
+    getAdvocateRequests,
+    getUserDonations,
   } = useApp();
 
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [photoPickerVisible, setPhotoPickerVisible] = useState(false);
+  const [viewAvatarVisible, setViewAvatarVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+    primaryText: 'OK',
+    onPrimaryPress: null,
+    secondaryText: null,
+    onSecondaryPress: null,
+  });
 
   // Form states for profile modal
   const [editName, setEditName] = useState(currentUser?.name || '');
   const [editOrg, setEditOrg] = useState(currentUser?.organization || '');
   const [editLocation, setEditLocation] = useState(currentUser?.location || '');
 
+  const showAlert = (type, title, message, onPrimary = null, primaryText = 'OK', secondaryText = null, onSecondary = null) => {
+    setAlertConfig({
+      visible: true,
+      type,
+      title,
+      message,
+      primaryText,
+      onPrimaryPress: onPrimary || (() => setAlertConfig((prev) => ({ ...prev, visible: false }))),
+      secondaryText,
+      onSecondaryPress: onSecondary,
+    });
+  };
+
   const isAdvocate = currentUser?.role === 'advocate';
 
   const stats = isAdvocate
     ? [
-        { label: 'Responses', value: getAdvocateResponses().length, icon: 'shield-checkmark', color: COLORS.secondaryDark, bg: '#D8F0E4', onPress: () => navigation.navigate('Activity', { tab: 'responses' }) },
-        { label: 'My Animals', value: getAdvocateAnimals().length,   icon: 'paw',              color: COLORS.primaryDeep, bg: COLORS.tagBg, onPress: () => navigation.navigate('MyAnimals') },
-        { label: 'Requests',  value: getAdvocateRequests().length,  icon: 'heart',            color: '#7C3AED',          bg: '#F3EEFF', onPress: () => navigation.navigate('Activity', { tab: 'requests' }) },
+        {
+          label: 'Responses',
+          value: getAdvocateResponses().length,
+          onPress: () => navigation.navigate('Activity', { tab: 'responses' }),
+        },
+        {
+          label: 'My Animals',
+          value: getAdvocateAnimals().length,
+          onPress: () => navigation.navigate('MyAnimals'),
+        },
+        {
+          label: 'Requests',
+          value: getAdvocateRequests().length,
+          onPress: () => navigation.navigate('Activity', { tab: 'requests' }),
+        },
       ]
     : [
-        { label: 'Reports',  value: getUserReports().length,  icon: 'alert-circle', color: COLORS.danger,      bg: '#FCE8E8', onPress: () => navigation.navigate('Activity', { tab: 'reports' }) },
-        { label: 'Requests', value: getUserRequests().length, icon: 'heart',        color: '#7C3AED',          bg: '#F3EEFF', onPress: () => navigation.navigate('Activity', { tab: 'requests' }) },
-        { label: 'Donations',value: getUserDonations().length,icon: 'gift',         color: COLORS.secondaryDark, bg: COLORS.advocateBadge, onPress: () => navigation.navigate('Activity', { tab: 'donations' }) },
+        {
+          label: 'Reports',
+          value: getUserReports().length,
+          onPress: () => navigation.navigate('Activity', { tab: 'reports' }),
+        },
+        {
+          label: 'Requests',
+          value: getUserRequests().length,
+          onPress: () => navigation.navigate('Activity', { tab: 'requests' }),
+        },
+        {
+          label: 'Donations',
+          value: getUserDonations().length,
+          onPress: () => navigation.navigate('Activity', { tab: 'donations' }),
+        },
       ];
 
-  const mainActions = [
-    { icon: 'time-outline',        label: 'Activity Dashboard', screen: 'Activity',      color: COLORS.primaryDeep, desc: 'View reports, responses & requests' },
-    { icon: 'chatbubbles-outline', label: 'Direct Messages',     screen: 'Messages',      color: COLORS.secondaryDark, desc: 'Chat with advocates & rescuers' },
-    { icon: 'gift-outline',        label: 'Donation History',   screen: 'Activity',      color: COLORS.warning,     desc: 'Track financial contributions' },
+  const menuItems = [
+    {
+      icon: 'time-outline',
+      label: 'Activity Dashboard',
+      desc: 'Track your reports, requests & responses',
+      screen: 'Activity',
+      color: '#2E7A99',
+      bg: '#DDF1F8',
+    },
+    {
+      icon: 'chatbubbles-outline',
+      label: 'Direct Messages',
+      desc: 'Chat with advocates, rescuers & shelters',
+      screen: 'Messages',
+      color: '#306B4D',
+      bg: '#EBF4EF',
+    },
+    {
+      icon: 'gift-outline',
+      label: 'Donations & Support',
+      desc: 'View your verified contributions',
+      screen: 'Activity',
+      params: { tab: 'donations' },
+      color: '#B45309',
+      bg: '#FEF3DC',
+    },
+    ...(isAdvocate
+      ? [
+          {
+            icon: 'paw-outline',
+            label: 'Manage Animals',
+            desc: 'Post & update adoption listings',
+            screen: 'MyAnimals',
+            color: '#2E7A99',
+            bg: '#DDF1F8',
+          },
+          {
+            icon: 'notifications-outline',
+            label: 'Rescue Alerts Hub',
+            desc: 'Emergency reports in your area',
+            screen: 'RescueAlerts',
+            color: '#D94F4F',
+            bg: '#FCE8E8',
+          },
+          {
+            icon: 'person-outline',
+            label: 'Public Profile Card',
+            desc: 'Preview how community members see you',
+            screen: 'PublicProfile',
+            params: { advocateId: currentUser?.id },
+            color: '#306B4D',
+            bg: '#EBF4EF',
+          },
+        ]
+      : [
+          {
+            icon: 'alert-circle-outline',
+            label: 'Report an Animal in Need',
+            desc: 'Submit a new rescue report',
+            screen: 'ReportRescue',
+            color: '#D94F4F',
+            bg: '#FCE8E8',
+          },
+          {
+            icon: 'search-outline',
+            label: 'Adopt or Foster',
+            desc: 'Browse animals waiting for a home',
+            screen: 'Listings',
+            color: '#2E7A99',
+            bg: '#DDF1F8',
+          },
+        ]),
   ];
 
-  const roleActions = isAdvocate
-    ? [
-        { icon: 'paw-outline',           label: 'Manage Animals',  screen: 'MyAnimals',   color: COLORS.primaryDeep, desc: 'Post and manage adoption/foster animals' },
-        { icon: 'notifications-outline', label: 'Rescue Alerts',   screen: 'RescueAlerts', color: COLORS.danger,      desc: 'Active emergency alerts in your area' },
-      ]
-    : [
-        { icon: 'alert-circle-outline', label: 'Report Rescue',    screen: 'ReportRescue', color: COLORS.danger,      desc: 'Submit a new stray or injured animal report' },
-        { icon: 'search-outline',       label: 'Adopt or Foster',  screen: 'Listings',     color: COLORS.info,        desc: 'Browse animals waiting for a home' },
-      ];
-
-  // ── Photo picker ────────────────────────────────────────────────────────
-  const handleChangePhoto = () => {
-    Alert.alert('Profile Photo', 'Choose an option', [
-      { text: 'Take Photo',          onPress: () => pickImage('camera') },
-      { text: 'Choose from Gallery', onPress: () => pickImage('gallery') },
-      ...(currentUser?.avatar ? [{ text: 'Remove Photo', style: 'destructive', onPress: () => updateUser({ avatar: null }) }] : []),
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
   const pickImage = async (source) => {
+    setPhotoPickerVisible(false);
     let result;
     if (source === 'camera') {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') { Alert.alert('Permission needed', 'Allow camera access to take a photo.'); return; }
-      result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.8 });
+      if (status !== 'granted') {
+        showAlert('warning', 'Permission Needed', 'Allow camera access to take a photo.');
+        return;
+      }
+      result = await ImagePicker.launchCameraAsync({
+        allowsEditing: false,
+        quality: 0.85,
+        base64: true,
+      });
     } else {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') { Alert.alert('Permission needed', 'Allow photo library access.'); return; }
-      result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.8 });
+      if (status !== 'granted') {
+        showAlert('warning', 'Permission Needed', 'Allow photo library access.');
+        return;
+      }
+      result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: false,
+        quality: 0.85,
+        base64: true,
+      });
     }
-    if (!result.canceled) {
+    if (!result.canceled && result.assets && result.assets[0]) {
+      const asset = result.assets[0];
       setUploadingPhoto(true);
-      setTimeout(() => {
-        updateUser({ avatar: result.assets[0].uri });
+      try {
+        const cloudUrl = await uploadImageToImgBB(asset.uri, asset.base64);
+        updateUser({ avatar: cloudUrl });
+      } catch (err) {
+        console.error('Avatar upload error:', err);
+        updateUser({ avatar: asset.uri });
+      } finally {
         setUploadingPhoto(false);
-      }, 600);
+      }
     }
+  };
+
+  const handleChangePhoto = () => {
+    setPhotoPickerVisible(true);
   };
 
   const handleSaveProfile = () => {
@@ -93,14 +233,22 @@ export default function ProfileScreen({ navigation }) {
       location: editLocation.trim(),
     });
     setEditModalVisible(false);
-    Alert.alert('Success', 'Profile information updated!');
+    showAlert('success', 'Profile Updated', 'Your profile details have been saved.');
   };
 
   const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out of ALAGA?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log Out', style: 'destructive', onPress: logout },
-    ]);
+    showAlert(
+      'warning',
+      'Log Out',
+      'Are you sure you want to log out of your ALAGA account?',
+      () => {
+        setAlertConfig((prev) => ({ ...prev, visible: false }));
+        logout();
+      },
+      'Log Out',
+      'Cancel',
+      () => setAlertConfig((prev) => ({ ...prev, visible: false }))
+    );
   };
 
   const insets = useSafeAreaInsets();
@@ -108,161 +256,125 @@ export default function ProfileScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        
+        {/* ── Seamless Organic Header ───────────────────────── */}
+        <View style={[styles.profileHeader, { paddingTop: safeTopPadding }]}>
+          
+          {/* Avatar with Camera Badge */}
+          <TouchableOpacity style={styles.avatarWrap} onPress={handleChangePhoto} activeOpacity={0.85}>
+            {uploadingPhoto ? (
+              <View style={styles.avatar}>
+                <ActivityIndicator color="#2E7A99" />
+              </View>
+            ) : currentUser?.avatar ? (
+              <Image source={{ uri: currentUser.avatar }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                <Text style={styles.avatarInitials}>
+                  {currentUser?.name?.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase() || 'AL'}
+                </Text>
+              </View>
+            )}
+            <View style={styles.cameraIconBadge}>
+              <Ionicons name="camera" size={13} color="#FFFFFF" />
+            </View>
+          </TouchableOpacity>
 
-        {/* ── Hero Banner Card ──────────────────────────────── */}
-        <View style={styles.heroCard}>
-          <View style={[styles.heroBannerBg, { height: 90 + safeTopPadding }]}>
-            <View style={styles.decorCircle1} />
-            <View style={styles.decorCircle2} />
+          {/* User Name */}
+          <Text style={styles.userName}>{currentUser?.name || 'Kareena Jane'}</Text>
+
+          {/* Role Pill */}
+          <View style={[styles.rolePill, { backgroundColor: isAdvocate ? '#B8D3C3' : '#B8E4E5' }]}>
+            <Ionicons
+              name={isAdvocate ? 'shield-checkmark' : 'heart'}
+              size={12}
+              color="#473018"
+            />
+            <Text style={styles.rolePillText}>
+              {isAdvocate ? 'Verified Animal Advocate' : 'Community Rescuer'}
+            </Text>
           </View>
 
-          {/* Profile Header Contents */}
-          <View style={styles.profileHeaderContent}>
-            {/* Avatar */}
-            <TouchableOpacity style={styles.avatarContainer} onPress={handleChangePhoto} activeOpacity={0.88}>
-              {uploadingPhoto ? (
-                <View style={styles.avatarImg}>
-                  <ActivityIndicator color={COLORS.primaryDeep} />
-                </View>
-              ) : currentUser?.avatar ? (
-                <Image source={{ uri: currentUser.avatar }} style={styles.avatarImg} />
-              ) : (
-                <View style={[styles.avatarImg, styles.avatarPlaceholder]}>
-                  <Text style={styles.avatarInitials}>
-                    {currentUser?.name?.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
-                  </Text>
-                </View>
-              )}
-              <View style={styles.cameraBadge}>
-                <Ionicons name="camera" size={12} color="#fff" />
+          {/* Org & Location Info */}
+          {currentUser?.organization ? (
+            <Text style={styles.userOrg}>{currentUser.organization}</Text>
+          ) : null}
+
+          <View style={styles.metaRow}>
+            {currentUser?.location ? (
+              <View style={styles.metaItem}>
+                <Ionicons name="location-outline" size={13} color="#8C7D6A" />
+                <Text style={styles.metaText}>{currentUser.location}</Text>
               </View>
-            </TouchableOpacity>
-
-            {/* Name & Role */}
-            <Text style={styles.name}>{currentUser?.name}</Text>
-            
-            <View style={[styles.roleTag, { backgroundColor: isAdvocate ? COLORS.advocateBadge : COLORS.tagBg }]}>
-              <Ionicons
-                name={isAdvocate ? 'shield-checkmark' : 'heart'}
-                size={13}
-                color={isAdvocate ? COLORS.secondaryDark : COLORS.primaryDeep}
-              />
-              <Text style={[styles.roleText, { color: isAdvocate ? COLORS.secondaryDark : COLORS.primaryDeep }]}>
-                {isAdvocate ? 'Animal Advocate' : 'Community Guardian'}
-              </Text>
-            </View>
-
-            {currentUser?.organization ? (
-              <Text style={styles.orgText}>{currentUser.organization}</Text>
             ) : null}
-
-            {/* Info Chips */}
-            <View style={styles.infoChipsRow}>
-              {currentUser?.location ? (
-                <View style={styles.infoChip}>
-                  <Ionicons name="location-outline" size={12} color={COLORS.textMuted} />
-                  <Text style={styles.infoChipText}>{currentUser.location}</Text>
-                </View>
-              ) : null}
-              <View style={styles.infoChip}>
-                <Ionicons name="mail-outline" size={12} color={COLORS.textMuted} />
-                <Text style={styles.infoChipText}>{currentUser?.email}</Text>
-              </View>
+            <View style={styles.metaItem}>
+              <Ionicons name="mail-outline" size={13} color="#8C7D6A" />
+              <Text style={styles.metaText}>{currentUser?.email}</Text>
             </View>
-
-            {/* Edit Profile Button */}
-            <TouchableOpacity
-              style={styles.editProfileBtn}
-              onPress={() => {
-                setEditName(currentUser?.name || '');
-                setEditOrg(currentUser?.organization || '');
-                setEditLocation(currentUser?.location || '');
-                setEditModalVisible(true);
-              }}
-            >
-              <Ionicons name="create-outline" size={14} color={COLORS.brown} />
-              <Text style={styles.editProfileBtnText}>Edit Profile</Text>
-            </TouchableOpacity>
           </View>
+
+          {/* Edit Profile Button */}
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() => {
+              setEditName(currentUser?.name || '');
+              setEditOrg(currentUser?.organization || '');
+              setEditLocation(currentUser?.location || '');
+              setEditModalVisible(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="create-outline" size={14} color="#473018" />
+            <Text style={styles.editBtnText}>Edit Profile</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* ── Metric Stats Cards ────────────────────────────── */}
-        <View style={styles.statsGrid}>
-          {stats.map((s) => (
-            <TouchableOpacity key={s.label} style={styles.statCard} onPress={s.onPress} activeOpacity={0.75}>
-              <View style={[styles.statIconCircle, { backgroundColor: s.bg }]}>
-                <Ionicons name={s.icon} size={16} color={s.color} />
-              </View>
-              <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
-              <Text style={styles.statLabel}>{s.label}</Text>
-            </TouchableOpacity>
+        {/* ── Single Unified Stats Bar ──────────────────────── */}
+        <View style={styles.statsCard}>
+          {stats.map((s, idx) => (
+            <React.Fragment key={s.label}>
+              {idx > 0 && <View style={styles.statsDivider} />}
+              <TouchableOpacity style={styles.statCol} onPress={s.onPress} activeOpacity={0.7}>
+                <Text style={styles.statNum}>{s.value}</Text>
+                <Text style={styles.statLabel}>{s.label}</Text>
+              </TouchableOpacity>
+            </React.Fragment>
           ))}
         </View>
 
-        {/* ── Main Activity Section ──────────────────────────── */}
-        <View style={styles.sectionHeaderWrap}>
-          <Text style={styles.sectionTitle}>Overview & Activity</Text>
-        </View>
-
-        <View style={styles.cardGroup}>
-          {mainActions.map((item, idx) => (
+        {/* ── Unified Clean Menu List ───────────────────────── */}
+        <View style={styles.menuContainer}>
+          {menuItems.map((item, idx) => (
             <TouchableOpacity
               key={item.label}
-              style={[styles.groupItem, idx === mainActions.length - 1 && styles.groupItemLast]}
-              onPress={() => navigation.navigate(item.screen)}
-              activeOpacity={0.8}
+              style={[styles.menuRow, idx === menuItems.length - 1 && styles.menuRowLast]}
+              onPress={() => navigation.navigate(item.screen, item.params)}
+              activeOpacity={0.7}
             >
-              <View style={[styles.itemIconWrap, { backgroundColor: item.color + '14' }]}>
+              <View style={[styles.iconCircle, { backgroundColor: item.bg }]}>
                 <Ionicons name={item.icon} size={18} color={item.color} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.itemTitle}>{item.label}</Text>
-                <Text style={styles.itemDesc}>{item.desc}</Text>
+              <View style={styles.menuContent}>
+                <Text style={styles.menuTitle}>{item.label}</Text>
+                <Text style={styles.menuSubtitle}>{item.desc}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+              <Ionicons name="chevron-forward" size={16} color="#947E68" />
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* ── Role Features Section ──────────────────────────── */}
-        <View style={styles.sectionHeaderWrap}>
-          <Text style={styles.sectionTitle}>
-            {isAdvocate ? 'Advocate Toolkit' : 'Community Services'}
-          </Text>
-        </View>
-
-        <View style={styles.cardGroup}>
-          {roleActions.map((item, idx) => (
-            <TouchableOpacity
-              key={item.label}
-              style={[styles.groupItem, idx === roleActions.length - 1 && styles.groupItemLast]}
-              onPress={() => navigation.navigate(item.screen)}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.itemIconWrap, { backgroundColor: item.color + '14' }]}>
-                <Ionicons name={item.icon} size={18} color={item.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.itemTitle}>{item.label}</Text>
-                <Text style={styles.itemDesc}>{item.desc}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* ── Account Options ────────────────────────────────── */}
-        <TouchableOpacity style={styles.logoutCard} onPress={handleLogout} activeOpacity={0.85}>
-          <Ionicons name="log-out-outline" size={18} color={COLORS.danger} />
-          <Text style={styles.logoutCardText}>Log Out Account</Text>
+        {/* ── Clean Logout Action ───────────────────────────── */}
+        <TouchableOpacity style={styles.logoutRow} onPress={handleLogout} activeOpacity={0.7}>
+          <Ionicons name="log-out-outline" size={18} color="#D94F4F" />
+          <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
 
-        <Text style={styles.appFooter}>ALAGA · Where every life deserves alaga · v1.0</Text>
+        <Text style={styles.footerNote}>ALAGA · Where every life deserves alaga · v1.0</Text>
       </ScrollView>
 
-      {/* ── Edit Profile Modal ───────────────────────────────── */}
+      {/* ── Edit Profile Modal Sheet ─────────────────────────── */}
       <Modal visible={editModalVisible} transparent animationType="slide" onRequestClose={() => setEditModalVisible(false)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -270,213 +382,481 @@ export default function ProfileScreen({ navigation }) {
         >
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Profile Info</Text>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.modalClose}>
-                <Ionicons name="close" size={20} color={COLORS.textMuted} />
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitle}>Edit Profile</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={20} color="#8C7D6A" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.formGroup}>
+            <View style={styles.formItem}>
               <Text style={styles.formLabel}>FULL NAME</Text>
               <TextInput
-                style={styles.formInput}
+                style={styles.formTextInput}
                 value={editName}
                 onChangeText={setEditName}
                 placeholder="Your full name"
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor="#947E68"
               />
             </View>
 
             {isAdvocate && (
-              <View style={styles.formGroup}>
+              <View style={styles.formItem}>
                 <Text style={styles.formLabel}>ORGANIZATION / SHELTER</Text>
                 <TextInput
-                  style={styles.formInput}
+                  style={styles.formTextInput}
                   value={editOrg}
                   onChangeText={setEditOrg}
                   placeholder="e.g. PAWS Advocates / Independent Shelter"
-                  placeholderTextColor={COLORS.textMuted}
+                  placeholderTextColor="#947E68"
                 />
               </View>
             )}
 
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>LOCATION</Text>
+            <View style={styles.formItem}>
+              <Text style={styles.formLabel}>LOCATION / CITY</Text>
               <TextInput
-                style={styles.formInput}
+                style={styles.formTextInput}
                 value={editLocation}
                 onChangeText={setEditLocation}
                 placeholder="e.g. Quezon City, Metro Manila"
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor="#947E68"
               />
             </View>
 
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProfile}>
-              <Text style={styles.saveBtnText}>Save Changes</Text>
+            <TouchableOpacity style={styles.modalSaveBtn} onPress={handleSaveProfile} activeOpacity={0.85}>
+              <Text style={styles.modalSaveBtnText}>Save Changes</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* ── Branded Photo Picker Modal ───────────────────────── */}
+      <PhotoPickerModal
+        visible={photoPickerVisible}
+        onClose={() => setPhotoPickerVisible(false)}
+        onSelectCamera={() => pickImage('camera')}
+        onSelectGallery={() => pickImage('gallery')}
+        onViewPhoto={() => {
+          setPhotoPickerVisible(false);
+          setViewAvatarVisible(true);
+        }}
+        hasExistingPhoto={Boolean(currentUser?.avatar)}
+        onRemovePhoto={() => {
+          setPhotoPickerVisible(false);
+          updateUser({ avatar: null });
+        }}
+        title="Profile Photo"
+        subtitle="Choose an image for your profile"
+      />
+
+      {/* ── Full-Screen Avatar Viewer Modal ─────────────────── */}
+      <Modal
+        visible={viewAvatarVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewAvatarVisible(false)}
+      >
+        <View style={styles.previewModalOverlay}>
+          <View style={[styles.previewTopHeader, { paddingTop: safeTopPadding }]}>
+            <TouchableOpacity
+              style={styles.previewHeaderBtn}
+              onPress={() => setViewAvatarVisible(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <Text style={styles.previewCounterText}>Profile Photo</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <View style={styles.previewImageArea}>
+            {currentUser?.avatar && (
+              <Image
+                source={{ uri: currentUser.avatar }}
+                style={styles.previewFullImage}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Branded Alert Modal ──────────────────────────────── */}
+      <AlertModal
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        primaryText={alertConfig.primaryText}
+        onPrimaryPress={alertConfig.onPrimaryPress}
+        secondaryText={alertConfig.secondaryText}
+        onSecondaryPress={alertConfig.onSecondaryPress}
+        onClose={() => setAlertConfig((prev) => ({ ...prev, visible: false }))}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  scroll: { paddingBottom: 110 },
-
-  // Hero Card
-  heroCard: {
-    backgroundColor: COLORS.surface,
-    borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
-    overflow: 'hidden', marginBottom: 14,
-    borderWidth: 1, borderColor: COLORS.border,
-    ...SHADOWS.card,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
-  heroBannerBg: {
-    height: 90, backgroundColor: COLORS.primaryDeep,
-    position: 'relative', overflow: 'hidden',
-  },
-  decorCircle1: {
-    position: 'absolute', width: 140, height: 140, borderRadius: 70,
-    backgroundColor: 'rgba(255,255,255,0.1)', top: -40, right: -20,
-  },
-  decorCircle2: {
-    position: 'absolute', width: 90, height: 90, borderRadius: 45,
-    backgroundColor: 'rgba(255,255,255,0.08)', bottom: -20, left: 10,
+  scroll: {
+    paddingBottom: 110,
   },
 
-  profileHeaderContent: {
-    alignItems: 'center', marginTop: -42, paddingBottom: SIZES.md16,
-    paddingHorizontal: SIZES.lg24,
+  // ── Seamless Organic Header ───────────────────────────
+  profileHeader: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 18,
   },
-  avatarContainer: { position: 'relative', marginBottom: 10 },
-  avatarImg: {
-    width: 84, height: 84, borderRadius: 42,
-    borderWidth: 4, borderColor: COLORS.surface,
+  avatarWrap: {
+    position: 'relative',
+    marginBottom: 12,
+    marginTop: 6,
+  },
+  avatar: {
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    borderWidth: 3.5,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#EBF4EF',
+    shadowColor: '#473018',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   avatarPlaceholder: {
-    backgroundColor: COLORS.tagBg, alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  avatarInitials: { fontSize: 30, fontWeight: '800', color: COLORS.primaryDeep },
-  cameraBadge: {
-    position: 'absolute', bottom: 2, right: 2,
-    width: 24, height: 24, borderRadius: 12,
-    backgroundColor: COLORS.primaryDeep,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: COLORS.surface,
+  avatarInitials: {
+    fontSize: 30,
+    fontWeight: '800',
+    color: '#2E7A99',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  cameraIconBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#473018',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
 
-  name: { fontSize: 20, fontWeight: '800', color: COLORS.brown, marginBottom: 3 },
-  roleTag: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 10, paddingVertical: 3,
-    borderRadius: SIZES.radiusFull, marginBottom: 6,
+  userName: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    letterSpacing: -0.3,
+    marginBottom: 6,
   },
-  roleText: { fontSize: 11, fontWeight: '700' },
-  orgText: { fontSize: 13, color: COLORS.secondaryDark, fontWeight: '700', marginBottom: 6 },
+  rolePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 6,
+  },
+  rolePillText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  userOrg: {
+    fontSize: 13,
+    color: '#306B4D',
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    marginBottom: 6,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaText: {
+    fontSize: 12,
+    color: '#685038',
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
 
-  infoChipsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 12 },
-  infoChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: SIZES.radiusFull, backgroundColor: COLORS.inputBg,
-    borderWidth: 1, borderColor: COLORS.border,
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 18,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E8DEC5',
+    shadowColor: '#473018',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  infoChipText: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '500' },
+  editBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
 
-  editProfileBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingVertical: 6,
-    borderRadius: SIZES.radiusFull, backgroundColor: COLORS.inputBg,
-    borderWidth: 1, borderColor: COLORS.border,
+  // ── Unified Single Stats Card ─────────────────────────
+  statsCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    borderRadius: 18,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#E8DEC5',
+    marginBottom: 16,
+    shadowColor: '#473018',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 2,
   },
-  editProfileBtnText: { fontSize: 11, fontWeight: '700', color: COLORS.brown },
+  statCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statNum: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  statLabel: {
+    fontSize: 11.5,
+    color: '#8C7D6A',
+    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    marginTop: 2,
+  },
+  statsDivider: {
+    width: 1,
+    height: '60%',
+    backgroundColor: '#F4EDE0',
+    alignSelf: 'center',
+  },
 
-  // Stats grid (Compact & Interactive)
-  statsGrid: {
-    flexDirection: 'row', gap: 10,
-    paddingHorizontal: SIZES.md16, marginBottom: 14,
+  // ── Clean Unified Menu List ───────────────────────────
+  menuContainer: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E8DEC5',
+    overflow: 'hidden',
+    marginBottom: 16,
+    shadowColor: '#473018',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 2,
   },
-  statCard: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: COLORS.surface, borderRadius: 14,
-    paddingVertical: 10, paddingHorizontal: 6,
-    borderWidth: 1, borderColor: COLORS.border,
-    ...SHADOWS.card,
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F4EDE0',
   },
-  statIconCircle: {
-    width: 32, height: 32, borderRadius: 16,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 4,
+  menuRowLast: {
+    borderBottomWidth: 0,
   },
-  statValue: { fontSize: 18, fontWeight: '800' },
-  statLabel: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '700', marginTop: 1 },
+  iconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuContent: {
+    flex: 1,
+  },
+  menuTitle: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  menuSubtitle: {
+    fontSize: 11.5,
+    color: '#8C7D6A',
+    marginTop: 1,
+    fontFamily: 'PlusJakartaSans_400Regular',
+  },
 
-  // Grouped cards
-  sectionHeaderWrap: { paddingHorizontal: SIZES.md16, marginBottom: 6 },
-  sectionTitle: { fontSize: 11, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 0.8, textTransform: 'uppercase' },
-
-  cardGroup: {
-    marginHorizontal: SIZES.md16, backgroundColor: COLORS.surface,
-    borderRadius: 16, borderWidth: 1, borderColor: COLORS.border,
-    marginBottom: 14, overflow: 'hidden',
-    ...SHADOWS.card,
+  // ── Clean Logout ──────────────────────────────────────
+  logoutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    marginHorizontal: 20,
+    marginBottom: 8,
   },
-  groupItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 14, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: COLORS.divider,
+  logoutText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#D94F4F',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
-  groupItemLast: { borderBottomWidth: 0 },
-  itemIconWrap: {
-    width: 34, height: 34, borderRadius: 17,
-    alignItems: 'center', justifyContent: 'center',
+
+  footerNote: {
+    textAlign: 'center',
+    fontSize: 11,
+    color: '#947E68',
+    marginBottom: 14,
+    fontFamily: 'PlusJakartaSans_500Medium',
   },
-  itemTitle: { fontSize: 14, fontWeight: '700', color: COLORS.brown },
-  itemDesc: { fontSize: 11, color: COLORS.textMuted, marginTop: 1 },
 
-  // Logout card
-  logoutCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    marginHorizontal: SIZES.md16, paddingVertical: 12,
-    borderRadius: 14, borderWidth: 1, borderColor: '#FCA5A5',
-    backgroundColor: '#FEF2F2', marginBottom: 14,
-  },
-  logoutCardText: { fontSize: 14, fontWeight: '800', color: COLORS.danger },
-
-  appFooter: { textAlign: 'center', fontSize: 11, color: COLORS.textMuted, marginBottom: 12 },
-
-  // Edit Modal
+  // ── Modal Sheet ───────────────────────────────────────
   modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.4)',
+    flex: 1,
+    backgroundColor: 'rgba(45, 31, 18, 0.4)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: COLORS.surface,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: SIZES.lg24, paddingBottom: 36,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 22,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === 'ios' ? 38 : 24,
+    borderTopWidth: 1,
+    borderColor: '#E8DFC8',
   },
   modalHandle: {
-    width: 40, height: 4, borderRadius: 2,
-    backgroundColor: COLORS.border, alignSelf: 'center', marginBottom: SIZES.md16,
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E8DFC8',
+    alignSelf: 'center',
+    marginBottom: 16,
   },
-  modalHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: SIZES.lg24,
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 18,
   },
-  modalTitle: { fontSize: SIZES.lg, fontWeight: '800', color: COLORS.brown },
-  modalClose: { padding: 4 },
-  formGroup: { marginBottom: SIZES.md16 },
-  formLabel: { fontSize: 11, fontWeight: '800', color: COLORS.textMuted, marginBottom: 6, letterSpacing: 0.5 },
-  formInput: {
-    backgroundColor: COLORS.inputBg, borderWidth: 1, borderColor: COLORS.border,
-    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
-    fontSize: 14, color: COLORS.brown, fontWeight: '600',
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
-  saveBtn: {
-    backgroundColor: COLORS.primaryDeep, borderRadius: 12,
-    paddingVertical: 14, alignItems: 'center', marginTop: 8,
+  modalCloseBtn: {
+    padding: 4,
   },
-  saveBtnText: { fontSize: 14, fontWeight: '800', color: '#fff' },
+  formItem: {
+    marginBottom: 14,
+  },
+  formLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#8C7D6A',
+    marginBottom: 6,
+    letterSpacing: 0.6,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  formTextInput: {
+    backgroundColor: '#FFFDF6',
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 13,
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+  modalSaveBtn: {
+    backgroundColor: '#92CDE5',
+    borderRadius: 14,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    ...SHADOWS.sm,
+  },
+  modalSaveBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+
+  // Full-Screen Image Preview Modal
+  previewModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 28, 0.96)',
+    justifyContent: 'space-between',
+  },
+  previewTopHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingBottom: 14,
+  },
+  previewHeaderBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewCounterText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  previewImageArea: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  previewFullImage: {
+    width: '100%',
+    height: '100%',
+  },
 });

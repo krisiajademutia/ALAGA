@@ -11,7 +11,7 @@ import EmptyState from '../../components/EmptyState';
 const STATUS_FILTERS = ['All', 'Available', 'Being Fostered', 'Under Care', 'Adopted'];
 
 export default function MyAnimalsScreen({ navigation }) {
-  const { getAdvocateAnimals, returnAnimalToListings, markAnimalAdopted, updateAnimal, rescueReports } = useApp();
+  const { getAdvocateAnimals, returnAnimalToListings, markAnimalAdopted, updateAnimal, rescueReports, showAlert } = useApp();
   const [filterStatus, setFilterStatus] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [actionAnimal, setActionAnimal] = useState(null); // animal for the action modal
@@ -33,37 +33,33 @@ export default function MyAnimalsScreen({ navigation }) {
   });
 
   const handleReturn = (animal) => {
-    Alert.alert(
-      'Return to Listings',
-      `Move ${animal.name} back to the available listings? They will be visible to the community again.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Yes, Return',
-          onPress: () => {
-            returnAnimalToListings(animal.id);
-            setActionAnimal(null);
-          },
-        },
-      ]
-    );
+    showAlert({
+      title: 'Return to Listings',
+      message: `Move ${animal.name} back to the available listings? They will be visible to the community again.`,
+      type: 'info',
+      customIcon: 'paw',
+      secondaryText: 'Cancel',
+      primaryText: 'Yes, Return',
+      onPrimaryPress: () => {
+        returnAnimalToListings(animal.id);
+        setActionAnimal(null);
+      },
+    });
   };
 
   const handleMarkAdopted = (animal) => {
-    Alert.alert(
-      'Mark as Adopted',
-      `Confirm that ${animal.name} has been permanently adopted? This will remove them from all listings.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: () => {
-            markAnimalAdopted(animal.id);
-            setActionAnimal(null);
-          },
-        },
-      ]
-    );
+    showAlert({
+      title: 'Mark as Adopted',
+      message: `Confirm that ${animal.name} has been permanently adopted? This will remove them from all listings.`,
+      type: 'warning',
+      customIcon: 'paw',
+      secondaryText: 'Cancel',
+      primaryText: 'Confirm',
+      onPrimaryPress: () => {
+        markAnimalAdopted(animal.id);
+        setActionAnimal(null);
+      },
+    });
   };
 
   const insets = useSafeAreaInsets();
@@ -519,54 +515,133 @@ const styles = StyleSheet.create({
   cardDate:        { fontSize: SIZES.xs, color: COLORS.textMuted },
 
   // Modal
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(45, 31, 18, 0.4)',
+  },
   sheet: {
-    backgroundColor: COLORS.surface,
-    borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: SIZES.lg24, paddingBottom: 40,
-    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 22,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === 'ios' ? 38 : 28,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopWidth: 1,
+    borderColor: '#E8DFC8',
   },
   sheetHandle: {
-    width: 44, height: 4, borderRadius: 2,
-    backgroundColor: COLORS.border, alignSelf: 'center', marginBottom: SIZES.md16,
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E8DFC8',
+    alignSelf: 'center',
+    marginBottom: 16,
   },
-  sheetAnimal: { fontSize: SIZES.xl, fontWeight: '800', color: COLORS.brown, marginBottom: 4 },
-  sheetStatus: { fontSize: SIZES.sm, color: COLORS.textSecondary, marginBottom: SIZES.md16 },
+  sheetAnimal: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#473018',
+    marginBottom: 3,
+  },
+  sheetStatus: {
+    fontSize: 12,
+    color: '#685038',
+    marginBottom: 16,
+  },
 
   fosterInfo: {
-    flexDirection: 'row', alignItems: 'center', gap: SIZES.xs4 + 2,
-    backgroundColor: '#FEF3DC', borderRadius: SIZES.r12,
-    padding: SIZES.sm8 + 2, marginBottom: SIZES.md16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
   },
-  fosterInfoText: { fontSize: SIZES.sm, color: '#92400E' },
+  fosterInfoText: {
+    fontSize: 12,
+    color: '#92400E',
+  },
 
   rescueInfo: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: SIZES.xs4 + 2,
-    backgroundColor: COLORS.tagBg, borderRadius: SIZES.r12,
-    padding: SIZES.sm8 + 2, marginBottom: SIZES.md16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#EBF7FA',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#CCEAF3',
   },
-  rescueInfoText: { flex: 1 },
-  rescueInfoTitle: { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.primaryDeep, marginBottom: 2 },
-  rescueInfoDesc: { fontSize: SIZES.xs, color: COLORS.textSecondary, lineHeight: 16 },
+  rescueInfoText: {
+    flex: 1,
+  },
+  rescueInfoTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2E7A99',
+    marginBottom: 2,
+  },
+  rescueInfoDesc: {
+    fontSize: 11,
+    color: '#685038',
+    lineHeight: 15,
+  },
 
   actionBtn: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: SIZES.md16,
-    paddingVertical: SIZES.sm8 + 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
   },
   actionIcon: {
-    width: 46, height: 46, borderRadius: 23,
-    alignItems: 'center', justifyContent: 'center',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
     flexShrink: 0,
   },
-  actionText:  { flex: 1, paddingTop: 2 },
-  actionTitle: { fontSize: SIZES.body, fontWeight: '800', color: COLORS.brown, marginBottom: 3 },
-  actionDesc:  { fontSize: SIZES.sm, color: COLORS.textSecondary, lineHeight: 18 },
-  sheetDivider:{ height: 1, backgroundColor: COLORS.divider, marginVertical: SIZES.xs4 },
+  actionText: {
+    flex: 1,
+  },
+  actionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#473018',
+    marginBottom: 2,
+  },
+  actionDesc: {
+    fontSize: 12,
+    color: '#8C7D6A',
+    lineHeight: 16,
+  },
+  sheetDivider: {
+    height: 1,
+    backgroundColor: '#F4EDE0',
+    marginVertical: 4,
+  },
 
   cancelSheetBtn: {
-    marginTop: SIZES.md16, paddingVertical: SIZES.sm8 + 4,
-    borderRadius: SIZES.r12, borderWidth: 1.5, borderColor: COLORS.border,
+    marginTop: 14,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#FAF5E8',
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  cancelSheetText: { fontSize: SIZES.body, fontWeight: '700', color: COLORS.textSecondary },
+  cancelSheetText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#685038',
+  },
 });

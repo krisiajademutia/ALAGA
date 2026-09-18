@@ -11,23 +11,12 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SIZES, SHADOWS, FONTS } from '../constants/theme';
+import { COLORS, SHADOWS, FONTS } from '../constants/theme';
 
 const { width } = Dimensions.get('window');
 
 /**
- * Premium custom Alert Dialog with background blur
- *
- * Props:
- * - visible (boolean)
- * - type ('error' | 'warning' | 'success' | 'info')
- * - title (string)
- * - message (string)
- * - primaryText (string)
- * - onPrimaryPress (function)
- * - secondaryText (string, optional)
- * - onSecondaryPress (function, optional)
- * - onClose (function)
+ * Premium custom Alert Dialog harmonized with ALAGA Design System
  */
 export default function AlertModal({
   visible,
@@ -39,39 +28,70 @@ export default function AlertModal({
   secondaryText,
   onSecondaryPress,
   onClose,
+  customIcon,
 }) {
   if (!visible) return null;
 
   const getIconConfig = () => {
+    if (customIcon) {
+      return {
+        icon: customIcon,
+        iconColor:
+          type === 'error'
+            ? '#D94F4F'
+            : type === 'warning'
+            ? '#D97706'
+            : type === 'success'
+            ? '#2D9E5F'
+            : '#2E7A99',
+        bgColor:
+          type === 'error'
+            ? '#FDECEE'
+            : type === 'warning'
+            ? '#FFFBEB'
+            : type === 'success'
+            ? '#EAF7F0'
+            : '#EBF7FA',
+        borderColor:
+          type === 'error'
+            ? '#F8D7DA'
+            : type === 'warning'
+            ? '#FDE68A'
+            : type === 'success'
+            ? '#C8EDE0'
+            : '#CCEAF3',
+      };
+    }
+
     switch (type) {
       case 'error':
         return {
           icon: 'alert-circle',
-          iconColor: '#E63946',
+          iconColor: '#D94F4F',
           bgColor: '#FDECEE',
           borderColor: '#F8D7DA',
         };
       case 'warning':
         return {
           icon: 'warning-outline',
-          iconColor: '#E76F51',
-          bgColor: '#FFF3E8',
-          borderColor: '#FFE0C2',
+          iconColor: '#D97706',
+          bgColor: '#FFFBEB',
+          borderColor: '#FDE68A',
         };
       case 'success':
         return {
-          icon: 'checkmark-circle-outline',
-          iconColor: '#2A9D8F',
-          bgColor: '#EAF7F4',
-          borderColor: '#C8EDE4',
+          icon: 'paw',
+          iconColor: '#2D9E5F',
+          bgColor: '#EAF7F0',
+          borderColor: '#C8EDE0',
         };
       case 'info':
       default:
         return {
           icon: 'shield-checkmark-outline',
-          iconColor: COLORS.primary,
-          bgColor: '#E7F2F5',
-          borderColor: '#C6E2E9',
+          iconColor: '#2E7A99',
+          bgColor: '#EBF7FA',
+          borderColor: '#CCEAF3',
         };
     }
   };
@@ -86,21 +106,21 @@ export default function AlertModal({
       onRequestClose={onClose || onPrimaryPress}
     >
       <View style={styles.container}>
-        {/* Blurred Background */}
+        {/* Background Blur */}
         <BlurView
-          intensity={Platform.OS === 'ios' ? 45 : 60}
+          intensity={Platform.OS === 'ios' ? 40 : 50}
           tint="dark"
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Semi-transparent tint overlay */}
+        {/* Backdrop Dismiss */}
         <TouchableWithoutFeedback onPress={onClose || onPrimaryPress}>
           <View style={styles.backdropOverlay} />
         </TouchableWithoutFeedback>
 
         {/* Dialog Card */}
         <View style={styles.dialogCard}>
-          {/* Top Status Icon */}
+          {/* Status Icon */}
           <View
             style={[
               styles.iconWrapper,
@@ -110,7 +130,7 @@ export default function AlertModal({
               },
             ]}
           >
-            <Ionicons name={config.icon} size={36} color={config.iconColor} />
+            <Ionicons name={config.icon} size={30} color={config.iconColor} />
           </View>
 
           {/* Title */}
@@ -125,7 +145,7 @@ export default function AlertModal({
               <TouchableOpacity
                 style={styles.secondaryBtn}
                 onPress={onSecondaryPress || onClose}
-                activeOpacity={0.8}
+                activeOpacity={0.75}
               >
                 <Text style={styles.secondaryBtnText}>{secondaryText}</Text>
               </TouchableOpacity>
@@ -140,7 +160,14 @@ export default function AlertModal({
               onPress={onPrimaryPress || onClose}
               activeOpacity={0.85}
             >
-              <Text style={styles.primaryBtnText}>{primaryText}</Text>
+              <Text
+                style={[
+                  styles.primaryBtnText,
+                  type === 'error' && styles.primaryBtnTextDanger,
+                ]}
+              >
+                {primaryText}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -158,85 +185,98 @@ const styles = StyleSheet.create({
   },
   backdropOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10, 25, 30, 0.45)',
+    backgroundColor: 'rgba(45, 31, 18, 0.48)',
   },
   dialogCard: {
     width: '100%',
-    maxWidth: Math.min(width - 44, 380),
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    paddingHorizontal: 24,
-    paddingTop: 28,
-    paddingBottom: 22,
+    maxWidth: Math.min(width - 44, 360),
+    backgroundColor: '#FFFDF8',
+    borderRadius: 22,
+    paddingHorizontal: 22,
+    paddingTop: 24,
+    paddingBottom: 20,
     alignItems: 'center',
-    ...SHADOWS.card,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 14,
-    borderWidth: 1,
-    borderColor: '#E7F0F3',
+    shadowColor: '#473018',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    elevation: 10,
+    borderWidth: 1.5,
+    borderColor: '#E8DFC8',
   },
   iconWrapper: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
     borderWidth: 1.5,
   },
   titleText: {
-    ...FONTS.titleLg,
-    color: '#1C2E25',
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 18,
+    color: '#473018',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
+    letterSpacing: -0.2,
   },
   messageText: {
-    ...FONTS.bodyMedium,
-    color: '#4F635B',
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 13.5,
+    color: '#685038',
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
+    lineHeight: 20,
+    marginBottom: 22,
+    paddingHorizontal: 4,
   },
   buttonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     width: '100%',
   },
   secondaryBtn: {
     flex: 1,
-    height: 48,
+    height: 46,
     borderRadius: 14,
-    backgroundColor: '#F1F5F7',
+    backgroundColor: '#FAF5E8',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E8DFC8',
   },
   secondaryBtnText: {
-    ...FONTS.bodyMedium,
-    fontWeight: '700',
-    color: '#5C6F68',
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13.5,
+    color: '#685038',
   },
   primaryBtn: {
     flex: 1,
-    height: 48,
+    height: 46,
     borderRadius: 14,
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#92CDE5',
     alignItems: 'center',
     justifyContent: 'center',
-    ...SHADOWS.sm,
+    shadowColor: '#2E7A99',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
   primaryBtnFull: {
     flex: 1,
   },
   primaryBtnDanger: {
-    backgroundColor: '#E63946',
+    backgroundColor: '#D94F4F',
+    shadowColor: '#D94F4F',
   },
   primaryBtnText: {
-    ...FONTS.bodyMedium,
-    fontWeight: '800',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 13.5,
+    color: '#473018',
+  },
+  primaryBtnTextDanger: {
     color: '#FFFFFF',
-    letterSpacing: 0.3,
   },
 });

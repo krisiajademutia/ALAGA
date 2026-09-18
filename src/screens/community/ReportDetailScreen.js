@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, Alert, Modal, Dimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
@@ -11,12 +12,18 @@ import MapCard from '../../components/MapCard';
 import Header from '../../components/Header';
 import { URGENCY_LEVELS } from '../../data/mockData';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const PHOTO_CARD_WIDTH = SCREEN_WIDTH - SIZES.paddingL * 2;
+
 export default function ReportDetailScreen({ route, navigation }) {
+  const insets = useSafeAreaInsets();
+  const safeTop = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
   const { reportId } = route.params || {};
-  const { rescueReports, currentUser, addComment, respondToReport, markRescued } = useApp();
+  const { rescueReports, currentUser, addComment, respondToReport, markRescued, startConversation, showAlert } = useApp();
   const report = rescueReports.find((r) => r.id === reportId);
   const [commentText, setCommentText] = useState('');
   const [replyTarget, setReplyTarget] = useState(null); // { id, name }
+  const [previewImageIndex, setPreviewImageIndex] = useState(null);
 
   if (!report) return null;
 
@@ -34,17 +41,27 @@ export default function ReportDetailScreen({ route, navigation }) {
   };
 
   const handleRespond = () => {
-    Alert.alert('Respond to Rescue', 'Are you willing to assist with this rescue case?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: "Yes, I'll Help", onPress: () => respondToReport(reportId) },
-    ]);
+    showAlert({
+      title: 'Respond to Rescue',
+      message: 'Are you willing to assist with this rescue case?',
+      type: 'info',
+      customIcon: 'paw',
+      secondaryText: 'Cancel',
+      primaryText: "Yes, I'll Help",
+      onPrimaryPress: () => respondToReport(reportId),
+    });
   };
 
   const handleMarkRescued = () => {
-    Alert.alert('Mark as Rescued', 'Confirm that this animal has been successfully rescued.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Confirm', onPress: () => markRescued(reportId) },
-    ]);
+    showAlert({
+      title: 'Mark as Rescued',
+      message: 'Confirm that this animal has been successfully rescued.',
+      type: 'warning',
+      customIcon: 'checkmark-circle',
+      secondaryText: 'Cancel',
+      primaryText: 'Confirm',
+      onPrimaryPress: () => markRescued(reportId),
+    });
   };
 
   return (
@@ -65,15 +82,58 @@ export default function ReportDetailScreen({ route, navigation }) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Photo */}
-        {report.photo ? (
-          <Image source={{ uri: report.photo }} style={styles.photo} />
-        ) : (
-          <View style={styles.photoPlaceholder}>
-            <Ionicons name="paw" size={48} color={COLORS.primaryLight} />
-            <Text style={styles.photoHint}>No photo attached</Text>
-          </View>
-        )}
+        {/* Photo Gallery or Single Photo */}
+        {(() => {
+          const allPhotos = (report.photos && report.photos.length > 0) ? report.photos : (report.photo ? [report.photo] : []);
+          if (allPhotos.length === 0) {
+            return (
+              <View style={styles.photoPlaceholder}>
+                <Ionicons name="paw" size={48} color={COLORS.primaryLight} />
+                <Text style={styles.photoHint}>No photo attached</Text>
+              </View>
+            );
+          }
+          if (allPhotos.length === 1) {
+            return (
+              <TouchableOpacity
+                activeOpacity={0.92}
+                onPress={() => setPreviewImageIndex(0)}
+                style={styles.photoContainer}
+              >
+                <Image source={{ uri: allPhotos[0] }} style={styles.photo} resizeMode="cover" />
+                <View style={styles.tapToExpandBadge}>
+                  <Ionicons name="expand-outline" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
+                  <Text style={styles.tapToExpandText}>Tap to view full image</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          }
+          return (
+            <View style={styles.multiPhotoWrap}>
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                style={styles.multiPhotoScroll}
+              >
+                {allPhotos.map((imgUri, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    activeOpacity={0.92}
+                    onPress={() => setPreviewImageIndex(idx)}
+                    style={styles.multiPhotoCard}
+                  >
+                    <Image source={{ uri: imgUri }} style={styles.photo} resizeMode="cover" />
+                    <View style={styles.photoCountBadge}>
+                      <Text style={styles.photoCountText}>{idx + 1} / {allPhotos.length}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <Text style={styles.multiPhotoHint}>Swipe to see all photos · Tap to view full size</Text>
+            </View>
+          );
+        })()}
 
         {/* Status + Urgency pills */}
         <View style={styles.pillRow}>
@@ -123,13 +183,49 @@ export default function ReportDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Responder badge */}
+        {/* Responder badge & direct chat */}
         {report.responderId && (
           <View style={[styles.card, styles.responderCard]}>
-            <Ionicons name="shield-checkmark" size={18} color={COLORS.secondaryDark} />
-            <Text style={styles.responderText}>
-              An Animal Advocate has responded to this case.
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Ionicons name="shield-checkmark" size={20} color={COLORS.secondaryDark} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.responderText}>
+                  {report.responderName || 'An advocate'} has responded to this rescue!
+                </Text>
+                <Text style={{ fontSize: 11.5, color: '#685038', marginTop: 2 }}>
+                  Coordinate live assistance and arrival with the advocate.
+                </Text>
+              </View>
+            </View>
+
+            {report.responderId !== currentUser?.id && (
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#2E7A99',
+                  paddingVertical: 9,
+                  borderRadius: 12,
+                  marginTop: 10,
+                  gap: 6,
+                }}
+                onPress={() => {
+                  const convId = startConversation(report.responderId, report.responderName || 'Advocate');
+                  navigation.navigate('Chat', {
+                    conversationId: convId,
+                    otherName: report.responderName || 'Advocate',
+                    otherId: report.responderId,
+                    initialDraft: `Hi ${report.responderName || ''}! Thank you for responding to my rescue report. Here is the latest update:`,
+                  });
+                }}
+              >
+                <Ionicons name="chatbubbles" size={15} color="#FFFFFF" />
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
+                  Chat with {report.responderName || 'Advocate'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -207,6 +303,78 @@ export default function ReportDetailScreen({ route, navigation }) {
           />
         </TouchableOpacity>
       </View>
+
+      {/* ── Full-Screen Image Viewer Modal ─────────────────── */}
+      <Modal
+        visible={previewImageIndex !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewImageIndex(null)}
+      >
+        <View style={styles.previewModalOverlay}>
+          <View style={[styles.previewTopHeader, { paddingTop: safeTop }]}>
+            <TouchableOpacity
+              style={styles.previewHeaderBtn}
+              onPress={() => setPreviewImageIndex(null)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <Text style={styles.previewCounterText}>
+              {(() => {
+                const photosList = (report.photos && report.photos.length > 0) ? report.photos : (report.photo ? [report.photo] : []);
+                return previewImageIndex !== null ? `${previewImageIndex + 1} of ${photosList.length}` : '';
+              })()}
+            </Text>
+
+            <View style={{ width: 40 }} />
+          </View>
+
+          <View style={styles.previewImageArea}>
+            {(() => {
+              const photosList = (report.photos && report.photos.length > 0) ? report.photos : (report.photo ? [report.photo] : []);
+              if (previewImageIndex !== null && photosList[previewImageIndex]) {
+                return (
+                  <Image
+                    source={{ uri: photosList[previewImageIndex] }}
+                    style={styles.previewFullImage}
+                    resizeMode="contain"
+                  />
+                );
+              }
+              return null;
+            })()}
+          </View>
+
+          {(() => {
+            const photosList = (report.photos && report.photos.length > 0) ? report.photos : (report.photo ? [report.photo] : []);
+            if (photosList.length <= 1) return null;
+            return (
+              <View style={styles.previewNavRow}>
+                <TouchableOpacity
+                  style={[styles.previewNavBtn, previewImageIndex === 0 && styles.previewNavBtnDisabled]}
+                  disabled={previewImageIndex === 0}
+                  onPress={() => setPreviewImageIndex((prev) => Math.max(0, prev - 1))}
+                >
+                  <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.previewNavBtn,
+                    previewImageIndex === photosList.length - 1 && styles.previewNavBtnDisabled,
+                  ]}
+                  disabled={previewImageIndex === photosList.length - 1}
+                  onPress={() => setPreviewImageIndex((prev) => Math.min(photosList.length - 1, prev + 1))}
+                >
+                  <Ionicons name="chevron-forward" size={22} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            );
+          })()}
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -270,13 +438,76 @@ const styles = StyleSheet.create({
 
   scroll: { padding: SIZES.paddingL, paddingBottom: 20 },
 
+  photoContainer: {
+    position: 'relative',
+    borderRadius: SIZES.radiusLg,
+    overflow: 'hidden',
+    marginBottom: SIZES.paddingM,
+  },
   photo: {
-    width: '100%', height: 220, borderRadius: SIZES.radiusLg,
-    marginBottom: SIZES.paddingM, resizeMode: 'cover',
+    width: '100%',
+    height: 220,
+    borderRadius: SIZES.radiusLg,
+    resizeMode: 'cover',
+  },
+  tapToExpandBadge: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(20, 20, 20, 0.65)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  tapToExpandText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  multiPhotoWrap: {
+    marginBottom: SIZES.paddingM,
+  },
+  multiPhotoScroll: {
+    borderRadius: SIZES.radiusLg,
+  },
+  multiPhotoCard: {
+    width: PHOTO_CARD_WIDTH,
+    position: 'relative',
+    borderRadius: SIZES.radiusLg,
+    overflow: 'hidden',
+  },
+  photoCountBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(20, 20, 20, 0.65)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  photoCountText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  multiPhotoHint: {
+    color: COLORS.textMuted,
+    fontSize: SIZES.xsmall,
+    textAlign: 'center',
+    marginTop: 6,
+    fontFamily: 'PlusJakartaSans_500Medium',
   },
   photoPlaceholder: {
-    height: 160, backgroundColor: COLORS.tagBg, borderRadius: SIZES.radiusLg,
-    alignItems: 'center', justifyContent: 'center', marginBottom: SIZES.paddingM,
+    height: 160,
+    backgroundColor: COLORS.tagBg,
+    borderRadius: SIZES.radiusLg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SIZES.paddingM,
   },
   photoHint: { color: COLORS.textMuted, fontSize: SIZES.small, marginTop: 8, fontFamily: 'PlusJakartaSans_500Medium' },
 
@@ -379,4 +610,61 @@ const styles = StyleSheet.create({
   },
   sendBtn:         { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled: { opacity: 0.35 },
+
+  // Full-Screen Image Preview Modal
+  previewModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 28, 0.96)',
+    justifyContent: 'space-between',
+  },
+  previewTopHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingBottom: 14,
+  },
+  previewHeaderBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewCounterText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  previewImageArea: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  previewFullImage: {
+    width: '100%',
+    height: '100%',
+  },
+  previewNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingBottom: Platform.OS === 'ios' ? 38 : 24,
+  },
+  previewNavBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewNavBtnDisabled: {
+    opacity: 0.25,
+  },
 });

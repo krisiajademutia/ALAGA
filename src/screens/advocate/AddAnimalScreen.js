@@ -23,7 +23,7 @@ const READINESS = [
 ];
 
 export default function AddAnimalScreen({ route, navigation }) {
-  const { addAnimal, getAdvocateRescuedCases } = useApp();
+  const { addAnimal, getAdvocateRescuedCases, showAlert } = useApp();
   const rescueReportId = route.params?.rescueReportId || null;
   const rescuedCases = (getAdvocateRescuedCases ? getAdvocateRescuedCases() : []) || [];
 
@@ -117,7 +117,11 @@ export default function AddAnimalScreen({ route, navigation }) {
       navigation.navigate('MainTabs', { screen: 'MyAnimals' });
     } catch (err) {
       setLoading(false);
-      Alert.alert('Error', 'An error occurred while saving: ' + err.message);
+      showAlert({
+        title: 'Error',
+        message: 'An error occurred while saving: ' + err.message,
+        type: 'error',
+      });
     }
   };
 

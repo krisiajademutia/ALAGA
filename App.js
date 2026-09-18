@@ -31,8 +31,8 @@ export default function App() {
   if (!fontsLoaded && !fontError) {
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: '#F2F8FB', alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#5AABCC" />
+        <View style={{ flex: 1, backgroundColor: '#FCF8E8', alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color="#92CDE5" />
         </View>
       </SafeAreaProvider>
     );

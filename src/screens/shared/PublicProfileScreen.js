@@ -28,10 +28,14 @@ export default function PublicProfileScreen({ route, navigation }) {
   const handleMessage = () => {
     const convId = startConversation(
       userId,
-      user.name,
-      `Hi ${user.name}! I found your profile on ALAGA.`
+      user.name
     );
-    navigation.navigate('Chat', { conversationId: convId, otherName: user.name });
+    navigation.navigate('Chat', {
+      conversationId: convId,
+      otherName: user.name,
+      otherId: userId,
+      initialDraft: `Hi ${user.name}! I found your profile on ALAGA.`,
+    });
   };
 
   // Pair animals for 2-col grid

@@ -12,7 +12,7 @@ import Header from '../../components/Header';
 const FILTERS = ['Pending', 'Approved', 'Rejected', 'All'];
 
 export default function AdvocateRequestsScreen({ navigation }) {
-  const { getAdvocateRequests, updateRequestStatus, startConversation } = useApp();
+  const { getAdvocateRequests, updateRequestStatus, startConversation, showAlert } = useApp();
   const [filter, setFilter] = useState('Pending');
 
   const all          = getAdvocateRequests();
@@ -21,48 +21,46 @@ export default function AdvocateRequestsScreen({ navigation }) {
 
   const handleApprove = (req) => {
     const isAdoption = req.type === 'Adoption';
-    Alert.alert(
-      isAdoption ? 'Approve Adoption' : 'Approve Foster',
-      isAdoption
+    showAlert({
+      title: isAdoption ? 'Approve Adoption' : 'Approve Foster',
+      message: isAdoption
         ? `Approve ${req.requesterName} to permanently adopt ${req.animalName}? This will mark ${req.animalName} as Adopted.`
         : `Approve ${req.requesterName} to foster ${req.animalName}? This will mark ${req.animalName} as Being Fostered.\n\nCommit duration: ${req.commitDuration || 'Not specified'}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Approve',
-          onPress: () => {
-            updateRequestStatus(req.id, 'Approved');
-            const msg = isAdoption
-              ? `Hi ${req.requesterName}! Your adoption request for ${req.animalName} has been approved! Welcome to the family!`
-              : `Hi ${req.requesterName}! Your foster request for ${req.animalName} has been approved! Let's coordinate the handover.`;
-            const convId = startConversation(req.requesterId, req.requesterName, msg);
-            Alert.alert(
-              'Request Approved!',
-              'A message has been sent to notify them.',
-              [
-                { text: 'Open Chat', onPress: () => navigation.navigate('Chat', { conversationId: convId, otherName: req.requesterName }) },
-                { text: 'OK' },
-              ]
-            );
-          },
-        },
-      ]
-    );
+      type: 'info',
+      customIcon: 'paw',
+      secondaryText: 'Cancel',
+      primaryText: 'Approve',
+      onPrimaryPress: () => {
+        updateRequestStatus(req.id, 'Approved');
+        const msg = isAdoption
+          ? `Hi ${req.requesterName}! Your adoption request for ${req.animalName} has been approved! Welcome to the family!`
+          : `Hi ${req.requesterName}! Your foster request for ${req.animalName} has been approved! Let's coordinate the handover.`;
+        const convId = startConversation(req.requesterId, req.requesterName, msg);
+        setTimeout(() => {
+          showAlert({
+            title: 'Request Approved!',
+            message: 'A message has been sent to notify them.',
+            type: 'success',
+            customIcon: 'checkmark-circle',
+            secondaryText: 'OK',
+            primaryText: 'Open Chat',
+            onPrimaryPress: () => navigation.navigate('Chat', { conversationId: convId, otherName: req.requesterName }),
+          });
+        }, 300);
+      },
+    });
   };
 
   const handleReject = (req) => {
-    Alert.alert(
-      'Reject Request',
-      `Reject ${req.requesterName}'s ${req.type.toLowerCase()} request for ${req.animalName}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reject',
-          style: 'destructive',
-          onPress: () => updateRequestStatus(req.id, 'Rejected'),
-        },
-      ]
-    );
+    showAlert({
+      title: 'Reject Request',
+      message: `Reject ${req.requesterName}'s ${req.type.toLowerCase()} request for ${req.animalName}?`,
+      type: 'warning',
+      customIcon: 'alert-circle',
+      secondaryText: 'Cancel',
+      primaryText: 'Reject',
+      onPrimaryPress: () => updateRequestStatus(req.id, 'Rejected'),
+    });
   };
 
   return (
@@ -110,8 +108,13 @@ export default function AdvocateRequestsScreen({ navigation }) {
             onApprove={() => handleApprove(item)}
             onReject={() => handleReject(item)}
             onMessage={() => {
-              const convId = startConversation(item.requesterId, item.requesterName, `Hi ${item.requesterName}!`);
-              navigation.navigate('Chat', { conversationId: convId, otherName: item.requesterName });
+              const convId = startConversation(item.requesterId, item.requesterName);
+              navigation.navigate('Chat', {
+                conversationId: convId,
+                otherName: item.requesterName,
+                otherId: item.requesterId,
+                initialDraft: `Hi ${item.requesterName}!`,
+              });
             }}
           />
         )}

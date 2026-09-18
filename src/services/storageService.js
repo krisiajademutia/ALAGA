@@ -1,54 +1,73 @@
 import { IMGBB_API_KEY, isMockStorage } from '../config/storageConfig';
 
 /**
- * Upload an image from a local URI to ImgBB (Free cloud image hosting)
- * @param {string} localUri Local device file path or URI from expo-image-picker
- * @returns {Promise<string>} Public HTTPS image URL
+ * Upload an image from a local URI or base64 asset to ImgBB (Free cloud image hosting)
+ * @param {string|object} imageInput Local device URI or asset object { uri, base64 }
+ * @returns {Promise<string>} Public HTTPS image URL or valid data URI fallback
  */
-export async function uploadImageToImgBB(localUri) {
-  if (!localUri) return null;
+export async function uploadImageToImgBB(imageInput) {
+  if (!imageInput) return null;
+
+  const localUri = typeof imageInput === 'string' ? imageInput : imageInput.uri;
+  const base64 = typeof imageInput === 'object' ? imageInput.base64 : null;
 
   // If already a remote web URL, return as-is
-  if (localUri.startsWith('http://') || localUri.startsWith('https://')) {
+  if (localUri && (localUri.startsWith('http://') || localUri.startsWith('https://'))) {
     return localUri;
   }
 
   if (isMockStorage()) {
-    console.log('[ImgBB] No API key configured yet, using local URI fallback');
-    return localUri;
+    console.log('[ImgBB] Mock storage active, returning local/base64 URI');
+    return base64 ? `data:image/jpeg;base64,${base64}` : localUri;
   }
 
   try {
-    const formData = new FormData();
-    const filename = localUri.split('/').pop() || 'upload.jpg';
-    const match = /\.(\w+)$/.exec(filename);
-    const type = match ? `image/${match[1].toLowerCase()}` : 'image/jpeg';
+    // 1. Try uploading with base64 string directly
+    // This avoids React Native's "Unsupported FormDataPart implementation" with file objects
+    if (base64) {
+      const formData = new FormData();
+      formData.append('image', base64);
 
-    formData.append('image', {
-      uri: localUri,
-      name: filename,
-      type: type,
-    });
+      const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+        method: 'POST',
+        body: formData,
+      });
 
-    const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-      method: 'POST',
-      body: formData,
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-
-    const result = await response.json();
-    if (result.success && result.data?.url) {
-      console.log('[ImgBB] Image uploaded successfully:', result.data.url);
-      return result.data.url;
-    } else {
-      console.warn('[ImgBB] Upload failed:', result?.error?.message);
-      return localUri;
+      const result = await response.json();
+      if (result.success && result.data?.url) {
+        console.log('[ImgBB] Image uploaded successfully via base64:', result.data.url);
+        return result.data.url;
+      } else {
+        console.warn('[ImgBB] Upload error response:', result?.error?.message);
+      }
     }
+
+    // 2. Blob fallback for local URI if base64 wasn't provided or failed
+    if (localUri) {
+      const blobRes = await fetch(localUri);
+      const blob = await blobRes.blob();
+
+      const formData = new FormData();
+      const filename = localUri.split('/').pop() || 'upload.jpg';
+      formData.append('image', blob, filename);
+
+      const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (result.success && result.data?.url) {
+        console.log('[ImgBB] Image uploaded successfully via blob:', result.data.url);
+        return result.data.url;
+      }
+    }
+
+    // If ImgBB rejected or is unreachable, return data URI or localUri so app continues working
+    return base64 ? `data:image/jpeg;base64,${base64}` : localUri;
   } catch (error) {
-    console.warn('[ImgBB] Upload network error, falling back to local URI:', error.message);
-    return localUri;
+    console.warn('[ImgBB] Upload fallback to local/data URI:', error.message);
+    return base64 ? `data:image/jpeg;base64,${base64}` : localUri;
   }
 }
 

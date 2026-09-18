@@ -38,7 +38,7 @@ export default function RescueAlertsScreen({ navigation }) {
   });
 
   const formatDate = (dateStr) => {
-    if (!dateStr) return 'Aug 25, 2026';
+    if (!dateStr) return 'Recently';
     const d = new Date(dateStr);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
@@ -106,7 +106,7 @@ export default function RescueAlertsScreen({ navigation }) {
         renderItem={({ item }) => {
           const isHigh = item.urgency === 'High' || item.urgency === 'Critical';
           const cardTitle = item.title || `${item.condition || 'Injured'} ${item.animalType.toLowerCase()}`;
-          const viaText = `Via: ${item.reporterName || 'Elena Ramos'} (Advocate)`;
+          const viaText = item.reporterName ? `Via: ${item.reporterName}` : 'Via: Community Member';
 
           return (
             <TouchableOpacity

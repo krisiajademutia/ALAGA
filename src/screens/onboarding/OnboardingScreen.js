@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -143,10 +143,8 @@ export default function OnboardingScreen({ navigation }) {
 function Slide({ item }) {
   return (
     <View style={styles.slide}>
-      {/* Illustration */}
-      <View style={styles.imageWrap}>
-        <Image source={item.image} style={styles.image} resizeMode="contain" />
-      </View>
+      {/* Dynamic Context-Aware Animated Illustration */}
+      <AnimatedIllustration slideId={item.id} image={item.image} />
 
       {/* Text block */}
       <View style={styles.textContainer}>
@@ -160,10 +158,280 @@ function Slide({ item }) {
   );
 }
 
+function AnimatedIllustration({ slideId, image }) {
+  // Main floating and breathing loop
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Context-specific animations
+  const badge1Anim = useRef(new Animated.Value(0)).current;
+  const badge2Anim = useRef(new Animated.Value(0)).current;
+  const radarAnim  = useRef(new Animated.Value(0)).current;
+  const heartFloat = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // 1. Gentle continuous floating for character/artwork
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -10,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 8,
+          duration: 2200,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // 2. Soft breathing pulse
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.04,
+          duration: 1800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.98,
+          duration: 1800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // 3. Floating micro badges (Opposing rhythm)
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(badge1Anim, {
+          toValue: -12,
+          duration: 1600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(badge1Anim, {
+          toValue: 6,
+          duration: 1800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(badge2Anim, {
+          toValue: 10,
+          duration: 1700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(badge2Anim, {
+          toValue: -8,
+          duration: 1900,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // 4. Radar ripple expansion (for rescue & response slides)
+    Animated.loop(
+      Animated.timing(radarAnim, {
+        toValue: 1,
+        duration: 2400,
+        useNativeDriver: true,
+      })
+    ).start();
+
+    // 5. Rising love hearts (for adoption slide)
+    Animated.loop(
+      Animated.timing(heartFloat, {
+        toValue: 1,
+        duration: 2000,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, []);
+
+  const radarScale = radarAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.7, 1.45],
+  });
+  const radarOpacity = radarAnim.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [0.65, 0.35, 0],
+  });
+
+  const heartY = heartFloat.interpolate({
+    inputRange: [0, 1],
+    outputRange: [10, -45],
+  });
+  const heartScale = heartFloat.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.6, 1.1, 0.8],
+  });
+  const heartOpacity = heartFloat.interpolate({
+    inputRange: [0, 0.2, 0.8, 1],
+    outputRange: [0, 1, 0.8, 0],
+  });
+
+  return (
+    <View style={styles.imageWrap}>
+      {/* ── Background Pulsing Color Halos ───────────────── */}
+      <Animated.View
+        style={[
+          styles.haloCircle,
+          slideId === '1' && { backgroundColor: '#B8E4E5', width: 220, height: 220 },
+          slideId === '2' && { backgroundColor: '#FBEEAC', width: 210, height: 210 },
+          slideId === '3' && { backgroundColor: '#B8D3C3', width: 220, height: 220 },
+          slideId === '4' && { backgroundColor: '#FBEEAC', width: 230, height: 230 },
+          {
+            transform: [{ scale: pulseAnim }],
+            opacity: 0.4,
+          },
+        ]}
+      />
+
+      {/* ── Radar Ring for Rescue & Advocate slides ──────── */}
+      {(slideId === '2' || slideId === '3') && (
+        <Animated.View
+          style={[
+            styles.radarRing,
+            slideId === '2' ? { borderColor: '#92CDE5' } : { borderColor: '#B8D3C3' },
+            {
+              transform: [{ scale: radarScale }],
+              opacity: radarOpacity,
+            },
+          ]}
+        />
+      )}
+
+      {/* ── Main Floating Character Illustration ─────────── */}
+      <Animated.View
+        style={[
+          styles.mainArtWrap,
+          {
+            transform: [{ translateY: floatAnim }, { scale: pulseAnim }],
+          },
+        ]}
+      >
+        <Image source={image} style={styles.image} resizeMode="contain" />
+      </Animated.View>
+
+      {/* ── Context-Specific Floating Animated Badges ─────── */}
+      {/* SLIDE 1: Welcome (Paws & Love) */}
+      {slideId === '1' && (
+        <>
+          <Animated.View
+            style={[
+              styles.floatingBadge,
+              styles.badgeTopRight,
+              { backgroundColor: '#B8E4E5', transform: [{ translateY: badge1Anim }] },
+            ]}
+          >
+            <Ionicons name="paw" size={18} color="#2E7A99" />
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.floatingBadge,
+              styles.badgeBottomLeft,
+              { backgroundColor: '#FBEEAC', transform: [{ translateY: badge2Anim }] },
+            ]}
+          >
+            <Ionicons name="heart" size={18} color="#D94F4F" />
+          </Animated.View>
+        </>
+      )}
+
+      {/* SLIDE 2: Report & Rescue (GPS Pin & Alert Beacon) */}
+      {slideId === '2' && (
+        <>
+          <Animated.View
+            style={[
+              styles.floatingBadge,
+              styles.badgeTopRight,
+              { backgroundColor: '#92CDE5', transform: [{ translateY: badge1Anim }] },
+            ]}
+          >
+            <Ionicons name="location" size={19} color="#1E586E" />
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.floatingBadge,
+              styles.badgeBottomLeft,
+              { backgroundColor: '#FBEEAC', transform: [{ translateY: badge2Anim }] },
+            ]}
+          >
+            <Ionicons name="camera" size={17} color="#473018" />
+          </Animated.View>
+        </>
+      )}
+
+      {/* SLIDE 3: Advocate Network (Shield & Quick Response) */}
+      {slideId === '3' && (
+        <>
+          <Animated.View
+            style={[
+              styles.floatingBadge,
+              styles.badgeTopRight,
+              { backgroundColor: '#B8D3C3', transform: [{ translateY: badge1Anim }] },
+            ]}
+          >
+            <Ionicons name="shield-checkmark" size={19} color="#2E5A44" />
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.floatingBadge,
+              styles.badgeBottomLeft,
+              { backgroundColor: '#ABD7E2', transform: [{ translateY: badge2Anim }] },
+            ]}
+          >
+            <Ionicons name="flash" size={18} color="#D97706" />
+          </Animated.View>
+        </>
+      )}
+
+      {/* SLIDE 4: Forever Home (Rising Hearts & Home) */}
+      {slideId === '4' && (
+        <>
+          <Animated.View
+            style={[
+              styles.risingHeartWrap,
+              {
+                transform: [{ translateY: heartY }, { scale: heartScale }],
+                opacity: heartOpacity,
+              },
+            ]}
+          >
+            <Ionicons name="heart" size={24} color="#D94F4F" />
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.floatingBadge,
+              styles.badgeTopRight,
+              { backgroundColor: '#FBEEAC', transform: [{ translateY: badge1Anim }] },
+            ]}
+          >
+            <Ionicons name="home" size={18} color="#473018" />
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.floatingBadge,
+              styles.badgeBottomLeft,
+              { backgroundColor: '#B8E4E5', transform: [{ translateY: badge2Anim }] },
+            ]}
+          >
+            <Ionicons name="happy" size={18} color="#2E7A99" />
+          </Animated.View>
+        </>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.background,
   },
 
   skipBtn: {
@@ -176,7 +444,8 @@ const styles = StyleSheet.create({
   skipText: {
     fontSize: 15,
     color: '#473018',
-    fontWeight: '600',
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
   slide: {
@@ -189,15 +458,64 @@ const styles = StyleSheet.create({
     paddingBottom: 170,
   },
   imageWrap: {
-    width: 220,
-    height: 220,
-    marginBottom: 28,
+    width: 270,
+    height: 270,
+    marginBottom: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
-  image: {
+  haloCircle: {
+    position: 'absolute',
+    borderRadius: 150,
+  },
+  radarRing: {
+    position: 'absolute',
     width: 220,
     height: 220,
+    borderRadius: 110,
+    borderWidth: 2.5,
+  },
+  mainArtWrap: {
+    width: 230,
+    height: 230,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  image: {
+    width: 230,
+    height: 230,
+  },
+  floatingBadge: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
+    shadowColor: '#473018',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 4,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  badgeTopRight: {
+    top: 15,
+    right: 15,
+  },
+  badgeBottomLeft: {
+    bottom: 25,
+    left: 15,
+  },
+  risingHeartWrap: {
+    position: 'absolute',
+    top: 40,
+    alignSelf: 'center',
+    zIndex: 6,
   },
 
   textContainer: {
@@ -210,13 +528,16 @@ const styles = StyleSheet.create({
     color: '#473018',
     textAlign: 'center',
     marginBottom: 12,
+    letterSpacing: -0.4,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   slideSub: {
     fontSize: 14,
-    color: '#5C4E3A',
+    color: '#685038',
     textAlign: 'center',
-    lineHeight: 21,
+    lineHeight: 22,
     marginBottom: 12,
+    fontFamily: 'PlusJakartaSans_400Regular',
   },
   slideTagline: {
     fontSize: 16,
@@ -225,6 +546,7 @@ const styles = StyleSheet.create({
     color: '#473018',
     textAlign: 'center',
     marginTop: 8,
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
   footerContainer: {
@@ -232,8 +554,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
-    paddingBottom: 24,
+    backgroundColor: COLORS.background,
+    paddingBottom: 28,
   },
 
   dots: {
@@ -257,7 +579,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#B8D3C3',
+    backgroundColor: '#92CDE5',
     borderRadius: 25,
     paddingVertical: 14,
     shadowColor: '#473018',
@@ -270,6 +592,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#473018',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
   loginLink: {
     alignItems: 'center',
@@ -278,10 +601,12 @@ const styles = StyleSheet.create({
   },
   loginText: {
     fontSize: 13,
-    color: '#5C4E3A',
+    color: '#685038',
+    fontFamily: 'PlusJakartaSans_400Regular',
   },
   loginBold: {
     color: '#473018',
     fontWeight: '700',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 });
