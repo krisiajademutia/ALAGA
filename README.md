@@ -60,10 +60,6 @@ ALAGA is built following a decoupled, layered client-server architecture:
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Data Flow Diagram (Level 0)
-<p align="center">
-  <img src="assets/docs/Figure1_DFD_Level0.png" alt="Data Flow Diagram - Level 0" width="80%" />
-</p>
 
 ---
 
@@ -175,12 +171,6 @@ Make sure you have the following installed on your development machine:
 
 ---
 
-## 👥 Academic Attribution & Credits
-
-- **Developer & Author:** Krisia Jade Mutia
-- **Course Requirement:** CCE 106/L - Application Development & Emerging Technologies
-- **Adviser / Course Instructor:** Maricel A. Timbal, MIT
-- **Academic Term:** October 2025
 
 ---
 
