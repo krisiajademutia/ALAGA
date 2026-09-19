@@ -5,7 +5,6 @@
 </p>
 
 <p align="center">
-  <strong>Alert · Respond · Alaga</strong><br />
   <em>A modern, community-centered mobile platform connecting citizens reporting animals in distress with dedicated animal advocates and rescuers.</em>
 </p>
 
@@ -31,56 +30,6 @@ In urban and rural communities across the Philippines, thousands of stray, aband
 
 **ALAGA** resolves these barriers through an integrated, mobile-first ecosystem. Powered by **React Native**, **Expo**, and **Google Cloud Firestore**, ALAGA delivers real-time emergency dispatch with automated GPS geocoding, multi-image evidence uploads, dynamic urgency scoring, pet adoption and foster lifecycle management, verified donation tracking, and direct in-app messaging.
 
----
-
-## 🌟 Key Features
-
-### 🚨 Real-Time Rescue Reporting & Dispatch
-- **One-Tap GPS Capture**: Automatically retrieves device coordinates and translates them into human-readable addresses using `expo-location`.
-- **Multi-Photo Evidence**: Supports batch photo selection (up to 8 images) with high-resolution preview and cloud hosting.
-- **Dynamic Urgency Scoring**: Evaluates triage severity based on physical condition, vulnerability factors, and situational risks.
-- **Status Progression**: Live status tracking (`Reported` ➔ `Responded` ➔ `Rescued` ➔ `Closed`) to prevent duplicate rescue attempts.
-- **Interactive Spatial Map**: Visualizes open incidents geographically with filterable map pins.
-
-### 🐾 Pet Profile & Adoption Lifecycle
-- **Comprehensive Pet Profiles**: Captures breed, age, gender, weight, health/vaccination history, spay/neuter records, and behavioral traits.
-- **Multi-Image Photo Carousel**: Interactive hero swipe gallery with page indicators and full-screen zoom preview modal.
-- **Adoption & Foster Applications**: Community members submit formal applications with background questionnaires directly to the listing advocate.
-- **One-Tap Status Transitions**: Real-time status toggle (`Available` ➔ `Currently Fostered` ➔ `Adopted`) with instant Firestore synchronization.
-
-### 💬 Real-Time In-App Messaging & Notifications
-- **Direct 1-on-1 Chat**: End-to-end synchronized messaging between adopters, reporters, and animal advocates powered by Firestore snapshot streams.
-- **Unread Badge Counters**: Instant message badge increments and tab unread counts that decrement when conversations are opened.
-- **Dual Alert Channels**: Combines high-priority local device push notifications with in-app notification center alerts.
-
-### 🛡️ Role-Based Access Control (RBAC)
-- **Community Supporters**: Report rescue incidents, browse pets, submit adoption/foster applications, and donate to verified cases.
-- **Animal Advocates**: Claim and respond to rescue emergencies, publish and manage animal listings, review adoption applications, and audit donations.
-
-### 🎁 Transparent Donation Verification
-- **Case-Linked Financial Support**: Donors can sponsor specific rescue treatments or general shelter needs.
-- **Verification Audit Trail**: Uploads GCash, Maya, or bank deposit reference numbers and screenshot receipts for advocate audit approval.
-
----
-
-## 🎨 User Interface & Design System
-
-ALAGA employs an **empathy-driven, accessible design system** tailored for readability in high-stress emergency environments and bright outdoor lighting:
-
-- **Typography**: Clean, geometric typography powered by `@expo-google-fonts/plus-jakarta-sans` (`Regular`, `Medium`, `SemiBold`, `Bold`, `ExtraBold`).
-- **Brand Palette**:
-  - `Primary Sky Blue`: `#92CDE5` (Soothing, accessible primary accent)
-  - `Primary Deep Teal`: `#2E7A99` (High-contrast interactive buttons & badges)
-  - `Warm Background`: `#FCF8E8` (Soft, low-fatigue off-white canvas)
-  - `Deep Warm Brown`: `#473018` (High-contrast typography adhering to WCAG AA)
-  - `Secondary Sage`: `#B8D3C3` & `Pale Wash`: `#EBF4EF` (Calming status indicators)
-- **De-Boxed Layouts**: Streamlined metadata bars and borderless profile cards that eliminate bulky containers and maximize screen breathing room.
-
-<p align="center">
-  <img src="assets/docs/Figure3_UI_Design.png" alt="ALAGA UI Design System" width="90%" />
-</p>
-
----
 
 ## 🏗️ System Architecture
 
