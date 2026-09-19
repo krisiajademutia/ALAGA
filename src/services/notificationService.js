@@ -58,11 +58,6 @@ export async function initNotifications() {
 
   setupHandlerIfNeeded(N);
 
-  try {
-    if (N.cancelAllScheduledNotificationsAsync) {
-      await N.cancelAllScheduledNotificationsAsync().catch(() => {});
-    }
-  } catch (e) {}
 
   try {
     const { status: existingStatus } = await N.getPermissionsAsync();

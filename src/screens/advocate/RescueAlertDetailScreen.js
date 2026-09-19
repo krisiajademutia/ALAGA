@@ -20,6 +20,9 @@ import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import Avatar from '../../components/Avatar';
 import MapCard from '../../components/MapCard';
+import StatusPill from '../../components/StatusPill';
+import { URGENCY_LEVELS } from '../../data/mockData';
+import { getDistanceInKm } from '../../services/notificationService';
 
 export default function RescueAlertDetailScreen({ route, navigation }) {
   const { reportId } = route.params || {};
@@ -29,6 +32,7 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
     addComment,
     respondToReport,
     markRescued,
+    updateRescueReportUrgency,
     startConversation,
     showAlert,
   } = useApp();
@@ -37,10 +41,96 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
   const [commentText, setCommentText] = useState('');
   const [isFav, setIsFav] = useState(false);
   const [previewImageIndex, setPreviewImageIndex] = useState(null);
+  const [urgencyModalVisible, setUrgencyModalVisible] = useState(false);
+  const isAdvocate = currentUser?.role === 'advocate';
 
   const photosList = (report?.photos && report.photos.length > 0)
     ? report.photos
     : (report?.photo ? [report.photo] : []);
+
+  const urgencyObj =
+    URGENCY_LEVELS.find(
+      (u) => u.label.toLowerCase() === (report?.urgency || '').toLowerCase()
+    ) || { label: 'High', color: '#D94F4F', bg: '#FDEEEB' };
+
+  const distanceKm = React.useMemo(() => {
+    const rLat = report?.location?.latitude;
+    const rLng = report?.location?.longitude;
+    const uLat = currentUser?.latitude || currentUser?.locationCoordinates?.latitude;
+    const uLng = currentUser?.longitude || currentUser?.locationCoordinates?.longitude;
+    if (rLat && rLng && uLat && uLng) {
+      return getDistanceInKm(uLat, uLng, rLat, rLng);
+    }
+    return null;
+  }, [report?.location, currentUser]);
+
+  const detailTags = React.useMemo(() => {
+    if (!report) return [];
+    const tags = [];
+    if (typeof report.animalType === 'string' && report.animalType.trim()) {
+      tags.push({
+        id: 'animalType',
+        icon: 'paw',
+        label: 'Animal',
+        value: report.animalType.trim(),
+        color: '#2E7A99',
+        bg: '#EAF4F8',
+      });
+    }
+    if (typeof report.condition === 'string' && report.condition.trim()) {
+      tags.push({
+        id: 'condition',
+        icon: 'medical',
+        label: 'Condition',
+        value: report.condition.trim(),
+        color: '#D97706',
+        bg: '#FEF3C7',
+      });
+    }
+    if (
+      typeof report.gender === 'string' &&
+      report.gender.trim() &&
+      report.gender.toLowerCase() !== 'unknown'
+    ) {
+      tags.push({
+        id: 'gender',
+        icon: 'male-female',
+        label: 'Gender',
+        value: report.gender.trim(),
+        color: '#7C3AED',
+        bg: '#F3E8FF',
+      });
+    }
+    if (
+      typeof report.breed === 'string' &&
+      report.breed.trim() &&
+      report.breed.toLowerCase() !== 'unknown'
+    ) {
+      tags.push({
+        id: 'breed',
+        icon: 'pricetag',
+        label: 'Breed',
+        value: report.breed.trim(),
+        color: '#786854',
+        bg: '#F5EFE6',
+      });
+    }
+    if (
+      typeof report.age === 'string' &&
+      report.age.trim() &&
+      report.age.toLowerCase() !== 'unknown'
+    ) {
+      tags.push({
+        id: 'age',
+        icon: 'time',
+        label: 'Age',
+        value: report.age.trim(),
+        color: '#786854',
+        bg: '#F5EFE6',
+      });
+    }
+    return tags;
+  }, [report]);
 
   const insets = useSafeAreaInsets();
   const safeTop =
@@ -142,9 +232,9 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
             >
               <Image source={{ uri: photosList[0] }} style={styles.heroImage} resizeMode="cover" />
               <View style={styles.tapToExpandBadge}>
-                <Ionicons name="expand-outline" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
+                <Ionicons name="images-outline" size={13} color="#FFFFFF" style={{ marginRight: 5 }} />
                 <Text style={styles.tapToExpandText}>
-                  {photosList.length > 1 ? `${photosList.length} Photos · Tap to view` : 'Tap to view full image'}
+                  {photosList.length > 1 ? `${photosList.length} Photos · Tap to view gallery` : 'Tap to view full image'}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -181,85 +271,130 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
         <View style={styles.sheetBody}>
           <View style={styles.sheetHandle} />
 
+          {/* Status, Urgency & Distance Pills */}
+          <View style={styles.metaBadgeRow}>
+            <StatusPill status={report.status || 'Open'} />
+            {Boolean(report.urgency) && (
+              <TouchableOpacity
+                style={[styles.urgencyBadge, { backgroundColor: urgencyObj.bg }]}
+                onPress={() => isAdvocate && setUrgencyModalVisible(true)}
+                disabled={!isAdvocate}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.urgencyDot, { backgroundColor: urgencyObj.color }]} />
+                <Text style={[styles.urgencyText, { color: urgencyObj.color }]}>
+                  {report.urgency} Urgency
+                </Text>
+                {isAdvocate && (
+                  <Ionicons name="pencil" size={10} color={urgencyObj.color} style={{ marginLeft: 4 }} />
+                )}
+              </TouchableOpacity>
+            )}
+            {distanceKm !== null && (
+              <View style={styles.distanceBadge}>
+                <Ionicons name="navigate-outline" size={11} color="#2E7A99" style={{ marginRight: 3 }} />
+                <Text style={styles.distanceBadgeText}>
+                  {distanceKm < 1 ? `${Math.round(distanceKm * 1000)}m away` : `${distanceKm.toFixed(1)} km away`}
+                </Text>
+              </View>
+            )}
+          </View>
+
           {/* Rescue Case Title */}
           <Text style={styles.detailTitle}>
-            {report.title || `${report.animalType || 'Animal'} Rescue Alert`}
+            {report.title || (report.animalType ? `${report.animalType} Rescue Alert` : 'Rescue Alert')}
           </Text>
 
           {/* Location & Date */}
           <View style={styles.locRow}>
-            <Ionicons name="location-sharp" size={15} color="#D94F4F" style={{ marginRight: 4 }} />
+            <Ionicons name="location-sharp" size={15} color="#D94F4F" style={{ marginRight: 5, marginTop: 1 }} />
             <Text style={styles.locText}>
-              {report.location?.address || 'Pasig City'} • {report.createdAt ? new Date(report.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent'}
+              {report.location?.address || 'Location reported'}
+              {report.createdAt
+                ? ` • ${new Date(report.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                : ''}
             </Text>
           </View>
 
-          {/* 3 Stats Cards */}
-          <View style={styles.statsRow}>
-            <View style={[styles.statCard, styles.statGreen]}>
-              <Text style={styles.statLabel}>Gender</Text>
-              <Text style={styles.statVal}>{report.gender || 'Unknown'}</Text>
+          {/* ── Dynamic Attribute Tags (Only Render Fields Present in Report) ── */}
+          {detailTags.length > 0 && (
+            <View style={styles.detailTagsRow}>
+              {detailTags.map((tag) => (
+                <View key={tag.id} style={[styles.detailTag, { backgroundColor: tag.bg }]}>
+                  <Ionicons name={tag.icon} size={13} color={tag.color} style={{ marginRight: 5 }} />
+                  <Text style={[styles.detailTagText, { color: tag.color }]}>
+                    <Text style={styles.detailTagLabel}>{tag.label}: </Text>
+                    {tag.value}
+                  </Text>
+                </View>
+              ))}
             </View>
-            <View style={[styles.statCard, styles.statYellow]}>
-              <Text style={styles.statLabel}>Type</Text>
-              <Text style={styles.statVal}>{report.animalType || 'Dog'}</Text>
-            </View>
-            <View style={[styles.statCard, styles.statBlue]}>
-              <Text style={styles.statLabel}>Condition</Text>
-              <Text style={styles.statVal}>{report.condition || 'Rescue'}</Text>
-            </View>
-          </View>
+          )}
 
-          {/* Advocate Card */}
-          <View style={styles.advocateCard}>
-            <View style={styles.advocateLeft}>
+          <View style={styles.hairline} />
+
+          {/* ── Reporter Profile Row (Unboxed) ─────────────────── */}
+          <View style={styles.reporterRow}>
+            <View style={styles.reporterLeft}>
               <Avatar name={report.reporterName || 'Community Member'} size={42} />
-              <View style={styles.advocateTextCol}>
-                <Text style={styles.advocateName}>{report.reporterName || 'Community Member'}</Text>
-                <Text style={styles.advocateRole}>
-                  Reporter · Community Member
+              <View style={styles.reporterTextCol}>
+                <View style={styles.reporterNameRow}>
+                  <Text style={styles.reporterName} numberOfLines={1}>
+                    {report.reporterName || 'Community Member'}
+                  </Text>
+                  <Ionicons name="checkmark-circle" size={14} color="#2E7A99" style={{ marginLeft: 4 }} />
+                </View>
+                <Text style={styles.reporterRole}>
+                  Reported this rescue case
                 </Text>
               </View>
             </View>
             <TouchableOpacity
               style={styles.chatBtn}
               onPress={handleMessageAdvocate}
-              activeOpacity={0.8}
+              activeOpacity={0.82}
             >
-              <Ionicons name="chatbubble" size={14} color="#473018" style={{ marginRight: 4 }} />
-              <Text style={styles.chatBtnText}>Chat</Text>
+              <Ionicons name="chatbubble-ellipses" size={14} color="#2E7A99" style={{ marginRight: 5 }} />
+              <Text style={styles.chatBtnText}>Message</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Description */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Description</Text>
-            <Text style={styles.descText}>{report.description}</Text>
-
-            {/* Badges */}
-            <View style={styles.badgesRow}>
-              {(report.tags || [report.animalType || 'Rescue', report.condition || 'Needs help']).map(
-                (tag, idx) => (
-                  <View
-                    key={tag}
-                    style={[
-                      styles.tagPill,
-                      idx === 0 && styles.tagPillGreen,
-                      idx === 1 && styles.tagPillYellow,
-                      idx === 2 && styles.tagPillBlue,
-                      idx === 3 && styles.tagPillTeal,
-                    ]}
-                  >
-                    <Text style={styles.tagText}>{tag}</Text>
+          {/* ── Description / Report Details (Unboxed) ─────────── */}
+          {Boolean(report.description?.trim()) && (
+            <>
+              <View style={styles.hairline} />
+              <View style={styles.section}>
+                <View style={styles.sectionHeaderRow}>
+                  <Ionicons name="document-text-outline" size={15} color="#2E7A99" style={{ marginRight: 6 }} />
+                  <Text style={styles.sectionTitle}>Report Details & Notes</Text>
+                </View>
+                <Text style={styles.descriptionText}>
+                  {report.description.trim()}
+                </Text>
+                {Boolean(
+                  report.location?.landmark &&
+                  !report.location.landmark.toLowerCase().includes('near detected')
+                ) && (
+                  <View style={styles.landmarkInlineRow}>
+                    <Ionicons name="flag-outline" size={13} color="#8C7D6A" style={{ marginRight: 5, marginTop: 1 }} />
+                    <Text style={styles.landmarkInlineText}>
+                      <Text style={styles.landmarkInlineLabel}>Landmark: </Text>
+                      {report.location.landmark}
+                    </Text>
                   </View>
-                )
-              )}
-            </View>
-          </View>
+                )}
+              </View>
+            </>
+          )}
+
+          <View style={styles.hairline} />
 
           {/* ── Interactive Map View ─────────────────────────── */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Reported Location</Text>
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons name="map-outline" size={15} color="#2E7A99" style={{ marginRight: 6 }} />
+              <Text style={styles.sectionTitle}>Reported Location</Text>
+            </View>
             <MapCard
               location={report.location}
               title={report.title || `${report.animalType || 'Animal'} reported here`}
@@ -440,6 +575,77 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
           )}
         </View>
       </Modal>
+
+      {/* ── Urgency Triage Modal for Advocates ────────────────── */}
+      <Modal
+        visible={urgencyModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setUrgencyModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.triageModalOverlay}
+          activeOpacity={1}
+          onPress={() => setUrgencyModalVisible(false)}
+        >
+          <View style={styles.triageModalCard}>
+            <View style={styles.triageModalHeader}>
+              <Text style={styles.triageModalTitle}>Update Case Urgency</Text>
+              <TouchableOpacity
+                onPress={() => setUrgencyModalVisible(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={20} color="#8C7D6A" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.triageModalSub}>
+              Select the appropriate urgency level based on your assessment of the animal's physical state.
+            </Text>
+
+            <View style={styles.triageOptionsWrap}>
+              {URGENCY_LEVELS.map((u) => {
+                const isSelected = (report?.urgency || '').toLowerCase() === u.label.toLowerCase();
+                return (
+                  <TouchableOpacity
+                    key={u.label}
+                    style={[
+                      styles.triageOptionItem,
+                      isSelected && { borderColor: u.color, backgroundColor: u.bg },
+                    ]}
+                    onPress={() => {
+                      updateRescueReportUrgency(report.id, u.label);
+                      setUrgencyModalVisible(false);
+                      showAlert(
+                        'success',
+                        'Urgency Updated',
+                        `This rescue case is now set to ${u.label} Urgency.`
+                      );
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <View style={[styles.triageDot, { backgroundColor: u.color }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.triageOptionLabel, isSelected && { color: u.color, fontWeight: '800' }]}>
+                        {u.label} Urgency
+                      </Text>
+                      <Text style={styles.triageOptionDesc}>
+                        {u.label === 'High'
+                          ? 'Life-threatening trauma, severe bleeding, immediate rescue needed'
+                          : u.label === 'Medium'
+                          ? 'Malnourished, illness, or vulnerable nursing litter'
+                          : 'Stable stray, roaming, not in immediate physical danger'}
+                      </Text>
+                    </View>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={18} color={u.color} style={{ marginLeft: 8 }} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -455,7 +661,7 @@ const styles = StyleSheet.create({
 
   heroWrap: {
     position: 'relative',
-    height: 240,
+    height: 290,
     backgroundColor: '#E8F2F6',
   },
   heroTouch: {
@@ -469,18 +675,20 @@ const styles = StyleSheet.create({
   },
   tapToExpandBadge: {
     position: 'absolute',
-    bottom: 32,
+    bottom: 34,
     right: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(20, 20, 20, 0.65)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
+    backgroundColor: 'rgba(20, 20, 20, 0.74)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   tapToExpandText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '700',
     fontFamily: 'PlusJakartaSans_700Bold',
   },
@@ -493,130 +701,178 @@ const styles = StyleSheet.create({
   },
   floatingBack: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 32,
     left: 18,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#FFFFFF',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
-    ...SHADOWS.card,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.14,
+    shadowRadius: 6,
+    elevation: 4,
   },
   floatingHeart: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 32,
     right: 18,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#FFFFFF',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
-    ...SHADOWS.card,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.14,
+    shadowRadius: 6,
+    elevation: 4,
   },
 
   sheetBody: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    marginTop: -24,
+    marginTop: -26,
     paddingHorizontal: 20,
     paddingTop: 14,
   },
   sheetHandle: {
-    width: 38,
+    width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#D6D3D1',
+    backgroundColor: '#DDD6CA',
     alignSelf: 'center',
     marginBottom: 14,
   },
 
+  metaBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+  },
+  urgencyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 20,
+  },
+  urgencyDot: {
+    width: 6.5,
+    height: 6.5,
+    borderRadius: 3.5,
+    marginRight: 5,
+  },
+  urgencyText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  distanceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EBF4F8',
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 20,
+  },
+  distanceBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2E7A99',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+
   detailTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
-    color: COLORS.brown,
-    letterSpacing: -0.3,
+    color: '#382613',
+    letterSpacing: -0.4,
     marginBottom: 6,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   locRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
+    alignItems: 'flex-start',
+    marginBottom: 18,
   },
   locText: {
-    fontSize: 13,
-    color: '#5C4E3A',
+    fontSize: 12.5,
+    color: '#685038',
     fontWeight: '500',
+    lineHeight: 18,
+    flex: 1,
     fontFamily: 'PlusJakartaSans_500Medium',
   },
 
-  statsRow: {
+  // ── Unboxed Inline Attribute Tags ─────────────────────────
+  detailTagsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 18,
-  },
-  statCard: {
-    flex: 1,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-  },
-  statGreen: {
-    backgroundColor: '#E8F5EE',
-  },
-  statYellow: {
-    backgroundColor: '#FEF8DE',
-  },
-  statBlue: {
-    backgroundColor: '#E0F2FA',
-  },
-  statLabel: {
-    fontSize: 11,
-    color: '#8C7D6A',
-    fontWeight: '600',
+    flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 4,
+  },
+  detailTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  detailTagText: {
+    fontSize: 12,
+    fontWeight: '600',
     fontFamily: 'PlusJakartaSans_600SemiBold',
   },
-  statVal: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#473018',
+  detailTagLabel: {
+    fontWeight: '700',
     fontFamily: 'PlusJakartaSans_700Bold',
   },
 
-  advocateCard: {
+  // ── Hairline Divider ──────────────────────────────────────
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#EFE7DA',
+    marginVertical: 14,
+  },
+
+  // ── Unboxed Reporter Row ──────────────────────────────────
+  reporterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E3EFF6',
-    borderRadius: 20,
-    padding: 14,
-    marginBottom: 20,
-    ...SHADOWS.sm,
+    paddingVertical: 2,
   },
-  advocateLeft: {
+  reporterLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
     gap: 12,
   },
-  advocateTextCol: {
+  reporterTextCol: {
     flex: 1,
   },
-  advocateName: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#473018',
+  reporterNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  reporterName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#362415',
     fontFamily: 'PlusJakartaSans_700Bold',
   },
-  advocateRole: {
-    fontSize: 11,
+  reporterRole: {
+    fontSize: 12,
     color: '#8C7D6A',
     marginTop: 2,
     fontFamily: 'PlusJakartaSans_500Medium',
@@ -624,72 +880,63 @@ const styles = StyleSheet.create({
   chatBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FBEEAC',
-    paddingHorizontal: 16,
+    backgroundColor: '#EBF4F8',
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 18,
+    borderRadius: 20,
   },
   chatBtnText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
-    color: '#473018',
+    color: '#2E7A99',
     fontFamily: 'PlusJakartaSans_700Bold',
   },
 
+  // ── Content Sections ───────────────────────────────────────
   section: {
-    marginBottom: 20,
+    marginBottom: 4,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#473018',
-    marginBottom: 8,
+    color: '#3A2613',
     letterSpacing: -0.2,
     fontFamily: 'PlusJakartaSans_700Bold',
   },
-  descText: {
-    fontSize: 13.5,
-    color: '#4B3F33',
-    lineHeight: 21,
+  descriptionText: {
+    fontSize: 14,
+    color: '#473018',
+    lineHeight: 22,
     fontWeight: '400',
-    marginBottom: 12,
     fontFamily: 'PlusJakartaSans_400Regular',
   },
-  badgesRow: {
+  landmarkInlineRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    alignItems: 'center',
+    marginTop: 8,
   },
-  tagPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+  landmarkInlineText: {
+    fontSize: 12.5,
+    color: '#786854',
+    fontFamily: 'PlusJakartaSans_500Medium',
   },
-  tagPillGreen: {
-    backgroundColor: '#E8F5EE',
-  },
-  tagPillYellow: {
-    backgroundColor: '#FEF8DE',
-  },
-  tagPillBlue: {
-    backgroundColor: '#E0F2FA',
-  },
-  tagPillTeal: {
-    backgroundColor: '#D8EDE4',
-  },
-  tagText: {
-    fontSize: 12,
+  landmarkInlineLabel: {
     fontWeight: '700',
-    color: '#473018',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#5C4A38',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
   // Map Card
   mapCard: {
     borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 20,
     marginTop: 6,
+    marginBottom: 16,
   },
   noCommentsWrap: {
     paddingVertical: 24,
@@ -724,22 +971,23 @@ const styles = StyleSheet.create({
   respondBtn: {
     flexDirection: 'row',
     backgroundColor: '#2E7A99',
-    borderRadius: 25,
-    height: 48,
+    borderRadius: 26,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
     shadowColor: '#2E7A99',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    elevation: 4,
   },
   respondBtnText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
     fontFamily: 'PlusJakartaSans_700Bold',
+    letterSpacing: 0.2,
   },
   respondedCard: {
     backgroundColor: '#FFFFFF',
@@ -982,5 +1230,70 @@ const styles = StyleSheet.create({
   },
   previewNavBtnDisabled: {
     opacity: 0.25,
+  },
+
+  // Urgency Triage Modal Styles
+  triageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  triageModalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 20,
+    ...SHADOWS.medium,
+  },
+  triageModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  triageModalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#382513',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  triageModalSub: {
+    fontSize: 12,
+    color: '#8C7D6A',
+    lineHeight: 17,
+    marginBottom: 16,
+  },
+  triageOptionsWrap: {
+    gap: 10,
+  },
+  triageOptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#E8DFD8',
+    backgroundColor: '#FAFAF9',
+  },
+  triageDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  triageOptionLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#382513',
+    marginBottom: 2,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  triageOptionDesc: {
+    fontSize: 11,
+    color: '#8C7D6A',
+    lineHeight: 15,
   },
 });

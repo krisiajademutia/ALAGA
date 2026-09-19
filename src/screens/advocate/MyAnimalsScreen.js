@@ -307,6 +307,12 @@ function AnimalManageCard({ animal, onPress, onActions }) {
             <Ionicons name="paw-outline" size={28} color={COLORS.primaryLight} />
           </View>
         )}
+        {Boolean(animal.photos && animal.photos.length > 1) && (
+          <View style={styles.photoCountBadge}>
+            <Ionicons name="images" size={10} color="#fff" style={{ marginRight: 3 }} />
+            <Text style={styles.photoCountText}>{animal.photos.length}</Text>
+          </View>
+        )}
         <View style={styles.cardStatusPos}>
           <StatusPill status={animal.status} />
         </View>
@@ -484,6 +490,22 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   cardStatusPos: { position: 'absolute', top: SIZES.sm8, right: SIZES.sm8 },
+  photoCountBadge: {
+    position: 'absolute',
+    bottom: SIZES.sm8,
+    right: SIZES.sm8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(26, 21, 16, 0.75)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: SIZES.r12,
+  },
+  photoCountText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fff',
+  },
   cardBody:      { padding: SIZES.md16 },
   cardTopRow:    { flexDirection: 'row', alignItems: 'flex-start', marginBottom: SIZES.xs4 + 2 },
   cardName:      { fontSize: SIZES.lg, fontWeight: '800', color: COLORS.brown },

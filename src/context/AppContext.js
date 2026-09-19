@@ -15,6 +15,7 @@ import {
   claimRescueReportFirebase,
   markReportRescuedFirebase,
   addRescueCommentFirebase,
+  updateRescueReportUrgencyFirebase,
 } from '../services/rescueService';
 import {
   subscribeToAnimals,
@@ -22,7 +23,14 @@ import {
   updateAnimalFirebase,
   subscribeToApplications,
   submitApplicationFirebase,
+  updateApplicationFirebase,
 } from '../services/animalService';
+import {
+  subscribeToConversations,
+  saveConversationFirebase,
+  markConversationReadFirebase,
+  deleteConversationFirebase,
+} from '../services/chatService';
 import { isMockFirebase } from '../config/firebaseConfig';
 import * as Location from 'expo-location';
 import {
@@ -55,6 +63,7 @@ const defaultContext = {
   respondToReport: () => {},
   markRescued: () => {},
   addComment: () => {},
+  updateRescueReportUrgency: () => {},
   addAnimal: () => {},
   updateAnimal: () => {},
   returnAnimalToListings: () => {},
@@ -65,6 +74,7 @@ const defaultContext = {
   startConversation: () => '',
   clearConversation: () => {},
   deleteConversation: () => {},
+  setActiveConversationId: () => {},
   submitDonation: () => {},
   getUserConversations: () => [],
   getUnreadMessagesCount: () => 0,
@@ -105,31 +115,44 @@ export function AppProvider({ children }) {
 
   const isInitialRescuesLoad = useRef(true);
   const currentUserRef = useRef(currentUser);
-  const mySubmittedReportIds = useRef(new Set());
+  const mySubmittedReportIds = useRef(new Map()); // Map<reportId, authorUserId>
+  const notifiedReportIdsRef = useRef(new Set()); // Set of report IDs that have triggered phone alerts for active user
+  const notifiedMessageIdsRef = useRef(new Set()); // Set of message IDs that have triggered alerts
+  const activeConversationIdRef = useRef(null); // ID of chat screen currently active/focused
+
+  const setActiveConversationId = (id) => {
+    activeConversationIdRef.current = id;
+  };
 
   useEffect(() => {
     currentUserRef.current = currentUser;
   }, [currentUser]);
 
-  // Robust check to determine if a report was filed by the current user
+  // Robust check to determine if a report was filed by the given user
   const isOwnReport = (report, user) => {
     if (!report || !user) return false;
     const uId = user.id || user.uid;
 
-    // 1. Locally submitted on this device session
-    if (mySubmittedReportIds.current && report.id && mySubmittedReportIds.current.has(report.id)) {
-      return true;
+    // 1. Locally submitted by THIS user in the current session
+    if (mySubmittedReportIds.current && report.id) {
+      const localAuthor = mySubmittedReportIds.current.get(report.id);
+      if (localAuthor && (localAuthor === uId || (user.email && localAuthor === user.email))) {
+        return true;
+      }
     }
-    // 2. Exact match against user ID or UID
+
+    // 2. Exact match on reporterId against user ID or UID
     if (
       report.reporterId &&
+      uId &&
       (report.reporterId === uId ||
         report.reporterId === user.id ||
         report.reporterId === user.uid)
     ) {
       return true;
     }
-    // 3. Email match
+
+    // 3. Exact email match (case-insensitive)
     if (
       user.email &&
       report.reporterEmail &&
@@ -137,14 +160,18 @@ export function AppProvider({ children }) {
     ) {
       return true;
     }
-    // 4. Name match as fallback if present
+
+    // 4. Exact name match ONLY IF it's not a generic default placeholder name
+    const genericNames = ['community member', 'user', 'animal advocate', 'alaga user'];
     if (
       user.name &&
       report.reporterName &&
+      !genericNames.includes(user.name.trim().toLowerCase()) &&
       user.name.trim().toLowerCase() === report.reporterName.trim().toLowerCase()
     ) {
       return true;
     }
+
     return false;
   };
 
@@ -159,18 +186,17 @@ export function AppProvider({ children }) {
       }).catch((err) => {
         console.warn('[AppContext] notifyPhoneSystem error:', err);
       });
-      return;
+    } else {
+      // 2. On web (where native phone system notifications are unavailable), show the in-app banner component
+      setInAppBanner({
+        id: String(Date.now()),
+        title,
+        message,
+        report,
+        type,
+        onPress,
+      });
     }
-
-    // 2. On web (where native phone system notifications are unavailable), show the in-app banner component
-    setInAppBanner({
-      id: String(Date.now()),
-      title,
-      message,
-      report,
-      type,
-      onPress,
-    });
   };
 
   const hideInAppNotification = () => {
@@ -179,6 +205,183 @@ export function AppProvider({ children }) {
 
   const getOpenAlertsCount = () =>
     rescueReports.filter((r) => r.status === 'Open').length;
+
+  const pushNotification = (notifData) => {
+    const notifId = notifData.id || `n${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+    const newNotif = {
+      id: notifId,
+      createdAt: notifData.createdAt || new Date().toISOString(),
+      read: false,
+      userId: notifData.userId || currentUser?.id || 'all',
+      title: notifData.title || 'Notification',
+      body: notifData.body || notifData.message || '',
+      message: notifData.body || notifData.message || '',
+      type: notifData.type || 'rescue',
+      icon: notifData.icon || (notifData.type === 'rescue' ? 'shield-outline' : notifData.type === 'chat' ? 'chatbubble' : 'notifications'),
+      iconBg: notifData.iconBg || (notifData.type === 'rescue' ? '#FDF0ED' : notifData.type === 'chat' ? '#E0F2FA' : '#FEF3E2'),
+      iconColor: notifData.iconColor || (notifData.type === 'rescue' ? '#C23E3E' : notifData.type === 'chat' ? '#206B82' : '#F5A623'),
+      timeAgo: 'Just now',
+      section: 'TODAY',
+      ...notifData,
+    };
+    setNotifications((prev) => {
+      if (
+        prev.some(
+          (n) =>
+            n.id === newNotif.id ||
+            (newNotif.reportId && n.reportId === newNotif.reportId && n.userId === newNotif.userId)
+        )
+      ) {
+        return prev;
+      }
+      return [newNotif, ...prev];
+    });
+  };
+
+  const triggerRescueAlertNotification = async (report) => {
+    if (!report) return;
+
+    const activeUser = currentUserRef.current;
+    if (!activeUser) return;
+    if (isOwnReport(report, activeUser)) {
+      console.log('[AppContext] Suppressing notification: user is the author of this report');
+      return;
+    }
+
+    let distance = null;
+    let distStr = '';
+    const rLat = report.location?.latitude;
+    const rLng = report.location?.longitude;
+
+    let uLat = activeUser?.latitude || activeUser?.locationCoordinates?.latitude;
+    let uLng = activeUser?.longitude || activeUser?.locationCoordinates?.longitude;
+
+    if (rLat && rLng) {
+      if (!uLat || !uLng) {
+        try {
+          const { status } = await Location.getForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            uLat = pos.coords.latitude;
+            uLng = pos.coords.longitude;
+          }
+        } catch (e) {}
+      }
+
+      if (uLat && uLng) {
+        distance = getDistanceInKm(uLat, uLng, rLat, rLng);
+        if (distance !== null) {
+          distStr = distance < 1 ? ` (${Math.round(distance * 1000)}m away)` : ` (${distance.toFixed(1)} km away)`;
+        }
+      }
+    }
+
+    const locationText = report.location?.address || 'Near your location';
+    const animalLabel = report.animalType || 'Animal';
+    const titleText = `Rescue Alert: ${animalLabel} Reported${distStr}`;
+    const descText = `${report.title || report.condition || 'Animal in need'} reported at ${locationText}. Tap to review details.`;
+
+    // 1. Post to native smartphone notification shade (mobile)
+    if (Platform.OS !== 'web') {
+      notifyNearbyRescueAlert({ report, distanceKm: distance });
+    } else {
+      // 2. On web (where native phone notifications are unavailable), drop down the in-app banner component
+      setInAppBanner({
+        id: `banner_${report.id}_${Date.now()}`,
+        title: titleText,
+        message: descText,
+        report,
+        type: 'rescue',
+        onPress: () => {
+          if (activeUser?.role === 'advocate') {
+            navigate('RescueAlertDetail', { reportId: report.id });
+          } else {
+            navigate('ReportDetail', { reportId: report.id });
+          }
+        },
+      });
+    }
+
+    // 3. Add to notifications feed for this user (increments bell badge count)
+    pushNotification({
+      id: `rescue_notif_${report.id}`,
+      userId: activeUser.id,
+      title: titleText,
+      message: descText,
+      body: descText,
+      type: 'rescue',
+      reportId: report.id,
+      icon: 'shield-outline',
+      iconBg: '#FDF0ED',
+      iconColor: '#C23E3E',
+      distanceKm: distance,
+      createdAt: report.createdAt || new Date().toISOString(),
+    });
+  };
+
+  const syncRescueAlertNotifications = async (user, reports) => {
+    if (!user || !user.id || !Array.isArray(reports) || reports.length === 0) return;
+    const uId = user.id || user.uid;
+
+    const storageKey = `@alaga_notified_reports_${uId}`;
+    try {
+      const stored = await AsyncStorage.getItem(storageKey);
+      if (stored) {
+        const arr = JSON.parse(stored);
+        if (Array.isArray(arr)) {
+          arr.forEach((id) => notifiedReportIdsRef.current.add(id));
+        }
+      }
+    } catch (e) {}
+
+    let hasNewToPersist = false;
+
+    for (const rep of reports) {
+      if (!rep || rep.status !== 'Open') continue;
+      // Strictly guard: NEVER notify the author of the report
+      if (isOwnReport(rep, user)) continue;
+
+      // Only notify for reports created in the last 48 hours
+      const repTime = rep.createdAt ? new Date(rep.createdAt).getTime() : 0;
+      const hoursAgo = (Date.now() - repTime) / (1000 * 60 * 60);
+      if (hoursAgo > 48) continue;
+
+      const locationText = rep.location?.address || 'Near your location';
+      const animalLabel = rep.animalType || 'Animal';
+      const titleText = `Rescue Alert: ${animalLabel} Reported`;
+      const descText = `${rep.title || rep.condition || 'Animal in need'} reported at ${locationText}. Tap to review details.`;
+      const notifId = `rescue_notif_${rep.id}`;
+
+      // 1. Ensure the in-app notification feed card exists
+      pushNotification({
+        id: notifId,
+        userId: uId,
+        title: titleText,
+        message: descText,
+        body: descText,
+        type: 'rescue',
+        reportId: rep.id,
+        icon: 'shield-outline',
+        iconBg: '#FDF0ED',
+        iconColor: '#C23E3E',
+        createdAt: rep.createdAt || new Date().toISOString(),
+      });
+
+      // 2. If this user has not yet received a system/popup alert for this report on this device:
+      if (!notifiedReportIdsRef.current.has(rep.id)) {
+        notifiedReportIdsRef.current.add(rep.id);
+        hasNewToPersist = true;
+
+        // Trigger phone system notification (pull-down shade) + animated in-app toast banner
+        triggerRescueAlertNotification(rep);
+      }
+    }
+
+    if (hasNewToPersist) {
+      const arr = Array.from(notifiedReportIdsRef.current);
+      AsyncStorage.setItem(storageKey, JSON.stringify(arr)).catch(() => {});
+    }
+  };
 
   // ── Global Themed Alert Modal State ─────────────────────────────────────────
   const [globalAlert, setGlobalAlert] = useState({
@@ -319,41 +522,39 @@ export function AppProvider({ children }) {
     }
   }, [notifications]);
 
+  // ── Load & Persist Conversations ───────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem('@alaga_conversations_v2');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            setConversations(parsed);
+          }
+        }
+      } catch (e) {}
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (Array.isArray(conversations) && conversations.length > 0) {
+      AsyncStorage.setItem('@alaga_conversations_v2', JSON.stringify(conversations)).catch(() => {});
+    }
+  }, [conversations]);
+
   // ── Firebase Real-Time Synchronization ─────────────────────────────────────
   useEffect(() => {
     if (!isMockFirebase()) {
       // Public feeds (Rescue alerts and Adoptable animals)
       const unsubRescues = subscribeToRescueReports((liveReports) => {
         const reportsList = Array.isArray(liveReports) ? liveReports : [];
-
-        // 1. Initial snapshot on app startup: hydrate database feed without firing alert popups
-        if (isInitialRescuesLoad.current) {
-          isInitialRescuesLoad.current = false;
-          setRescueReports(reportsList);
-          return;
-        }
+        setRescueReports(reportsList);
 
         const activeUser = currentUserRef.current;
-        // 2. Do not trigger push notifications if user is not authenticated (e.g. on onboarding/splash/login)
-        if (!activeUser) {
-          setRescueReports(reportsList);
-          return;
+        if (activeUser) {
+          syncRescueAlertNotifications(activeUser, reportsList);
         }
-
-        // 3. Subsequent real-time arrivals: notify advocates and other users (never the reporter)
-        setRescueReports((prev) => {
-          const existingIds = new Set(prev.map((r) => r.id));
-          reportsList.forEach((rep) => {
-            if (
-              !existingIds.has(rep.id) &&
-              rep.status === 'Open' &&
-              !isOwnReport(rep, activeUser)
-            ) {
-              triggerRescueAlertNotification(rep);
-            }
-          });
-          return reportsList;
-        });
       });
 
       const unsubAnimals = subscribeToAnimals((liveAnimals) => {
@@ -367,17 +568,73 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  // User-specific applications listener (runs only when authenticated)
+  // Sync rescue alert & message notifications whenever the logged-in user changes
   useEffect(() => {
-    if (!isMockFirebase() && currentUser) {
+    if (currentUser?.id) {
+      notifiedReportIdsRef.current.clear();
+      notifiedMessageIdsRef.current.clear();
+
+      const storageKey = `@alaga_notified_reports_${currentUser.id}`;
+      AsyncStorage.getItem(storageKey)
+        .then((stored) => {
+          if (stored) {
+            try {
+              const arr = JSON.parse(stored);
+              if (Array.isArray(arr)) {
+                arr.forEach((id) => notifiedReportIdsRef.current.add(id));
+              }
+            } catch (e) {}
+          }
+          if (Array.isArray(rescueReports) && rescueReports.length > 0) {
+            syncRescueAlertNotifications(currentUser, rescueReports);
+          }
+        })
+        .catch(() => {
+          if (Array.isArray(rescueReports) && rescueReports.length > 0) {
+            syncRescueAlertNotifications(currentUser, rescueReports);
+          }
+        });
+
+      const msgKey = `@alaga_notified_messages_${currentUser.id}`;
+      AsyncStorage.getItem(msgKey)
+        .then((stored) => {
+          if (stored) {
+            try {
+              const arr = JSON.parse(stored);
+              if (Array.isArray(arr)) {
+                arr.forEach((id) => notifiedMessageIdsRef.current.add(id));
+              }
+            } catch (e) {}
+          }
+          if (Array.isArray(conversations) && conversations.length > 0) {
+            handleLiveConversations(conversations);
+          }
+        })
+        .catch(() => {
+          if (Array.isArray(conversations) && conversations.length > 0) {
+            handleLiveConversations(conversations);
+          }
+        });
+    }
+  }, [currentUser?.id]);
+
+  // User-specific applications & conversations listener (runs only when authenticated)
+  useEffect(() => {
+    if (!isMockFirebase() && currentUser?.id) {
       const unsubApps = subscribeToApplications(currentUser, (liveApps) => {
         setRequests(liveApps || []);
       });
-      return () => unsubApps();
+      const unsubConvos = subscribeToConversations(currentUser, (liveConvos) => {
+        handleLiveConversations(liveConvos);
+      });
+      return () => {
+        unsubApps?.();
+        unsubConvos?.();
+      };
     } else {
       setRequests([]);
     }
-  }, [currentUser]);
+  }, [currentUser?.id]);
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   const login = async (email, password) => {
@@ -421,6 +678,10 @@ export function AppProvider({ children }) {
   const logout = () => {
     logoutFromFirebase();
     setCurrentUser(null);
+    mySubmittedReportIds.current.clear();
+    notifiedReportIdsRef.current.clear();
+    notifiedMessageIdsRef.current.clear();
+    activeConversationIdRef.current = null;
   };
 
   // ── Update current user profile ───────────────────────────────────────────
@@ -434,94 +695,13 @@ export function AppProvider({ children }) {
     }
   };
 
-  // ── Emergency Rescue Alert Broadcaster ──────────────────────────────────
-  const triggerRescueAlertNotification = async (report) => {
-    if (!report) return;
-
-    const activeUser = currentUserRef.current;
-    // Strictly guard: never trigger notifications if user is unauthenticated (e.g. on splash or onboarding)
-    if (!activeUser) return;
-    // Strictly guard: NEVER notify the user who posted the report
-    if (isOwnReport(report, activeUser)) {
-      console.log('[AppContext] Suppressing notification: user is the author of this report');
-      return;
-    }
-
-    let distance = null;
-    let distStr = '';
-    const rLat = report.location?.latitude;
-    const rLng = report.location?.longitude;
-
-    let uLat = activeUser?.latitude || activeUser?.locationCoordinates?.latitude;
-    let uLng = activeUser?.longitude || activeUser?.locationCoordinates?.longitude;
-
-    if (rLat && rLng) {
-      if (!uLat || !uLng) {
-        try {
-          const { status } = await Location.getForegroundPermissionsAsync();
-          if (status === 'granted') {
-            const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-            uLat = pos.coords.latitude;
-            uLng = pos.coords.longitude;
-          }
-        } catch (e) {
-          // ignore
-        }
-      }
-
-      if (uLat && uLng) {
-        distance = getDistanceInKm(uLat, uLng, rLat, rLng);
-        if (distance !== null) {
-          distStr = distance < 1 ? ` (${Math.round(distance * 1000)}m away)` : ` (${distance.toFixed(1)} km away)`;
-        }
-      }
-    }
-
-    const locationText = report.location?.address || 'Near your location';
-    const animalLabel = report.animalType || 'Animal';
-    const titleText = `Rescue Alert: ${animalLabel} Reported${distStr}`;
-    const descText = `${report.title || report.condition || 'Animal in need'} reported at ${locationText}. Tap to review details.`;
-
-    // 1. Trigger notification: phone OS system notification on mobile, in-app banner on web
-    if (Platform.OS !== 'web') {
-      notifyNearbyRescueAlert({ report, distanceKm: distance });
-    } else {
-      showInAppNotification({
-        title: titleText,
-        message: descText,
-        report,
-        type: 'rescue',
-        onPress: () => {
-          if (activeUser?.role === 'advocate') {
-            navigate('RescueAlertDetail', { reportId: report.id });
-          } else {
-            navigate('ReportDetail', { reportId: report.id });
-          }
-        },
-      });
-    }
-
-    // 2. Add to notifications feed (increments bell badge count)
-    pushNotification({
-      userId: activeUser.id,
-      title: titleText,
-      message: descText,
-      body: descText,
-      type: 'rescue',
-      reportId: report.id,
-      icon: 'shield-alert-outline',
-      iconBg: '#FDF0ED',
-      iconColor: '#C23E3E',
-      distanceKm: distance,
-    });
-  };
-
   // ── Rescue Reports ────────────────────────────────────────────────────────
   const addRescueReport = (reportData) => {
     const reportId = reportData?.id || `r${Date.now()}`;
+    const authorId = currentUser?.id || currentUser?.uid || 'u_anon';
     const newReport = {
       id: reportId,
-      reporterId: currentUser?.id || currentUser?.uid || 'u_anon',
+      reporterId: authorId,
       reporterName: currentUser?.name || 'Community Member',
       reporterEmail: currentUser?.email || '',
       status: 'Open',
@@ -530,10 +710,10 @@ export function AppProvider({ children }) {
       comments: [],
       ...reportData,
     };
-    // Mark as locally submitted so this device never alerts itself
-    mySubmittedReportIds.current.add(reportId);
+    // Mark as locally submitted by this specific author
+    mySubmittedReportIds.current.set(reportId, authorId);
     if (newReport.id) {
-      mySubmittedReportIds.current.add(newReport.id);
+      mySubmittedReportIds.current.set(newReport.id, authorId);
     }
     setRescueReports((prev) => [newReport, ...prev]);
     createRescueReportFirebase(newReport);
@@ -563,6 +743,14 @@ export function AppProvider({ children }) {
       )
     );
     markReportRescuedFirebase(reportId);
+  };
+
+  const updateRescueReportUrgency = (reportId, urgency) => {
+    if (!reportId || !urgency) return;
+    setRescueReports((prev) =>
+      prev.map((r) => (r.id === reportId ? { ...r, urgency } : r))
+    );
+    updateRescueReportUrgencyFirebase(reportId, urgency);
   };
 
   const addComment = (reportId, text, parentCommentId = null) => {
@@ -614,34 +802,52 @@ export function AppProvider({ children }) {
   };
 
   const updateAnimal = (animalId, updates) => {
+    let fullUpdated = null;
     setAnimals((prev) =>
-      prev.map((a) => (a.id === animalId ? { ...a, ...updates } : a))
+      prev.map((a) => {
+        if (a.id === animalId) {
+          fullUpdated = { ...a, ...updates };
+          return fullUpdated;
+        }
+        return a;
+      })
     );
-    updateAnimalFirebase(animalId, updates);
+    const existing = animals.find((a) => a.id === animalId);
+    updateAnimalFirebase(animalId, updates, fullUpdated || (existing ? { ...existing, ...updates } : null));
   };
 
   // Return a fostered animal back to available listings
   const returnAnimalToListings = (animalId) => {
+    const statusUpdate = { status: 'Available', fosterId: null, fosterName: null };
+    let fullUpdated = null;
     setAnimals((prev) =>
-      prev.map((a) =>
-        a.id === animalId
-          ? { ...a, status: 'Available', fosterId: null, fosterName: null }
-          : a
-      )
+      prev.map((a) => {
+        if (a.id === animalId) {
+          fullUpdated = { ...a, ...statusUpdate };
+          return fullUpdated;
+        }
+        return a;
+      })
     );
-    updateAnimalFirebase(animalId, { status: 'Available', fosterId: null, fosterName: null });
+    const existing = animals.find((a) => a.id === animalId);
+    updateAnimalFirebase(animalId, statusUpdate, fullUpdated || (existing ? { ...existing, ...statusUpdate } : null));
   };
 
   // Permanently mark an animal as adopted
   const markAnimalAdopted = (animalId) => {
+    const statusUpdate = { status: 'Adopted', fosterId: null, fosterName: null };
+    let fullUpdated = null;
     setAnimals((prev) =>
-      prev.map((a) =>
-        a.id === animalId
-          ? { ...a, status: 'Adopted', fosterId: null, fosterName: null }
-          : a
-      )
+      prev.map((a) => {
+        if (a.id === animalId) {
+          fullUpdated = { ...a, ...statusUpdate };
+          return fullUpdated;
+        }
+        return a;
+      })
     );
-    updateAnimalFirebase(animalId, { status: 'Adopted', fosterId: null, fosterName: null });
+    const existing = animals.find((a) => a.id === animalId);
+    updateAnimalFirebase(animalId, statusUpdate, fullUpdated || (existing ? { ...existing, ...statusUpdate } : null));
   };
 
   // ── Adoption / Foster Requests ────────────────────────────────────────────
@@ -693,6 +899,7 @@ export function AppProvider({ children }) {
     setRequests((prev) =>
       prev.map((r) => (r.id === requestId ? { ...r, status } : r))
     );
+    updateApplicationFirebase(requestId, { status });
 
     if (req) {
       const animal = animals.find((a) => a.id === req.animalId);
@@ -725,32 +932,135 @@ export function AppProvider({ children }) {
     // When approved: update the animal's status accordingly
     if (status === 'Approved') {
       if (req) {
-        setAnimals((prev) =>
-          prev.map((a) => {
-            if (a.id !== req.animalId) return a;
-            if (req.type === 'Adoption') {
-              return { ...a, status: 'Adopted', fosterId: null, fosterName: null };
-            }
-            if (req.type === 'Foster') {
-              return { ...a, status: 'Being Fostered', fosterId: req.requesterId, fosterName: req.requesterName };
-            }
-            return a;
-          })
-        );
+        const animalStatusUpdates =
+          req.type === 'Adoption'
+            ? { status: 'Adopted', fosterId: null, fosterName: null }
+            : req.type === 'Foster'
+            ? { status: 'Being Fostered', fosterId: req.requesterId, fosterName: req.requesterName }
+            : null;
+
+        if (animalStatusUpdates) {
+          let updatedAnimal = null;
+          setAnimals((prev) =>
+            prev.map((a) => {
+              if (a.id !== req.animalId) return a;
+              updatedAnimal = { ...a, ...animalStatusUpdates };
+              return updatedAnimal;
+            })
+          );
+          const existing = animals.find((a) => a.id === req.animalId);
+          updateAnimalFirebase(req.animalId, animalStatusUpdates, updatedAnimal || existing);
+        }
       }
     }
   };
 
   // ── Messaging ─────────────────────────────────────────────────────────────
+  const handleLiveConversations = (liveConvos) => {
+    if (!Array.isArray(liveConvos)) return;
+    setConversations(liveConvos);
+
+    const activeUser = currentUserRef.current;
+    if (!activeUser || !activeUser.id) return;
+    const uId = activeUser.id;
+
+    liveConvos.forEach((convo) => {
+      if (!convo || !Array.isArray(convo.participants) || !convo.participants.includes(uId)) {
+        return;
+      }
+
+      // Check unread count for active user
+      const unreadForMe =
+        convo.unreadCounts && typeof convo.unreadCounts[uId] === 'number'
+          ? convo.unreadCounts[uId]
+          : (convo.lastSenderId && convo.lastSenderId !== uId && convo.unread ? (convo.unreadCount || 1) : 0);
+
+      // If user is currently looking at this exact chat screen, auto-mark as read
+      if (activeConversationIdRef.current === convo.id) {
+        if (unreadForMe > 0) {
+          markConversationRead(convo.id);
+        }
+        return;
+      }
+
+      // Only notify if there are unread messages and the last sender was someone else
+      if (unreadForMe > 0 && convo.lastSenderId && convo.lastSenderId !== uId) {
+        const lastMsgObj = Array.isArray(convo.messages) && convo.messages.length > 0
+          ? convo.messages[convo.messages.length - 1]
+          : null;
+        const msgKey = lastMsgObj?.id || `${convo.id}_${convo.lastMessageTime}`;
+
+        if (!notifiedMessageIdsRef.current.has(msgKey)) {
+          notifiedMessageIdsRef.current.add(msgKey);
+
+          const storageKey = `@alaga_notified_messages_${uId}`;
+          AsyncStorage.getItem(storageKey).then((stored) => {
+            const arr = stored ? JSON.parse(stored) : [];
+            if (!arr.includes(msgKey)) {
+              arr.push(msgKey);
+              AsyncStorage.setItem(storageKey, JSON.stringify(arr.slice(-100))).catch(() => {});
+            }
+          }).catch(() => {});
+
+          const otherId = convo.participants.find((p) => p !== uId);
+          const senderName =
+            convo.participantNames?.[convo.lastSenderId] ||
+            convo.participantNames?.[otherId] ||
+            'ALAGA Member';
+          const msgText = convo.lastMessage || 'Sent you a message';
+
+          // 1. Phone system heads-up notification (pull-down shade on mobile)
+          if (Platform.OS !== 'web') {
+            notifyNewMessage({
+              senderName,
+              messageText: msgText,
+              conversationId: convo.id,
+            });
+          } else {
+            // In-app dropdown toast banner on web
+            showInAppNotification({
+              title: `💬 Message from ${senderName}`,
+              message: msgText,
+              type: 'message',
+              onPress: () => {
+                navigate('Chat', { conversationId: convo.id, userName: senderName });
+              },
+            });
+          }
+
+          // 2. Add to bell notification screen stream
+          pushNotification({
+            id: `msg_notif_${msgKey}`,
+            userId: uId,
+            title: `💬 Message from ${senderName}`,
+            message: msgText,
+            body: msgText,
+            type: 'chat',
+            icon: 'chatbubble-outline',
+            iconBg: '#EBF4F8',
+            iconColor: '#2A728F',
+            conversationId: convo.id,
+            senderName,
+            createdAt: convo.lastMessageTime || new Date().toISOString(),
+          });
+        }
+      }
+    });
+  };
+
   const sendMessage = (conversationId, messageData) => {
     if (!conversationId || !messageData) return;
+    const activeUser = currentUserRef.current;
+    if (!activeUser || !activeUser.id) return;
+    const uId = activeUser.id;
+
     let newMsg;
     if (typeof messageData === 'string') {
       const trimmed = messageData.trim();
       if (!trimmed) return;
       newMsg = {
         id: `m${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        senderId: currentUser.id,
+        senderId: uId,
         text: trimmed,
         type: 'text',
         time: new Date().toISOString(),
@@ -758,7 +1068,7 @@ export function AppProvider({ children }) {
     } else {
       newMsg = {
         id: `m${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        senderId: currentUser.id,
+        senderId: uId,
         text: messageData.text || '',
         type: messageData.type || 'text',
         mediaUri: messageData.mediaUri || null,
@@ -777,54 +1087,38 @@ export function AppProvider({ children }) {
         ? '📍 Location'
         : newMsg.text;
 
-    const isFromOther = newMsg.senderId !== currentUser?.id;
+    let updatedConvo = null;
 
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === conversationId
-          ? {
-              ...c,
-              messages: [...c.messages, newMsg],
-              lastMessage: lastSummary,
-              lastMessageTime: newMsg.time,
-              lastSenderId: newMsg.senderId,
-              unreadCount: isFromOther ? (c.unreadCount || 0) + 1 : (c.unreadCount || 0),
-              unread: isFromOther || c.unread,
-            }
-          : c
-      )
-    );
+    setConversations((prev) => {
+      const existing = prev.find((c) => c.id === conversationId);
+      if (!existing) return prev;
 
-    if (isFromOther) {
-      const convo = conversations.find((c) => c.id === conversationId);
-      const senderName = convo?.participantNames?.[newMsg.senderId] || 'ALAGA Member';
-      if (Platform.OS !== 'web') {
-        notifyNewMessage({
-          senderName,
-          messageText: lastSummary,
-          conversationId,
-        });
-      } else {
-        showInAppNotification({
-          title: `Message from ${senderName}`,
-          message: lastSummary,
-          type: 'message',
-          onPress: () => {
-            navigate('Chat', { conversationId, userName: senderName });
-          },
-        });
-      }
-      pushNotification({
-        userId: currentUser?.id,
-        title: `Message from ${senderName}`,
-        message: lastSummary,
-        body: lastSummary,
-        type: 'chat',
-        icon: 'chatbubble-outline',
-        iconBg: '#EBF4F8',
-        iconColor: '#2A728F',
-        conversationId,
+      const nextUnreadCounts = { ...(existing.unreadCounts || {}) };
+      // For all other participants, increment their unread count
+      (existing.participants || []).forEach((pId) => {
+        if (pId !== uId) {
+          nextUnreadCounts[pId] = (nextUnreadCounts[pId] || 0) + 1;
+        } else {
+          nextUnreadCounts[pId] = 0;
+        }
       });
+
+      updatedConvo = {
+        ...existing,
+        messages: [...(existing.messages || []), newMsg],
+        lastMessage: lastSummary,
+        lastMessageTime: newMsg.time,
+        lastSenderId: newMsg.senderId,
+        unreadCounts: nextUnreadCounts,
+        unreadCount: (nextUnreadCounts[uId] || 0),
+        unread: false, // sender has already read their own message
+      };
+
+      return prev.map((c) => (c.id === conversationId ? updatedConvo : c));
+    });
+
+    if (updatedConvo) {
+      saveConversationFirebase(updatedConvo);
     }
   };
 
@@ -832,6 +1126,7 @@ export function AppProvider({ children }) {
     if (!otherUserId || !currentUser?.id) return '';
     const existing = conversations.find(
       (c) =>
+        c.participants &&
         c.participants.includes(currentUser.id) &&
         c.participants.includes(otherUserId)
     );
@@ -842,31 +1137,45 @@ export function AppProvider({ children }) {
       id: `conv${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       participants: [currentUser.id, otherUserId],
       participantNames: {
-        [currentUser.id]: currentUser.name,
+        [currentUser.id]: currentUser.name || 'Community Member',
         [otherUserId]: otherUserName || 'Community Member',
       },
       lastMessage: '',
       lastMessageTime: new Date().toISOString(),
+      lastSenderId: '',
       messages: [],
+      unreadCounts: {
+        [currentUser.id]: 0,
+        [otherUserId]: 0,
+      },
+      unread: false,
     };
     setConversations((prev) => [newConv, ...prev]);
+    saveConversationFirebase(newConv);
     return newConv.id;
   };
 
   const clearConversation = (conversationId) => {
     if (!conversationId) return;
+    let updatedConvo = null;
     setConversations((prev) =>
-      prev.map((c) =>
-        c.id === conversationId
-          ? { ...c, messages: [], lastMessage: '', lastMessageTime: new Date().toISOString() }
-          : c
-      )
+      prev.map((c) => {
+        if (c.id === conversationId) {
+          updatedConvo = { ...c, messages: [], lastMessage: '', lastMessageTime: new Date().toISOString() };
+          return updatedConvo;
+        }
+        return c;
+      })
     );
+    if (updatedConvo) {
+      saveConversationFirebase(updatedConvo);
+    }
   };
 
   const deleteConversation = (conversationId) => {
     if (!conversationId) return;
     setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+    deleteConversationFirebase(conversationId);
   };
 
   // ── Donations ─────────────────────────────────────────────────────────────
@@ -885,18 +1194,48 @@ export function AppProvider({ children }) {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const getUserConversations = () =>
-    conversations.filter((c) => c.participants.includes(currentUser?.id));
+    conversations.filter((c) => Array.isArray(c.participants) && c.participants.includes(currentUser?.id));
 
-  const getUnreadMessagesCount = () =>
-    getUserConversations().reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+  const getUnreadMessagesCount = () => {
+    const activeUser = currentUserRef.current || currentUser;
+    if (!activeUser?.id) return 0;
+    const uId = activeUser.id;
+
+    return getUserConversations().reduce((sum, c) => {
+      if (c.unreadCounts && typeof c.unreadCounts[uId] === 'number') {
+        return sum + c.unreadCounts[uId];
+      }
+      // Fallback for legacy data
+      if (c.lastSenderId && c.lastSenderId !== uId && c.unread) {
+        return sum + (c.unreadCount || 1);
+      }
+      return sum;
+    }, 0);
+  };
 
   const markConversationRead = (conversationId) => {
     if (!conversationId) return;
+    const activeUser = currentUserRef.current || currentUser;
+    if (!activeUser?.id) return;
+    const uId = activeUser.id;
+
     setConversations((prev) =>
-      prev.map((c) =>
-        c.id === conversationId ? { ...c, unreadCount: 0, unread: false } : c
-      )
+      prev.map((c) => {
+        if (c.id === conversationId) {
+          const nextCounts = { ...(c.unreadCounts || {}) };
+          nextCounts[uId] = 0;
+          return {
+            ...c,
+            unreadCounts: nextCounts,
+            unreadCount: 0,
+            unread: false,
+          };
+        }
+        return c;
+      })
     );
+
+    markConversationReadFirebase(conversationId, uId);
   };
 
   const getAllKnownUsers = () => {
@@ -1018,25 +1357,6 @@ export function AppProvider({ children }) {
     );
   };
 
-  const pushNotification = (notifData) => {
-    const newNotif = {
-      id: `n${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-      createdAt: new Date().toISOString(),
-      read: false,
-      userId: notifData.userId || currentUser?.id || 'all',
-      title: notifData.title || 'Notification',
-      body: notifData.body || notifData.message || '',
-      message: notifData.body || notifData.message || '',
-      type: notifData.type || 'rescue',
-      icon: notifData.icon || (notifData.type === 'rescue' ? 'alert-circle' : notifData.type === 'chat' ? 'chatbubble' : 'notifications'),
-      iconBg: notifData.iconBg || (notifData.type === 'rescue' ? '#FDE8E7' : notifData.type === 'chat' ? '#E0F2FA' : '#FEF3E2'),
-      iconColor: notifData.iconColor || (notifData.type === 'rescue' ? '#D93025' : notifData.type === 'chat' ? '#206B82' : '#F5A623'),
-      timeAgo: 'Just now',
-      section: 'TODAY',
-      ...notifData,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  };
 
   // ── Rescue Case Linking ───────────────────────────────────────────────────
   const getAdvocateRescuedCases = () =>
@@ -1067,6 +1387,7 @@ export function AppProvider({ children }) {
         respondToReport,
         markRescued,
         addComment,
+        updateRescueReportUrgency,
         // animals
         addAnimal,
         updateAnimal,
@@ -1080,6 +1401,7 @@ export function AppProvider({ children }) {
         startConversation,
         clearConversation,
         deleteConversation,
+        setActiveConversationId,
         // donations
         submitDonation,
         // helpers

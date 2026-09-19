@@ -27,10 +27,40 @@ import PhotoPickerModal from '../../components/PhotoPickerModal';
 const ANIMAL_TYPES = ['Dog', 'Cat', 'Bird', 'Other'];
 
 const CONDITIONS = [
-  { id: 'injured', label: 'Critical / Injured', icon: 'medical', color: '#D94F4F', urgency: 'High' },
-  { id: 'malnourished', label: 'Sick / Weak', icon: 'heart-dislike', color: '#D97706', urgency: 'High' },
-  { id: 'abandoned', label: 'Abandoned Litter', icon: 'cube', color: '#E69C24', urgency: 'High' },
-  { id: 'stray', label: 'Stray / Lost', icon: 'paw', color: '#2E7A99', urgency: 'Medium' },
+  { id: 'injured', label: 'Critical / Injured', icon: 'medical', color: '#D94F4F', defaultUrgency: 'High' },
+  { id: 'malnourished', label: 'Sick / Weak', icon: 'heart-dislike', color: '#D97706', defaultUrgency: 'Medium' },
+  { id: 'abandoned', label: 'Abandoned Litter', icon: 'cube', color: '#E69C24', defaultUrgency: 'Medium' },
+  { id: 'stray', label: 'Stray / Lost', icon: 'paw', color: '#2E7A99', defaultUrgency: 'Low' },
+];
+
+const URGENCY_LEVELS = [
+  {
+    level: 'Low',
+    label: 'Low',
+    desc: 'Stable / healthy stray, roaming, not in immediate physical danger',
+    color: '#27AE60',
+    bg: '#E8F5EE',
+    border: '#A3E5BE',
+    icon: 'shield-outline',
+  },
+  {
+    level: 'Medium',
+    label: 'Medium',
+    desc: 'Sick, malnourished, or nursing litter needing timely rescue / foster',
+    color: '#E69C24',
+    bg: '#FEF6E8',
+    border: '#F9D898',
+    icon: 'time-outline',
+  },
+  {
+    level: 'High',
+    label: 'High',
+    desc: 'Severe bleeding, broken limb, hit-by-car, or life-threatening trauma',
+    color: '#D94F4F',
+    bg: '#FDF0ED',
+    border: '#F5BEB5',
+    icon: 'alert-circle-outline',
+  },
 ];
 
 export default function ReportRescueScreen({ navigation }) {
@@ -45,7 +75,8 @@ export default function ReportRescueScreen({ navigation }) {
 
   // Form State
   const [selectedType, setSelectedType] = useState('Dog');
-  const [selectedCondition, setSelectedCondition] = useState('injured');
+  const [selectedCondition, setSelectedCondition] = useState('stray');
+  const [selectedUrgency, setSelectedUrgency] = useState('Low');
   const [photos, setPhotos] = useState([]); // Array of { uri, base64 }
   const [activePreviewIndex, setActivePreviewIndex] = useState(null); // Full-screen image viewer index
   const [landmark, setLandmark] = useState('');
@@ -209,7 +240,7 @@ export default function ReportRescueScreen({ navigation }) {
         title,
         animalType: selectedType,
         condition: condObj.label,
-        urgency: condObj.urgency,
+        urgency: selectedUrgency,
         description: description.trim() || `${selectedType} spotted at ${finalAddress}`,
         photo: primaryPhoto,
         photos: uploadedUrls.length > 0 ? uploadedUrls : [primaryPhoto],
@@ -359,7 +390,7 @@ export default function ReportRescueScreen({ navigation }) {
             })}
           </View>
 
-          {/* ── 3. Condition & Urgency (Compact 2x2 Grid) ──────── */}
+          {/* ── 3. Observed Condition (Compact 2x2 Grid) ──────── */}
           <Text style={styles.sectionHeading}>OBSERVED CONDITION</Text>
           <View style={styles.condGrid}>
             {CONDITIONS.map((cond) => {
@@ -368,7 +399,12 @@ export default function ReportRescueScreen({ navigation }) {
                 <TouchableOpacity
                   key={cond.id}
                   style={[styles.condChip, active && styles.condChipActive]}
-                  onPress={() => setSelectedCondition(cond.id)}
+                  onPress={() => {
+                    setSelectedCondition(cond.id);
+                    if (cond.defaultUrgency) {
+                      setSelectedUrgency(cond.defaultUrgency);
+                    }
+                  }}
                   activeOpacity={0.7}
                 >
                   <View style={[styles.condDot, { backgroundColor: cond.color }]} />
@@ -382,6 +418,50 @@ export default function ReportRescueScreen({ navigation }) {
               );
             })}
           </View>
+
+          {/* ── 3.5 Explicit Urgency Level Selector ─────────────── */}
+          <View style={styles.labelRow}>
+            <Text style={styles.sectionHeading}>URGENCY LEVEL</Text>
+            <Text style={styles.optionalText}>Tap to adjust priority</Text>
+          </View>
+          <View style={styles.urgencyRow}>
+            {URGENCY_LEVELS.map((choice) => {
+              const active = selectedUrgency === choice.level;
+              return (
+                <TouchableOpacity
+                  key={choice.level}
+                  style={[
+                    styles.urgencyBtn,
+                    { borderColor: active ? choice.color : '#E8DFD8' },
+                    active && { backgroundColor: choice.bg },
+                  ]}
+                  onPress={() => setSelectedUrgency(choice.level)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.urgencyBtnDot, { backgroundColor: choice.color }]} />
+                  <Text
+                    style={[
+                      styles.urgencyBtnText,
+                      active && { color: choice.color, fontWeight: '800' },
+                    ]}
+                  >
+                    {choice.label}
+                  </Text>
+                  {active && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={14}
+                      color={choice.color}
+                      style={{ marginLeft: 4 }}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={styles.urgencyDescription}>
+            {URGENCY_LEVELS.find((u) => u.level === selectedUrgency)?.desc}
+          </Text>
 
           {/* ── 4. Photo Evidence (Modern Multi-Photo Gallery) ── */}
           <View style={styles.labelRow}>
@@ -793,6 +873,42 @@ const styles = StyleSheet.create({
   condChipTextActive: {
     fontWeight: '800',
     color: '#1E586E',
+  },
+
+  // 3.5 Urgency Selector
+  urgencyRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 6,
+  },
+  urgencyBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E8DFD8',
+  },
+  urgencyBtnDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  urgencyBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#685038',
+  },
+  urgencyDescription: {
+    fontSize: 11,
+    color: '#8C7D6A',
+    fontStyle: 'italic',
+    marginBottom: 16,
+    paddingHorizontal: 2,
   },
 
   // 4. Photo Evidence (Modern Attachment Bar)

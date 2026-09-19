@@ -175,9 +175,14 @@ export default function MessagesScreen({ navigation }) {
           const otherName = item.participantNames?.[otherId] || 'Community Member';
           const lastMsg = item.lastMessage || 'Sent a message';
           const time = formatTime(item.lastMessageTime);
-          const isFromOther = item.lastSenderId !== currentUser?.id;
-          const isUnread = Boolean(item.unread && isFromOther);
-          const unreadCount = isFromOther ? (item.unreadCount || 0) : 0;
+          const uId = currentUser?.id;
+          const isFromOther = item.lastSenderId && item.lastSenderId !== uId;
+          const userUnreadCount =
+            item.unreadCounts && typeof item.unreadCounts[uId] === 'number'
+              ? item.unreadCounts[uId]
+              : (isFromOther && item.unread ? (item.unreadCount || 1) : 0);
+          const unreadCount = userUnreadCount;
+          const isUnread = unreadCount > 0;
 
           return (
             <TouchableOpacity
@@ -187,6 +192,7 @@ export default function MessagesScreen({ navigation }) {
                 navigation.navigate('Chat', {
                   conversationId: item.id,
                   otherName,
+                  otherId,
                 });
               }}
               activeOpacity={0.72}

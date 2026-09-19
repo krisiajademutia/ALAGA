@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, LogBox } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
@@ -13,6 +13,11 @@ import {
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { AppProvider } from './src/context/AppContext';
 import AppNavigator from './src/navigation/AppNavigator';
+
+LogBox.ignoreLogs([
+  'Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go',
+  '`expo-notifications` functionality is not fully supported in Expo Go',
+]);
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({

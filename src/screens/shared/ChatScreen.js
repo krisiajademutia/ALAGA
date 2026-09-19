@@ -33,8 +33,9 @@ const QUICK_PROMPTS = [
 ];
 
 export default function ChatScreen({ route, navigation }) {
-  const { conversationId, otherName, otherId: routeOtherId, initialDraft } = route.params || {};
-  const { conversations, currentUser, sendMessage, clearConversation, markConversationRead, showAlert } = useApp();
+  const { conversationId, otherName, userName: routeUserName, otherId: routeOtherId, initialDraft } = route.params || {};
+  const resolvedOtherName = otherName || routeUserName;
+  const { conversations, currentUser, sendMessage, clearConversation, markConversationRead, setActiveConversationId, showAlert } = useApp();
   const [text, setText] = useState(initialDraft || '');
   const [attachModalVisible, setAttachModalVisible] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
@@ -45,13 +46,28 @@ export default function ChatScreen({ route, navigation }) {
   const inputRef = useRef(null);
 
   const convo = conversations.find((c) => c.id === conversationId);
-  const otherId = routeOtherId || (convo ? (convo.participant1 === currentUser?.id ? convo.participant2 : convo.participant1) : null);
-  const name = otherName || (convo ? (convo.participant1 === currentUser?.id ? convo.participant2Name : convo.participant1Name) : 'Chat');
+  const detectedOtherId = convo?.participants?.find((p) => p !== currentUser?.id);
+  const otherId = routeOtherId || detectedOtherId || null;
+  const name =
+    resolvedOtherName ||
+    (detectedOtherId && convo?.participantNames?.[detectedOtherId]) ||
+    (convo?.participant1 === currentUser?.id ? convo?.participant2Name : convo?.participant1Name) ||
+    'Chat';
   const messages = convo ? convo.messages : [];
+
+  // Register active conversation for auto-read and heads-up notification suppression while actively in chat
+  useEffect(() => {
+    if (setActiveConversationId && conversationId) {
+      setActiveConversationId(conversationId);
+      return () => {
+        setActiveConversationId(null);
+      };
+    }
+  }, [conversationId, setActiveConversationId]);
 
   // Mark conversation read on mount / view
   useEffect(() => {
-    if (convo?.id) {
+    if (convo?.id && markConversationRead) {
       markConversationRead(convo.id);
     }
   }, [convo?.id, messages?.length]);

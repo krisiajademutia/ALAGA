@@ -32,6 +32,13 @@ export default function AnimalCard({ animal, onPress, style, horizontal = false 
             </View>
           )}
 
+          {Boolean(animal.photos && animal.photos.length > 1) && (
+            <View style={styles.gridPhotoCountBadge}>
+              <Ionicons name="images" size={9} color="#fff" style={{ marginRight: 2 }} />
+              <Text style={styles.photoCountText}>{animal.photos.length}</Text>
+            </View>
+          )}
+
           {/* Top Row: Available Badge & Heart */}
           <View style={styles.topRowOverlay}>
             <View style={styles.availableBadge}>
@@ -111,6 +118,13 @@ export default function AnimalCard({ animal, onPress, style, horizontal = false 
         ) : (
           <View style={styles.imageFallbackWrap}>
             <Ionicons name="paw" size={46} color={COLORS.primary} />
+          </View>
+        )}
+
+        {Boolean(animal.photos && animal.photos.length > 1) && (
+          <View style={styles.photoCountBadge}>
+            <Ionicons name="images" size={10} color="#fff" style={{ marginRight: 3 }} />
+            <Text style={styles.photoCountText}>{animal.photos.length}</Text>
           </View>
         )}
 
@@ -252,6 +266,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...SHADOWS.sm,
+  },
+  gridPhotoCountBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(26, 21, 16, 0.75)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    zIndex: 3,
+  },
+  photoCountBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(26, 21, 16, 0.75)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+    zIndex: 3,
+  },
+  photoCountText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fff',
   },
 
   gridContent: {

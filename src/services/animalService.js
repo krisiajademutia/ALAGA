@@ -1,7 +1,7 @@
 import {
   collection,
   doc,
-  addDoc,
+  setDoc,
   updateDoc,
   onSnapshot,
   query,
@@ -51,7 +51,7 @@ export function subscribeToAnimals(onUpdate, onError) {
 }
 
 /**
- * Add a new animal listing
+ * Add a new animal listing using deterministic ID
  */
 export async function addAnimalFirebase(animalData) {
   if (isMockFirebase() || !db) {
@@ -59,15 +59,18 @@ export async function addAnimalFirebase(animalData) {
   }
 
   try {
+    const docId = animalData?.id || `a${Date.now()}`;
     const payload = {
       ...animalData,
+      id: docId,
       status: animalData.status || 'Available',
-      createdAt: new Date().toISOString(),
+      createdAt: animalData.createdAt || new Date().toISOString(),
       timestamp: serverTimestamp(),
     };
 
-    const docRef = await addDoc(collection(db, ANIMALS_COLLECTION), payload);
-    return { success: true, id: docRef.id, animal: { id: docRef.id, ...payload } };
+    const docRef = doc(db, ANIMALS_COLLECTION, docId);
+    await setDoc(docRef, payload, { merge: true });
+    return { success: true, id: docId, animal: payload };
   } catch (error) {
     console.error('[animalService] Add animal error:', error);
     return { success: false, error: error.message };
@@ -75,14 +78,24 @@ export async function addAnimalFirebase(animalData) {
 }
 
 /**
- * Update an animal listing
+ * Update an animal listing. Uses setDoc with merge: true so if the document
+ * was created locally or before full network sync, it upserts gracefully
+ * instead of throwing "No document to update".
  */
-export async function updateAnimalFirebase(animalId, updates) {
-  if (isMockFirebase() || !db) return;
+export async function updateAnimalFirebase(animalId, updates, fullAnimalData = null) {
+  if (isMockFirebase() || !db || !animalId) return { isMock: true };
 
   try {
-    const animalRef = doc(db, ANIMALS_COLLECTION, animalId);
-    await updateDoc(animalRef, updates);
+    const docId = String(animalId);
+    const animalRef = doc(db, ANIMALS_COLLECTION, docId);
+    const dataToSave = {
+      ...(fullAnimalData || {}),
+      ...updates,
+      id: docId,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await setDoc(animalRef, dataToSave, { merge: true });
     return { success: true };
   } catch (error) {
     console.error('[animalService] Update animal error:', error);
@@ -147,17 +160,37 @@ export async function submitApplicationFirebase(appData) {
   }
 
   try {
+    const docId = appData?.id || `req${Date.now()}`;
     const payload = {
       ...appData,
-      status: 'Pending',
-      createdAt: new Date().toISOString(),
+      id: docId,
+      status: appData.status || 'Pending',
+      createdAt: appData.createdAt || new Date().toISOString(),
       timestamp: serverTimestamp(),
     };
 
-    const docRef = await addDoc(collection(db, APPLICATIONS_COLLECTION), payload);
-    return { success: true, id: docRef.id, application: { id: docRef.id, ...payload } };
+    const docRef = doc(db, APPLICATIONS_COLLECTION, docId);
+    await setDoc(docRef, payload, { merge: true });
+    return { success: true, id: docId, application: payload };
   } catch (error) {
     console.error('[animalService] Application submission error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Update application status (Approved / Rejected)
+ */
+export async function updateApplicationFirebase(appId, updates) {
+  if (isMockFirebase() || !db || !appId) return { isMock: true };
+
+  try {
+    const docId = String(appId);
+    const appRef = doc(db, APPLICATIONS_COLLECTION, docId);
+    await setDoc(appRef, { ...updates, id: docId, updatedAt: new Date().toISOString() }, { merge: true });
+    return { success: true };
+  } catch (error) {
+    console.error('[animalService] Update application error:', error);
     return { success: false, error: error.message };
   }
 }

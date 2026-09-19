@@ -112,7 +112,7 @@ export default function NotificationScreen({ navigation }) {
     let bg = iconBg || '#EBF4F8';
 
     if (type === 'rescue') {
-      name = 'shield-alert-outline';
+      name = 'shield-outline';
       color = '#C23E3E';
       bg = '#FDF0ED';
     } else if (type === 'chat') {

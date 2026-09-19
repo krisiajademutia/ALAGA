@@ -137,3 +137,20 @@ export async function addRescueCommentFirebase(reportId, commentData) {
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * Update the urgency level of a rescue report (Triage)
+ */
+export async function updateRescueReportUrgencyFirebase(reportId, urgency) {
+  if (isMockFirebase() || !db || !reportId) return { isMock: true };
+
+  try {
+    const reportRef = doc(db, RESCUES_COLLECTION, reportId);
+    await updateDoc(reportRef, { urgency });
+    return { success: true };
+  } catch (error) {
+    console.warn('[rescueService] Update urgency warning:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+

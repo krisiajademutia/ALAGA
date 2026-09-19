@@ -13,6 +13,7 @@ import {
   TextInput,
   ActivityIndicator,
   StatusBar as RNStatusBar,
+  Dimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,6 +44,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [activePreviewIndex, setActivePreviewIndex] = useState(null);
+  const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
 
   const insets = useSafeAreaInsets();
   const safeTop =
@@ -52,6 +54,10 @@ export default function AnimalDetailScreen({ route, navigation }) {
     ) + 6;
 
   if (!animal) return null;
+
+  const allPhotos = (animal.photos && animal.photos.length > 0)
+    ? animal.photos
+    : (animal.photo ? [animal.photo] : []);
 
   // Real owner check: matches ID or matches name if advocate
   const isOwner = Boolean(
@@ -202,8 +208,43 @@ export default function AnimalDetailScreen({ route, navigation }) {
       >
         {/* ── Top Hero Image & Floating Controls ────────────── */}
         <View style={styles.heroWrap}>
-          {animal.photo ? (
-            <Image source={{ uri: animal.photo }} style={styles.heroImage} resizeMode="cover" />
+          {allPhotos.length > 1 ? (
+            <View style={{ flex: 1 }}>
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={(e) => {
+                  const offset = e.nativeEvent.contentOffset.x;
+                  const idx = Math.round(offset / Dimensions.get('window').width);
+                  setCurrentPhotoIdx(idx);
+                }}
+                style={{ width: '100%', height: '100%' }}
+              >
+                {allPhotos.map((imgUri, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    activeOpacity={0.95}
+                    onPress={() => setActivePreviewIndex(idx)}
+                    style={{ width: Dimensions.get('window').width, height: 240 }}
+                  >
+                    <Image source={{ uri: imgUri }} style={styles.heroImage} resizeMode="cover" />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <View style={styles.heroPagingBadge}>
+                <Ionicons name="images" size={12} color="#fff" style={{ marginRight: 4 }} />
+                <Text style={styles.heroPagingText}>{currentPhotoIdx + 1} / {allPhotos.length}</Text>
+              </View>
+            </View>
+          ) : allPhotos.length === 1 ? (
+            <TouchableOpacity
+              activeOpacity={0.95}
+              onPress={() => setActivePreviewIndex(0)}
+              style={{ width: '100%', height: '100%' }}
+            >
+              <Image source={{ uri: allPhotos[0] }} style={styles.heroImage} resizeMode="cover" />
+            </TouchableOpacity>
           ) : (
             <View style={styles.heroPlaceholder}>
               <Ionicons name="paw" size={64} color={COLORS.primary} />
@@ -251,26 +292,28 @@ export default function AnimalDetailScreen({ route, navigation }) {
             </Text>
           </View>
 
-          {/* 3 Stats Cards */}
-          <View style={styles.statsRow}>
-            <View style={[styles.statCard, styles.statGreen]}>
-              <Text style={styles.statLabel}>Gender</Text>
-              <Text style={styles.statVal}>{animal.gender || 'Unknown'}</Text>
+          {/* Key Attributes Bar (Streamlined, unified spec strip) */}
+          <View style={styles.specsBar}>
+            <View style={styles.specCol}>
+              <Text style={styles.specLabel}>GENDER</Text>
+              <Text style={styles.specValue} numberOfLines={1}>{animal.gender || 'Unknown'}</Text>
             </View>
-            <View style={[styles.statCard, styles.statYellow]}>
-              <Text style={styles.statLabel}>Age</Text>
-              <Text style={styles.statVal}>{animal.age || 'Not specified'}</Text>
+            <View style={styles.specDivider} />
+            <View style={styles.specCol}>
+              <Text style={styles.specLabel}>AGE</Text>
+              <Text style={styles.specValue} numberOfLines={1}>{animal.age || 'Not specified'}</Text>
             </View>
-            <View style={[styles.statCard, styles.statBlue]}>
-              <Text style={styles.statLabel}>Weight</Text>
-              <Text style={styles.statVal}>{animal.weight || 'Not specified'}</Text>
+            <View style={styles.specDivider} />
+            <View style={styles.specCol}>
+              <Text style={styles.specLabel}>WEIGHT</Text>
+              <Text style={styles.specValue} numberOfLines={1}>{animal.weight || 'Not specified'}</Text>
             </View>
           </View>
 
-          {/* Advocate Card */}
-          <View style={styles.advocateCard}>
+          {/* Advocate Profile Row (Borderless, seamless integration) */}
+          <View style={styles.advocateRow}>
             <View style={styles.advocateLeft}>
-              <Avatar name={animal.advocateName} size={42} />
+              <Avatar name={animal.advocateName} size={44} />
               <View style={styles.advocateTextCol}>
                 <Text style={styles.advocateName}>{animal.advocateName}</Text>
                 <Text style={styles.advocateRole}>
@@ -280,7 +323,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
             </View>
             {isOwner ? (
               <View style={styles.ownerBadgePill}>
-                <Ionicons name="person" size={12} color={COLORS.primaryDeep} style={{ marginRight: 3 }} />
+                <Ionicons name="person" size={12} color={COLORS.primaryDeep} style={{ marginRight: 4 }} />
                 <Text style={styles.ownerBadgePillText}>You</Text>
               </View>
             ) : (
@@ -289,7 +332,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
                 onPress={handleMessageAdvocate}
                 activeOpacity={0.8}
               >
-                <Ionicons name="chatbubble" size={14} color={COLORS.brown} style={{ marginRight: 4 }} />
+                <Ionicons name="chatbubble" size={13} color="#FFFFFF" style={{ marginRight: 5 }} />
                 <Text style={styles.chatBtnText}>Chat</Text>
               </TouchableOpacity>
             )}
@@ -303,16 +346,8 @@ export default function AnimalDetailScreen({ route, navigation }) {
             {/* Badges */}
             <View style={styles.badgesRow}>
               {(animal.personalityBadges || ['Gentle', 'Affectionate', 'Kid-Friendly']).map(
-                (badge, idx) => (
-                  <View
-                    key={badge}
-                    style={[
-                      styles.badgePill,
-                      idx % 3 === 0 && styles.badgePill1,
-                      idx % 3 === 1 && styles.badgePill2,
-                      idx % 3 === 2 && styles.badgePill3,
-                    ]}
-                  >
+                (badge) => (
+                  <View key={badge} style={styles.badgePill}>
                     <Text style={styles.badgeText}>{badge}</Text>
                   </View>
                 )
@@ -562,6 +597,40 @@ export default function AnimalDetailScreen({ route, navigation }) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* ── Full Screen Photo Viewer Modal ───────────────── */}
+      <Modal
+        visible={activePreviewIndex !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActivePreviewIndex(null)}
+      >
+        <View style={styles.fullPreviewOverlay}>
+          <StatusBar style="light" />
+          <View style={[styles.fullPreviewHeader, { paddingTop: safeTop }]}>
+            <TouchableOpacity
+              style={styles.fullPreviewCloseBtn}
+              onPress={() => setActivePreviewIndex(null)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.fullPreviewCount}>
+              {activePreviewIndex !== null ? `${activePreviewIndex + 1} of ${allPhotos.length}` : ''}
+            </Text>
+            <View style={{ width: 40 }} />
+          </View>
+          {activePreviewIndex !== null && allPhotos[activePreviewIndex] && (
+            <View style={styles.fullPreviewBody}>
+              <Image
+                source={{ uri: allPhotos[activePreviewIndex] }}
+                style={styles.fullPreviewImage}
+                resizeMode="contain"
+              />
+            </View>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -590,6 +659,57 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.secondary,
+  },
+  heroPagingBadge: {
+    position: 'absolute',
+    bottom: 34,
+    right: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(26, 21, 16, 0.75)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  heroPagingText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  fullPreviewOverlay: {
+    flex: 1,
+    backgroundColor: '#0A0A0A',
+    justifyContent: 'space-between',
+  },
+  fullPreviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    zIndex: 10,
+  },
+  fullPreviewCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullPreviewCount: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  fullPreviewBody: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  fullPreviewImage: {
+    width: '100%',
+    height: '80%',
   },
   floatingBack: {
     position: 'absolute',
@@ -668,50 +788,53 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 18,
-  },
-  statCard: {
-    flex: 1,
-    borderRadius: SIZES.r16,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-  },
-  statGreen: {
-    backgroundColor: COLORS.secondaryLight,
-  },
-  statYellow: {
-    backgroundColor: COLORS.accent,
-  },
-  statBlue: {
-    backgroundColor: COLORS.primaryLight,
-  },
-  statLabel: {
-    ...FONTS.caption,
-    color: COLORS.textMuted,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  statVal: {
-    ...FONTS.subheading,
-    fontSize: 15,
-    color: COLORS.brown,
-  },
-
-  advocateCard: {
+  specsBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FAF6EE',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    marginBottom: 18,
     borderWidth: 1,
-    borderColor: COLORS.divider,
-    borderRadius: SIZES.r20,
-    padding: 14,
-    marginBottom: 20,
-    ...SHADOWS.sm,
+    borderColor: '#F0E8D8',
+  },
+  specCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  specDivider: {
+    width: 1,
+    height: 26,
+    backgroundColor: '#E6DCBF',
+  },
+  specLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    color: COLORS.textMuted,
+    textTransform: 'uppercase',
+    marginBottom: 3,
+  },
+  specValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.brown,
+    textAlign: 'center',
+  },
+
+  advocateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    marginBottom: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2EDE2',
+    paddingBottom: 14,
   },
   advocateLeft: {
     flexDirection: 'row',
@@ -735,15 +858,17 @@ const styles = StyleSheet.create({
   chatBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.primaryDeep,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderRadius: SIZES.r18,
+    ...SHADOWS.sm,
   },
   chatBtnText: {
     ...FONTS.button,
     fontSize: 13,
-    color: COLORS.brown,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 
   section: {
@@ -766,22 +891,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   badgePill: {
+    backgroundColor: '#FAF5E8',
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: SIZES.r16,
-  },
-  badgePill1: {
-    backgroundColor: COLORS.secondaryLight,
-  },
-  badgePill2: {
-    backgroundColor: COLORS.accent,
-  },
-  badgePill3: {
-    backgroundColor: COLORS.primaryLight,
+    borderRadius: 16,
   },
   badgeText: {
     ...FONTS.bodyMedium,
     fontSize: 12,
+    fontWeight: '600',
     color: COLORS.brown,
   },
 
@@ -989,28 +1109,34 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   statusAvailableBg: {
-    backgroundColor: '#ABD7E2',
+    backgroundColor: '#E3F2F6',
+    borderWidth: 1,
+    borderColor: '#C8E4EE',
   },
   statusAvailableText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#473018',
+    color: COLORS.primaryDeep,
   },
   statusFosteredBg: {
-    backgroundColor: '#FBEEAC',
+    backgroundColor: '#FCF8E8',
+    borderWidth: 1,
+    borderColor: '#F0E6BE',
   },
   statusFosteredText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#473018',
+    color: '#8A5D10',
   },
   statusAdoptedBg: {
-    backgroundColor: '#B8D3C3',
+    backgroundColor: '#EBF4EF',
+    borderWidth: 1,
+    borderColor: '#CBE3D5',
   },
   statusAdoptedText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#473018',
+    color: COLORS.secondaryDark,
   },
   ownerStatusPillText: {
     ...FONTS.caption,
@@ -1034,7 +1160,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#15803D',
+    backgroundColor: COLORS.primaryDeep,
     paddingVertical: 14,
     borderRadius: SIZES.r24 + 1,
     ...SHADOWS.button,
@@ -1042,7 +1168,8 @@ const styles = StyleSheet.create({
   markAdoptedBtnText: {
     ...FONTS.button,
     fontSize: 15,
-    color: COLORS.surface,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   relistBtn: {
     flex: 1,
@@ -1063,12 +1190,12 @@ const styles = StyleSheet.create({
   ownerBadgePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.primaryLight,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    backgroundColor: '#EBF4F7',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: COLORS.primaryMid,
+    borderColor: '#CFE6EE',
   },
   ownerBadgePillText: {
     ...FONTS.caption,
@@ -1080,7 +1207,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.primaryDark,
+    backgroundColor: COLORS.primaryDeep,
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: SIZES.r24 + 1,
