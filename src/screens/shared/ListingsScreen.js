@@ -47,21 +47,20 @@ export default function ListingsScreen({ navigation }) {
       {/* Header */}
       <View style={[styles.header, { paddingTop: safeTopPadding }]}>
         <View style={styles.titleRow}>
-          <View>
-            <Text style={styles.title}>Find a Companion</Text>
-            <Text style={styles.subtitle}>
-              {filtered.length} animal{filtered.length !== 1 ? 's' : ''} looking for a home
+          <View style={{ flex: 1, paddingRight: 8 }}>
+            <Text style={styles.title} numberOfLines={1}>Adopt & Foster</Text>
+            <Text style={styles.subtitle} numberOfLines={1}>
+              Find pets available for adoption and temporary care
             </Text>
           </View>
           <View style={styles.countBadge}>
-            <Ionicons name="paw" size={14} color={COLORS.primaryDeep} />
-            <Text style={styles.countNum}>{filtered.length}</Text>
+            <Text style={styles.countNum} numberOfLines={1}>{filtered.length} Available</Text>
           </View>
         </View>
 
-        {/* Segmented Type Filter (Adopt vs Foster) */}
+        {/* Segmented Type Filter */}
         <View style={styles.segmentedContainer}>
-          {TYPE_FILTERS.map(({ key, label, icon }) => {
+          {TYPE_FILTERS.map(({ key, label }) => {
             const isActive = typeFilter === key;
             return (
               <TouchableOpacity
@@ -70,11 +69,6 @@ export default function ListingsScreen({ navigation }) {
                 onPress={() => setTypeFilter(key)}
                 activeOpacity={0.8}
               >
-                <Ionicons
-                  name={icon}
-                  size={14}
-                  color={isActive ? COLORS.primaryDeep : COLORS.textMuted}
-                />
                 <Text style={[styles.segmentText, isActive && styles.segmentTextActive]}>
                   {label}
                 </Text>
@@ -108,19 +102,6 @@ export default function ListingsScreen({ navigation }) {
               );
             })}
           </ScrollView>
-        </View>
-
-        {/* Info Legend */}
-        <View style={styles.legendBar}>
-          <View style={styles.legendItem}>
-            <Ionicons name="home" size={12} color={COLORS.primaryDeep} />
-            <Text style={styles.legendText}>Adopt = Permanent Home</Text>
-          </View>
-          <Text style={styles.legendDot}>•</Text>
-          <View style={styles.legendItem}>
-            <Ionicons name="heart" size={12} color="#B45309" />
-            <Text style={styles.legendText}>Foster = Temporary Care</Text>
-          </View>
         </View>
       </View>
 
@@ -177,11 +158,16 @@ const styles = StyleSheet.create({
   title:    { fontSize: SIZES.xxl, fontWeight: '800', color: COLORS.brown },
   subtitle: { fontSize: SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
   countBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: SIZES.xs4,
-    backgroundColor: COLORS.tagBg, paddingHorizontal: SIZES.sm8 + 2,
-    paddingVertical: SIZES.xs4 + 2, borderRadius: SIZES.r999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#EBF7FA',
+    borderWidth: 1,
+    borderColor: '#B8E4E5',
+    flexShrink: 0,
+    alignSelf: 'center',
   },
-  countNum: { fontSize: SIZES.body, fontWeight: '800', color: COLORS.primaryDeep },
+  countNum: { fontSize: 11.5, fontWeight: '700', color: '#2E7A99' },
 
   segmentedContainer: {
     flexDirection: 'row',

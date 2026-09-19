@@ -67,9 +67,8 @@ export default function AnimalCard({ animal, onPress, style, horizontal = false 
             {animal.species} · {animal.breed} · {animal.ageTag || animal.age}
           </Text>
           <View style={styles.locRow}>
-            <Ionicons name="location-sharp" size={12} color={COLORS.danger} style={{ marginRight: 2 }} />
             <Text style={styles.locText} numberOfLines={1}>
-              {animal.location || 'Pasig City (1.8 km)'}
+              {animal.location ? animal.location.replace(/\s*\(.*?\)/g, '') : 'Pasig City'}
             </Text>
           </View>
 
@@ -210,21 +209,25 @@ export default function AnimalCard({ animal, onPress, style, horizontal = false 
 }
 
 const styles = StyleSheet.create({
-  // Grid card mode
+  // Grid card mode (Professional rectangular card architecture)
   gridCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: SIZES.r20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E8F2F6',
+    borderColor: '#E8DEC5',
     flex: 1,
-    ...SHADOWS.card,
+    shadowColor: '#473018',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 2,
   },
   gridVisualBox: {
-    height: 125,
+    height: 130,
     position: 'relative',
     overflow: 'hidden',
-    backgroundColor: '#E8F2F6',
+    backgroundColor: '#F4EDE0',
   },
   cardCoverPhoto: {
     width: '100%',
@@ -244,28 +247,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 10,
+    padding: 8,
     zIndex: 2,
   },
   availableBadge: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    ...SHADOWS.sm,
+    borderWidth: 1,
+    borderColor: '#E8DEC5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   availableText: {
-    ...FONTS.badge,
-    color: COLORS.success,
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#306B4D',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
   heartCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: COLORS.surface,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    ...SHADOWS.sm,
+    borderWidth: 1,
+    borderColor: '#E8DEC5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   gridPhotoCountBadge: {
     position: 'absolute',
@@ -273,10 +290,10 @@ const styles = StyleSheet.create({
     right: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(26, 21, 16, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: 6,
     zIndex: 3,
   },
   photoCountBadge: {
@@ -285,67 +302,77 @@ const styles = StyleSheet.create({
     right: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(26, 21, 16, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: 10,
+    borderRadius: 8,
     zIndex: 3,
   },
   photoCountText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#fff',
+    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
   gridContent: {
-    padding: 12,
-    backgroundColor: COLORS.surface,
+    padding: 10,
+    backgroundColor: '#FFFFFF',
   },
   petName: {
-    ...FONTS.subheading,
-    fontSize: 15,
-    color: COLORS.brown,
+    fontSize: 14.5,
+    fontWeight: '800',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
     marginBottom: 2,
   },
   petBreed: {
-    ...FONTS.caption,
-    color: COLORS.textMuted,
+    fontSize: 11,
+    color: '#8C7D6A',
+    fontFamily: 'PlusJakartaSans_500Medium',
     marginBottom: 4,
   },
   locRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   locText: {
-    ...FONTS.caption,
-    color: COLORS.textSecondary,
+    fontSize: 11,
+    color: '#685038',
+    fontFamily: 'PlusJakartaSans_400Regular',
   },
   actionTagsRow: {
     flexDirection: 'row',
     gap: 6,
   },
   adoptTag: {
-    backgroundColor: '#92CDE5',
-    borderRadius: 10,
+    backgroundColor: '#EBF7FA',
+    borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#B8E4E5',
   },
   adoptTagText: {
-    ...FONTS.badge,
-    fontSize: 10,
-    color: '#473018',
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#2E7A99',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
   fosterTag: {
-    backgroundColor: '#FBEEAC',
-    borderRadius: 10,
+    backgroundColor: '#FEF3DC',
+    borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#F3D299',
   },
   fosterTagText: {
-    ...FONTS.badge,
-    fontSize: 10,
-    color: '#473018',
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#B45309',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
   // Full-width card mode

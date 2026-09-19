@@ -9,6 +9,8 @@ import {
   getUserProfileFirebase,
   loginWithGoogleCredential,
   loginWithGoogleProfile,
+  cacheUserProfile,
+  getAllUsersFirebase,
 } from '../services/authService';
 import {
   subscribeToRescueReports,
@@ -590,7 +592,20 @@ export function AppProvider({ children }) {
       });
 
       const unsubAnimals = subscribeToAnimals((liveAnimals) => {
-        setAnimals(liveAnimals || []);
+        const animalsList = liveAnimals || [];
+        setAnimals(animalsList);
+        animalsList.forEach((a) => {
+          if (a.advocateId && a.advocateAvatar) {
+            cacheUserProfile({ id: a.advocateId, name: a.advocateName, avatar: a.advocateAvatar });
+          }
+        });
+      });
+
+      // Load all registered users from Firestore to prime global avatar & profile cache
+      getAllUsersFirebase().then((allUsers) => {
+        if (Array.isArray(allUsers) && allUsers.length > 0) {
+          setUsers(allUsers);
+        }
       });
 
       return () => {
@@ -603,6 +618,7 @@ export function AppProvider({ children }) {
   // Sync rescue alert & message notifications whenever the logged-in user changes
   useEffect(() => {
     if (currentUser?.id) {
+      cacheUserProfile(currentUser);
       notifiedReportIdsRef.current.clear();
       notifiedMessageIdsRef.current.clear();
 
@@ -731,7 +747,9 @@ export function AppProvider({ children }) {
       }
       return [...(prev || []), { ...currentUser, ...updates }];
     });
-    setCurrentUser((prev) => ({ ...prev, ...updates }));
+    const updated = { ...currentUser, ...updates };
+    setCurrentUser(updated);
+    cacheUserProfile(updated);
     if (currentUser?.id) {
       userProfilesCacheRef.current.delete(currentUser.id);
       await updateUserProfile(currentUser.id, updates);
@@ -747,11 +765,13 @@ export function AppProvider({ children }) {
     const existing = (users || []).find((u) => u.id === userId);
     if (existing?.payoutMethods) {
       userProfilesCacheRef.current.set(userId, existing);
+      cacheUserProfile(existing);
       return existing;
     }
     const remote = await getUserProfileFirebase(userId);
     if (remote) {
       userProfilesCacheRef.current.set(userId, remote);
+      cacheUserProfile(remote);
       return remote;
     }
     return existing || null;
@@ -766,9 +786,11 @@ export function AppProvider({ children }) {
       reporterId: authorId,
       reporterName: currentUser?.name || 'Community Member',
       reporterEmail: currentUser?.email || '',
+      reporterAvatar: currentUser?.avatar || null,
       status: 'Open',
       createdAt: new Date().toISOString(),
       responderId: null,
+      responderAvatar: null,
       comments: [],
       ...reportData,
     };
@@ -791,6 +813,7 @@ export function AppProvider({ children }) {
               status: 'Responded',
               responderId: currentUser?.id,
               responderName: currentUser?.name,
+              responderAvatar: currentUser?.avatar || null,
             }
           : r
       )
@@ -820,6 +843,7 @@ export function AppProvider({ children }) {
       id: `c${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       userId: currentUser?.id || 'u_anon',
       userName: currentUser?.name || 'Community Member',
+      userAvatar: currentUser?.avatar || null,
       text,
       createdAt: new Date().toISOString(),
       replies: [],
@@ -852,6 +876,7 @@ export function AppProvider({ children }) {
       id: `a${Date.now()}`,
       advocateId: currentUser?.id || currentUser?.uid || 'u2',
       advocateName: currentUser?.name || 'Elena Ramos',
+      advocateAvatar: currentUser?.avatar || null,
       advocateEmail: currentUser?.email || null,
       createdAt: new Date().toISOString(),
       fosterId: null,
@@ -918,6 +943,7 @@ export function AppProvider({ children }) {
       id: `req${Date.now()}`,
       requesterId: currentUser?.id || 'u1',
       requesterName: currentUser?.name || 'Community Member',
+      requesterAvatar: currentUser?.avatar || null,
       status: 'Pending',
       createdAt: new Date().toISOString(),
       ...requestData,
@@ -1123,6 +1149,8 @@ export function AppProvider({ children }) {
       newMsg = {
         id: `m${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         senderId: uId,
+        senderName: activeUser.name || 'User',
+        senderAvatar: activeUser.avatar || null,
         text: trimmed,
         type: 'text',
         time: new Date().toISOString(),
@@ -1131,6 +1159,8 @@ export function AppProvider({ children }) {
       newMsg = {
         id: `m${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         senderId: uId,
+        senderName: activeUser.name || 'User',
+        senderAvatar: activeUser.avatar || null,
         text: messageData.text || '',
         type: messageData.type || 'text',
         mediaUri: messageData.mediaUri || null,
@@ -1171,6 +1201,10 @@ export function AppProvider({ children }) {
         lastMessage: lastSummary,
         lastMessageTime: newMsg.time,
         lastSenderId: newMsg.senderId,
+        participantAvatars: {
+          ...(existing.participantAvatars || {}),
+          [uId]: activeUser.avatar || null,
+        },
         unreadCounts: nextUnreadCounts,
         unreadCount: (nextUnreadCounts[uId] || 0),
         unread: false, // sender has already read their own message
@@ -1184,7 +1218,7 @@ export function AppProvider({ children }) {
     }
   };
 
-  const startConversation = (otherUserId, otherUserName) => {
+  const startConversation = (otherUserId, otherUserName, otherUserAvatar) => {
     if (!otherUserId || !currentUser?.id) return '';
     const existing = conversations.find(
       (c) =>
@@ -1193,6 +1227,18 @@ export function AppProvider({ children }) {
         c.participants.includes(otherUserId)
     );
     if (existing) {
+      if (otherUserAvatar && (!existing.participantAvatars || !existing.participantAvatars[otherUserId])) {
+        const updated = {
+          ...existing,
+          participantAvatars: {
+            ...(existing.participantAvatars || {}),
+            [currentUser.id]: currentUser.avatar || null,
+            [otherUserId]: otherUserAvatar,
+          },
+        };
+        setConversations((prev) => prev.map((c) => (c.id === existing.id ? updated : c)));
+        saveConversationFirebase(updated);
+      }
       return existing.id;
     }
     const newConv = {
@@ -1201,6 +1247,10 @@ export function AppProvider({ children }) {
       participantNames: {
         [currentUser.id]: currentUser.name || 'Community Member',
         [otherUserId]: otherUserName || 'Community Member',
+      },
+      participantAvatars: {
+        [currentUser.id]: currentUser.avatar || null,
+        [otherUserId]: otherUserAvatar || null,
       },
       lastMessage: '',
       lastMessageTime: new Date().toISOString(),
@@ -1406,7 +1456,9 @@ export function AppProvider({ children }) {
           name: u.name || 'Community Member',
           role: u.role || 'community',
           location: u.location || '',
+          avatar: u.avatar || null,
         });
+        cacheUserProfile(u);
       }
     });
 
@@ -1419,7 +1471,11 @@ export function AppProvider({ children }) {
           name: a.advocateName || 'Animal Advocate',
           role: 'advocate',
           location: a.location || '',
+          avatar: a.advocateAvatar || null,
         });
+        if (a.advocateAvatar) {
+          cacheUserProfile({ id: aId, name: a.advocateName, avatar: a.advocateAvatar });
+        }
       }
     });
 
@@ -1432,7 +1488,11 @@ export function AppProvider({ children }) {
           name: r.reporterName || 'Rescue Reporter',
           role: 'community',
           location: r.location?.address || '',
+          avatar: r.reporterAvatar || null,
         });
+        if (r.reporterAvatar) {
+          cacheUserProfile({ id: repId, name: r.reporterName, avatar: r.reporterAvatar });
+        }
       }
       const respId = r?.responderId;
       if (respId && respId !== currentUser?.id && !map.has(respId)) {
@@ -1441,6 +1501,7 @@ export function AppProvider({ children }) {
           name: r.responderName || 'Responding Advocate',
           role: 'advocate',
           location: '',
+          avatar: r.responderAvatar || null,
         });
       }
     });
@@ -1454,7 +1515,11 @@ export function AppProvider({ children }) {
           name: rq.requesterName || 'Applicant',
           role: 'community',
           location: '',
+          avatar: rq.requesterAvatar || null,
         });
+        if (rq.requesterAvatar) {
+          cacheUserProfile({ id: reqId, name: rq.requesterName, avatar: rq.requesterAvatar });
+        }
       }
     });
 

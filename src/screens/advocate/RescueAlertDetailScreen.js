@@ -335,8 +335,16 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
 
           {/* ── Reporter Profile Row (Unboxed) ─────────────────── */}
           <View style={styles.reporterRow}>
-            <View style={styles.reporterLeft}>
-              <Avatar name={report.reporterName || 'Community Member'} size={42} />
+            <TouchableOpacity
+              style={styles.reporterLeft}
+              onPress={() => navigation.navigate('PublicProfile', {
+                userId: report.reporterId,
+                userName: report.reporterName,
+                userAvatar: report.reporterAvatar,
+              })}
+              activeOpacity={0.8}
+            >
+              <Avatar name={report.reporterName || 'Community Member'} uri={report.reporterAvatar} size={42} />
               <View style={styles.reporterTextCol}>
                 <View style={styles.reporterNameRow}>
                   <Text style={styles.reporterName} numberOfLines={1}>
@@ -348,7 +356,7 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
                   Reported this rescue case
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.chatBtn}
               onPress={handleMessageAdvocate}
@@ -473,9 +481,13 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
             {report.comments && report.comments.length > 0 ? (
               report.comments.map((c) => (
                 <View key={c.id} style={styles.commentItem}>
-                  <Avatar name={c.userName} size={36} />
+                  <TouchableOpacity onPress={() => navigation.navigate('PublicProfile', { userId: c.userId, userName: c.userName, userAvatar: c.userAvatar })} activeOpacity={0.8}>
+                    <Avatar name={c.userName} uri={c.userAvatar} userId={c.userId} size={36} />
+                  </TouchableOpacity>
                   <View style={styles.commentBubble}>
-                    <Text style={styles.commentUser}>{c.userName}</Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('PublicProfile', { userId: c.userId, userName: c.userName, userAvatar: c.userAvatar })} activeOpacity={0.8}>
+                      <Text style={styles.commentUser}>{c.userName}</Text>
+                    </TouchableOpacity>
                     <Text style={styles.commentContent}>{c.text}</Text>
                     <View style={styles.commentBottomRow}>
                       <Text style={styles.commentTime}>
@@ -495,7 +507,7 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
 
             {/* Write comment input */}
             <View style={styles.writeCommentRow}>
-              <Avatar name={currentUser?.name || 'User'} size={34} />
+              <Avatar name={currentUser?.name || 'User'} uri={currentUser?.avatar} userId={currentUser?.id} size={34} />
               <View style={styles.commentInputWrap}>
                 <TextInput
                   style={styles.commentInput}

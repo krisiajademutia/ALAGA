@@ -169,10 +169,14 @@ export default function ReportDetailScreen({ route, navigation }) {
           <Text style={styles.cardTitle}>Reported By</Text>
           <TouchableOpacity
             style={styles.userRow}
-            onPress={() => navigation.navigate('PublicProfile', { userId: report.reporterId })}
+            onPress={() => navigation.navigate('PublicProfile', {
+              userId: report.reporterId,
+              userName: report.reporterName,
+              userAvatar: report.reporterAvatar,
+            })}
             activeOpacity={0.8}
           >
-            <Avatar name={report.reporterName} size={42} />
+            <Avatar name={report.reporterName} uri={report.reporterAvatar} size={42} />
             <View style={styles.userInfo}>
               <Text style={styles.userName}>{report.reporterName}</Text>
               <Text style={styles.userSub}>

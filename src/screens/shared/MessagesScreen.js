@@ -45,10 +45,12 @@ export default function MessagesScreen({ navigation }) {
   // Extract active contacts for Messenger horizontal story / active row
   const activeContacts = sorted.slice(0, 8).map((c) => {
     const otherId = c.participants?.find((p) => p !== currentUser?.id);
+    const otherAvatar = (otherId && c.participantAvatars?.[otherId]) || null;
     return {
       id: c.id,
       name: c.participantNames?.[otherId] || 'Member',
       otherId,
+      otherAvatar,
     };
   });
 
@@ -127,12 +129,14 @@ export default function MessagesScreen({ navigation }) {
                       navigation.navigate('Chat', {
                         conversationId: contact.id,
                         otherName: contact.name,
+                        otherId: contact.otherId,
+                        otherAvatar: contact.otherAvatar,
                       });
                     }}
                     activeOpacity={0.8}
                   >
                     <View style={styles.storyAvatarRing}>
-                      <Avatar name={contact.name} size={50} />
+                      <Avatar name={contact.name} userId={contact.otherId} uri={contact.otherAvatar} size={50} />
                     </View>
                     <Text style={styles.storyName} numberOfLines={1}>
                       {contact.name.split(' ')[0]}
@@ -173,6 +177,7 @@ export default function MessagesScreen({ navigation }) {
         renderItem={({ item }) => {
           const otherId = item.participants?.find((p) => p !== currentUser?.id);
           const otherName = item.participantNames?.[otherId] || 'Community Member';
+          const otherAvatar = (otherId && item.participantAvatars?.[otherId]) || null;
           const lastMsg = item.lastMessage || 'Sent a message';
           const time = formatTime(item.lastMessageTime);
           const uId = currentUser?.id;
@@ -193,12 +198,13 @@ export default function MessagesScreen({ navigation }) {
                   conversationId: item.id,
                   otherName,
                   otherId,
+                  otherAvatar,
                 });
               }}
               activeOpacity={0.72}
             >
               <View style={styles.rowAvatarWrap}>
-                <Avatar name={otherName} size={54} />
+                <Avatar name={otherName} userId={otherId} uri={otherAvatar} size={54} />
               </View>
 
               <View style={styles.rowContentWrap}>
@@ -334,18 +340,19 @@ export default function MessagesScreen({ navigation }) {
               <TouchableOpacity
                 style={styles.contactRow}
                 onPress={() => {
-                  const convId = startConversation(item.id, item.name);
+                  const convId = startConversation(item.id, item.name, item.avatar);
                   setNewChatVisible(false);
                   setNewChatSearch('');
                   navigation.navigate('Chat', {
                     conversationId: convId,
                     otherName: item.name,
                     otherId: item.id,
+                    otherAvatar: item.avatar,
                   });
                 }}
                 activeOpacity={0.75}
               >
-                <Avatar name={item.name} size={48} />
+                <Avatar name={item.name} userId={item.id} uri={item.avatar} size={48} />
                 <View style={styles.contactInfo}>
                   <Text style={styles.contactName}>{item.name}</Text>
                   <View style={styles.contactRoleRow}>

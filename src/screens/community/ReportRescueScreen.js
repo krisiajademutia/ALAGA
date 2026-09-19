@@ -253,6 +253,7 @@ export default function ReportRescueScreen({ navigation }) {
         reporterId: currentUser?.id || currentUser?.uid || 'u_reporter',
         reporterName: currentUser?.name || 'Community Member',
         reporterEmail: currentUser?.email || '',
+        reporterAvatar: currentUser?.avatar || '',
       };
 
       addRescueReport(reportPayload);

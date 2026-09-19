@@ -81,7 +81,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
         markAnimalAdopted(animal.id);
         setTimeout(() => {
           showAlert({
-            title: 'Success 🎉',
+            title: 'Success',
             message: `${animal.name} is now marked as Adopted!`,
             type: 'success',
             customIcon: 'paw',
@@ -173,12 +173,14 @@ export default function AnimalDetailScreen({ route, navigation }) {
   const handleMessageAdvocate = () => {
     const convId = startConversation(
       animal.advocateId,
-      animal.advocateName
+      animal.advocateName,
+      animal.advocateAvatar
     );
     navigation.navigate('Chat', {
       conversationId: convId,
       otherName: animal.advocateName,
       otherId: animal.advocateId,
+      otherAvatar: animal.advocateAvatar,
       initialDraft: `Hi! I'm interested in ${animal.name}. Can you tell me more?`,
     });
   };
@@ -312,15 +314,24 @@ export default function AnimalDetailScreen({ route, navigation }) {
 
           {/* Advocate Profile Row (Borderless, seamless integration) */}
           <View style={styles.advocateRow}>
-            <View style={styles.advocateLeft}>
-              <Avatar name={animal.advocateName} size={44} />
+            <TouchableOpacity
+              style={styles.advocateLeft}
+              onPress={() => navigation.navigate('PublicProfile', {
+                userId: animal.advocateId,
+                userName: animal.advocateName,
+                userAvatar: animal.advocateAvatar,
+                userRole: 'advocate',
+              })}
+              activeOpacity={0.8}
+            >
+              <Avatar name={animal.advocateName} uri={animal.advocateAvatar} userId={animal.advocateId} size={44} />
               <View style={styles.advocateTextCol}>
-                <Text style={styles.advocateName}>{animal.advocateName}</Text>
-                <Text style={styles.advocateRole}>
-                  {animal.advocateRole || 'Animal Advocate'}
+                <Text style={styles.advocateName} numberOfLines={1}>{animal.advocateName}</Text>
+                <Text style={styles.advocateRole} numberOfLines={1}>
+                  {animal.advocateRole || 'Animal Advocate'} · Tap profile
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
             {isOwner ? (
               <View style={styles.ownerBadgePill}>
                 <Ionicons name="person" size={12} color={COLORS.primaryDeep} style={{ marginRight: 4 }} />

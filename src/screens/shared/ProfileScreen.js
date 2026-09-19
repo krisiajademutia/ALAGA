@@ -13,8 +13,12 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Switch,
+  Dimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const GRID_CARD_WIDTH = (SCREEN_WIDTH - 52) / 2;
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -169,7 +173,7 @@ export default function ProfileScreen({ route, navigation }) {
       setPayoutModalVisible(false);
       showAlert(
         'success',
-        'Accounts Saved! 💳',
+        'Accounts Saved',
         'Your donation & payout methods have been updated in real time. Community members will now see your verified payment details and QR code when donating to your animals.'
       );
     } catch (err) {
@@ -291,10 +295,13 @@ export default function ProfileScreen({ route, navigation }) {
           },
           {
             icon: 'person-outline',
-            label: 'Public Profile Card',
-            desc: 'Preview how community members see you',
+            label: 'Preview Public Profile',
+            desc: 'See how community members view your profile & rescues',
             screen: 'PublicProfile',
-            params: { userId: currentUser?.id, advocateId: currentUser?.id },
+            params: {
+              userId: currentUser?.id || currentUser?.uid,
+              advocateId: currentUser?.id || currentUser?.uid,
+            },
             color: '#306B4D',
             bg: '#EBF4EF',
           },
@@ -318,10 +325,13 @@ export default function ProfileScreen({ route, navigation }) {
           },
           {
             icon: 'person-outline',
-            label: 'Public Profile Card',
-            desc: 'Preview your public profile',
+            label: 'Preview Public Profile',
+            desc: 'See how your profile & reports appear to others',
             screen: 'PublicProfile',
-            params: { userId: currentUser?.id, advocateId: currentUser?.id },
+            params: {
+              userId: currentUser?.id || currentUser?.uid,
+              advocateId: currentUser?.id || currentUser?.uid,
+            },
             color: '#306B4D',
             bg: '#EBF4EF',
           },
@@ -452,13 +462,13 @@ export default function ProfileScreen({ route, navigation }) {
           <View style={styles.metaRow}>
             {currentUser?.location ? (
               <View style={styles.metaItem}>
-                <Ionicons name="location-outline" size={13} color="#8C7D6A" />
-                <Text style={styles.metaText}>{currentUser.location}</Text>
+                <Ionicons name="location-outline" size={13} color="#8C7D6A" style={{ flexShrink: 0 }} />
+                <Text style={styles.metaText} numberOfLines={1}>{currentUser.location}</Text>
               </View>
             ) : null}
             <View style={styles.metaItem}>
-              <Ionicons name="mail-outline" size={13} color="#8C7D6A" />
-              <Text style={styles.metaText}>{currentUser?.email}</Text>
+              <Ionicons name="mail-outline" size={13} color="#8C7D6A" style={{ flexShrink: 0 }} />
+              <Text style={styles.metaText} numberOfLines={1}>{currentUser?.email}</Text>
             </View>
           </View>
 
@@ -692,7 +702,7 @@ export default function ProfileScreen({ route, navigation }) {
                       keyboardType="phone-pad"
                     />
 
-                    <Text style={[styles.formLabel, { marginTop: 10 }]}>GCASH QR CODE (RECOMMENDED)</Text>
+                    <Text style={[styles.formLabel, { marginTop: 10 }]}>GCASH QR CODE</Text>
                     {gcashQr ? (
                       <View style={styles.qrPreviewWrap}>
                         <Image source={{ uri: gcashQr }} style={styles.qrThumbImage} resizeMode="contain" />
@@ -758,7 +768,7 @@ export default function ProfileScreen({ route, navigation }) {
                       keyboardType="phone-pad"
                     />
 
-                    <Text style={[styles.formLabel, { marginTop: 10 }]}>MAYA QR CODE (RECOMMENDED)</Text>
+                    <Text style={[styles.formLabel, { marginTop: 10 }]}>MAYA QR CODE</Text>
                     {mayaQr ? (
                       <View style={styles.qrPreviewWrap}>
                         <Image source={{ uri: mayaQr }} style={styles.qrThumbImage} resizeMode="contain" />

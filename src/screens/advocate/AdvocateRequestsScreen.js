@@ -107,12 +107,21 @@ export default function AdvocateRequestsScreen({ navigation }) {
             request={item}
             onApprove={() => handleApprove(item)}
             onReject={() => handleReject(item)}
+            onViewProfile={() =>
+              navigation.navigate('PublicProfile', {
+                userId: item.requesterId,
+                userName: item.requesterName,
+                userAvatar: item.requesterAvatar,
+                userRole: 'community',
+              })
+            }
             onMessage={() => {
-              const convId = startConversation(item.requesterId, item.requesterName);
+              const convId = startConversation(item.requesterId, item.requesterName, item.requesterAvatar);
               navigation.navigate('Chat', {
                 conversationId: convId,
                 otherName: item.requesterName,
                 otherId: item.requesterId,
+                otherAvatar: item.requesterAvatar,
                 initialDraft: `Hi ${item.requesterName}!`,
               });
             }}
@@ -123,7 +132,7 @@ export default function AdvocateRequestsScreen({ navigation }) {
   );
 }
 
-function RequestCard({ request, onApprove, onReject, onMessage }) {
+function RequestCard({ request, onApprove, onReject, onMessage, onViewProfile }) {
   const isAdoption = request.type === 'Adoption';
   const typeColor  = isAdoption ? COLORS.primaryDeep : '#B45309';
   const typeBg     = isAdoption ? COLORS.tagBg : '#FEF3DC';
@@ -133,17 +142,19 @@ function RequestCard({ request, onApprove, onReject, onMessage }) {
     <View style={styles.card}>
       {/* Top row */}
       <View style={styles.cardTop}>
-        <Avatar name={request.requesterName} size={42} />
-        <View style={styles.cardInfo}>
-          <Text style={styles.requesterName}>{request.requesterName}</Text>
-          <View style={styles.typeRow}>
-            <View style={[styles.typePill, { backgroundColor: typeBg }]}>
-              <Ionicons name={typeIcon} size={11} color={typeColor} />
-              <Text style={[styles.typeText, { color: typeColor }]}>{request.type}</Text>
+        <TouchableOpacity onPress={onViewProfile} activeOpacity={0.8} style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 }}>
+          <Avatar name={request.requesterName} uri={request.requesterAvatar} userId={request.requesterId} size={42} />
+          <View style={styles.cardInfo}>
+            <Text style={styles.requesterName} numberOfLines={1}>{request.requesterName}</Text>
+            <View style={styles.typeRow}>
+              <View style={[styles.typePill, { backgroundColor: typeBg }]}>
+                <Ionicons name={typeIcon} size={11} color={typeColor} />
+                <Text style={[styles.typeText, { color: typeColor }]}>{request.type}</Text>
+              </View>
+              <Text style={styles.forAnimal} numberOfLines={1}>for {request.animalName}</Text>
             </View>
-            <Text style={styles.forAnimal}>for {request.animalName}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
         <StatusPill status={request.status} />
       </View>
 

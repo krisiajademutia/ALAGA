@@ -47,7 +47,7 @@ export default function RescueCard({ report, onPress, style }) {
 
         {/* Reporter row */}
         <View style={styles.topRow}>
-          <Avatar name={report.reporterName} size={24} />
+          <Avatar name={report.reporterName} uri={report.reporterAvatar} userId={report.reporterId} size={24} />
           <Text style={styles.reporterName} numberOfLines={1}>{report.reporterName}</Text>
           <Text style={styles.dot}>·</Text>
           <Text style={styles.timeAgo}>{timeAgo}</Text>

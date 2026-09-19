@@ -6,9 +6,13 @@ import {
   GoogleAuthProvider,
   signInWithCredential,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { isMockFirebase } from '../config/firebaseConfig';
+
+// In-memory profile & avatar cache for instant rendering across all screens
+const userAvatarCache = new Map();
+const userProfileCache = new Map();
 
 /**
  * Sign in user with email & password
@@ -311,20 +315,107 @@ export async function loginWithGoogleProfile({ email, name, photoURL, role = 'co
 }
 
 /**
- * Fetch a specific user's profile from Firestore (including their real payoutMethods)
+ * Cache a user profile object in-memory for instant avatar/name lookups across all screens
+ */
+export function cacheUserProfile(user) {
+  if (!user) return;
+  const id = user.id || user.uid;
+  const avatar = user.avatar || user.photoURL || user.photo || user.reporterAvatar || user.advocateAvatar || null;
+  if (id) {
+    userProfileCache.set(id, user);
+    if (avatar && typeof avatar === 'string' && avatar.trim().length > 0) {
+      userAvatarCache.set(id, avatar.trim());
+    }
+  }
+  if (user.name && typeof user.name === 'string') {
+    const lowerName = user.name.trim().toLowerCase();
+    if (avatar && typeof avatar === 'string' && avatar.trim().length > 0) {
+      userAvatarCache.set(lowerName, avatar.trim());
+    }
+  }
+}
+
+/**
+ * Get synchronously cached avatar URL by userId or user's display name
+ */
+export function getCachedUserAvatar(userId, name) {
+  if (userId && userAvatarCache.has(userId)) {
+    return userAvatarCache.get(userId);
+  }
+  if (name && typeof name === 'string') {
+    const lowerName = name.trim().toLowerCase();
+    if (userAvatarCache.has(lowerName)) {
+      return userAvatarCache.get(lowerName);
+    }
+  }
+  return null;
+}
+
+/**
+ * Synchronously retrieve cached user profile if present
+ */
+export function getCachedUserProfile(userId) {
+  if (!userId) return null;
+  return userProfileCache.get(userId) || null;
+}
+
+/**
+ * Fetch a specific user's profile from Firestore (including their real payoutMethods & avatar)
  */
 export async function getUserProfileFirebase(userId) {
-  if (isMockFirebase() || !db || !userId) return null;
+  if (!userId) return null;
+  const cached = getCachedUserProfile(userId);
+  if (cached) return cached;
+
+  if (isMockFirebase() || !db) return null;
   try {
     const userDocRef = doc(db, 'users', userId);
     const userDocSnap = await getDoc(userDocRef);
     if (userDocSnap.exists()) {
-      return { id: userId, ...userDocSnap.data() };
+      const profile = { id: userId, ...userDocSnap.data() };
+      cacheUserProfile(profile);
+      return profile;
     }
     return null;
   } catch (err) {
     console.warn('[authService] Error fetching user profile:', err);
     return null;
+  }
+}
+
+/**
+ * Asynchronously resolve a user's avatar URL from cache or Firestore
+ */
+export async function resolveUserAvatar(userId, name) {
+  const cached = getCachedUserAvatar(userId, name);
+  if (cached) return cached;
+
+  if (userId) {
+    const profile = await getUserProfileFirebase(userId);
+    if (profile && profile.avatar) {
+      return profile.avatar;
+    }
+  }
+  return null;
+}
+
+/**
+ * Fetch all registered users from Firestore users collection and prime the cache
+ */
+export async function getAllUsersFirebase() {
+  if (isMockFirebase() || !db) return [];
+  try {
+    const usersSnap = await getDocs(collection(db, 'users'));
+    const list = [];
+    usersSnap.forEach((d) => {
+      const userObj = { id: d.id, ...d.data() };
+      list.push(userObj);
+      cacheUserProfile(userObj);
+    });
+    return list;
+  } catch (err) {
+    console.warn('[authService] Error fetching all users:', err);
+    return [];
   }
 }
 

@@ -33,7 +33,15 @@ const QUICK_PROMPTS = [
 ];
 
 export default function ChatScreen({ route, navigation }) {
-  const { conversationId, otherName, userName: routeUserName, otherId: routeOtherId, initialDraft } = route.params || {};
+  const {
+    conversationId,
+    otherName,
+    userName: routeUserName,
+    otherId: routeOtherId,
+    otherAvatar: routeOtherAvatar,
+    userAvatar: routeUserAvatar,
+    initialDraft,
+  } = route.params || {};
   const resolvedOtherName = otherName || routeUserName;
   const { conversations, currentUser, sendMessage, clearConversation, markConversationRead, setActiveConversationId, showAlert } = useApp();
   const [text, setText] = useState(initialDraft || '');
@@ -48,6 +56,12 @@ export default function ChatScreen({ route, navigation }) {
   const convo = conversations.find((c) => c.id === conversationId);
   const detectedOtherId = convo?.participants?.find((p) => p !== currentUser?.id);
   const otherId = routeOtherId || detectedOtherId || null;
+  const otherAvatar =
+    routeOtherAvatar ||
+    routeUserAvatar ||
+    (detectedOtherId && convo?.participantAvatars?.[detectedOtherId]) ||
+    (otherId && convo?.participantAvatars?.[otherId]) ||
+    null;
   const name =
     resolvedOtherName ||
     (detectedOtherId && convo?.participantNames?.[detectedOtherId]) ||
@@ -297,7 +311,7 @@ export default function ChatScreen({ route, navigation }) {
         }, 200);
       },
       primaryText: otherId ? 'View Profile' : 'OK',
-      onPrimaryPress: otherId ? () => navigation.navigate('PublicProfile', { userId: otherId }) : null,
+      onPrimaryPress: otherId ? () => navigation.navigate('PublicProfile', { userId: otherId, userName: name, userAvatar: otherAvatar }) : null,
     });
   };
 
@@ -305,7 +319,7 @@ export default function ChatScreen({ route, navigation }) {
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <View style={styles.emptyAvatarWrap}>
-        <Avatar name={name} size={68} />
+        <Avatar name={name} userId={otherId} uri={otherAvatar} size={68} />
       </View>
       <Text style={styles.emptyName}>{name}</Text>
       <View style={styles.emptyRoleBadge}>
@@ -351,13 +365,13 @@ export default function ChatScreen({ route, navigation }) {
             style={styles.navCenter}
             onPress={() => {
               if (otherId) {
-                navigation.navigate('PublicProfile', { userId: otherId });
+                navigation.navigate('PublicProfile', { userId: otherId, userName: name, userAvatar: otherAvatar });
               }
             }}
             activeOpacity={0.75}
           >
             <View style={styles.navAvatarWrap}>
-              <Avatar name={name} size={38} />
+              <Avatar name={name} userId={otherId} uri={otherAvatar} size={38} />
             </View>
             <View style={styles.navTextWrap}>
               <Text style={styles.navName} numberOfLines={1}>
@@ -428,7 +442,7 @@ export default function ChatScreen({ route, navigation }) {
               {!isMine && (
                 <View style={styles.senderAvatarWrap}>
                   {!isSameSenderAsPrev ? (
-                    <Avatar name={name} size={30} />
+                    <Avatar name={name} userId={item.senderId || otherId} uri={item.senderAvatar || otherAvatar} size={30} />
                   ) : (
                     <View style={{ width: 30 }} />
                   )}

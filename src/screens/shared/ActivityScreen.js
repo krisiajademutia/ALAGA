@@ -6,23 +6,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import StatusPill from '../../components/StatusPill';
-import Avatar from '../../components/Avatar';
 import EmptyState from '../../components/EmptyState';
 
 const W = Dimensions.get('window').width;
 
-// ── Tab config ────────────────────────────────────────────────────────────────
+// ── Tab config (Clean, Professional Text Labels) ──────────────────────────────
 const COMMUNITY_TABS = [
-  { key: 'reports',   label: 'My Reports',  icon: 'alert-circle-outline',   iconActive: 'alert-circle' },
-  { key: 'requests',  label: 'My Requests', icon: 'heart-outline',           iconActive: 'heart' },
-  { key: 'donations', label: 'Donations',   icon: 'gift-outline',            iconActive: 'gift' },
+  { key: 'reports',   label: 'My Reports' },
+  { key: 'requests',  label: 'My Requests' },
+  { key: 'donations', label: 'Donations' },
 ];
 
 const ADVOCATE_TABS = [
-  { key: 'responses', label: 'Responses',  icon: 'shield-checkmark-outline', iconActive: 'shield-checkmark' },
-  { key: 'requests',  label: 'Requests',   icon: 'heart-outline',            iconActive: 'heart' },
-  { key: 'animals',   label: 'My Animals', icon: 'paw-outline',              iconActive: 'paw' },
-  { key: 'donations', label: 'Donations',  icon: 'gift-outline',             iconActive: 'gift' },
+  { key: 'responses', label: 'Responses' },
+  { key: 'requests',  label: 'Requests' },
+  { key: 'animals',   label: 'My Animals' },
+  { key: 'donations', label: 'Donations' },
 ];
 
 export default function ActivityScreen({ route, navigation }) {
@@ -101,7 +100,6 @@ export default function ActivityScreen({ route, navigation }) {
                   ? `Confirm receipt of ₱${Number(item.amount || 0).toLocaleString()} for ${item.animalName || 'ALAGA'}? This will notify ${item.donorName || 'the donor'}.`
                   : `Mark this donation as rejected?`,
                 type: isApprove ? 'info' : 'warning',
-                customIcon: isApprove ? 'gift' : 'alert-circle',
                 secondaryText: 'Cancel',
                 primaryText: isApprove ? 'Confirm Verified' : 'Confirm Reject',
                 onPrimaryPress: () => {
@@ -129,7 +127,7 @@ export default function ActivityScreen({ route, navigation }) {
     <View style={styles.root}>
       <StatusBar style="dark" />
 
-      {/* ── Header ──────────────────────────────────────────── */}
+      {/* ── Header Bar ────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: safeTopPadding }]}>
         <View style={styles.headerTop}>
           {navigation.canGoBack() && (
@@ -139,18 +137,17 @@ export default function ActivityScreen({ route, navigation }) {
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               activeOpacity={0.7}
             >
-              <Ionicons name="arrow-back" size={22} color={COLORS.brown} />
+              <Ionicons name="arrow-back" size={22} color="#473018" />
             </TouchableOpacity>
           )}
           <View style={styles.headerTitleWrap}>
-            <Text style={styles.headerTitle}>Activity Dashboard</Text>
-            <Text style={styles.headerSub}>
-              {isAdvocate ? 'Track & manage your rescue operations' : 'Track your reports, requests & contributions'}
+            <Text style={styles.headerTitle} numberOfLines={1}>Activity Dashboard</Text>
+            <Text style={styles.headerSub} numberOfLines={1}>
+              {isAdvocate ? 'Manage your rescue operations' : 'Track your reports, requests & contributions'}
             </Text>
           </View>
           <View style={styles.headerBadge}>
-            <Ionicons name="time" size={15} color={COLORS.primaryDeep} style={{ flexShrink: 0 }} />
-            <Text style={styles.headerBadgeText}>{rawData.length} total</Text>
+            <Text style={styles.headerBadgeText}>{rawData.length} Total</Text>
           </View>
         </View>
 
@@ -187,20 +184,9 @@ export default function ActivityScreen({ route, navigation }) {
                 }}
                 activeOpacity={0.78}
               >
-                <Ionicons
-                  name={isActive ? t.iconActive : t.icon}
-                  size={15}
-                  color={isActive ? '#FFFFFF' : COLORS.textSecondary}
-                  style={styles.tabIcon}
-                />
                 <Text style={[styles.tabPillText, isActive && styles.tabPillTextActive]}>
-                  {t.label}
+                  {t.label} {count > 0 ? count : ''}
                 </Text>
-                {count > 0 && (
-                  <View style={[styles.tabBadge, isActive ? styles.tabBadgeActive : styles.tabBadgeInactive]}>
-                    <Text style={[styles.tabBadgeText, isActive && styles.tabBadgeTextActive]}>{count}</Text>
-                  </View>
-                )}
               </TouchableOpacity>
             );
           })}
@@ -248,35 +234,28 @@ export default function ActivityScreen({ route, navigation }) {
           <View style={styles.modalOverlay}>
             <View style={styles.modalSheet}>
               <View style={styles.modalHandle} />
-              <View style={styles.modalHeader}>
-                <View style={styles.modalIconWrap}>
-                  <Ionicons
-                    name={selectedRequest.type === 'Adoption' ? 'home' : 'heart'}
-                    size={22}
-                    color={COLORS.primaryDeep}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.modalTitle}>{selectedRequest.type} Request</Text>
-                  <Text style={styles.modalSub}>{selectedRequest.animalName}</Text>
-                </View>
-                <TouchableOpacity onPress={() => setSelectedRequest(null)} style={styles.modalClose}>
-                  <Ionicons name="close" size={20} color={COLORS.textMuted} />
+              <View style={styles.modalHeaderRow}>
+                <Text style={styles.modalTitle}>Request Details</Text>
+                <TouchableOpacity onPress={() => setSelectedRequest(null)}>
+                  <Ionicons name="close" size={20} color="#8C7D6A" />
                 </TouchableOpacity>
               </View>
 
               <View style={styles.modalBody}>
                 <View style={styles.modalRow}>
+                  <Text style={styles.modalLabel}>Type:</Text>
+                  <Text style={styles.modalVal}>{selectedRequest.type || 'Adoption'}</Text>
+                </View>
+
+                <View style={styles.modalRow}>
                   <Text style={styles.modalLabel}>Status:</Text>
                   <StatusPill status={selectedRequest.status} />
                 </View>
 
-                {selectedRequest.commitDuration ? (
-                  <View style={styles.modalRow}>
-                    <Text style={styles.modalLabel}>Commitment:</Text>
-                    <Text style={styles.modalVal}>{selectedRequest.commitDuration}</Text>
-                  </View>
-                ) : null}
+                <View style={styles.modalRow}>
+                  <Text style={styles.modalLabel}>Animal:</Text>
+                  <Text style={styles.modalVal}>{selectedRequest.animalName || 'Animal'}</Text>
+                </View>
 
                 <View style={styles.modalRow}>
                   <Text style={styles.modalLabel}>Date Submitted:</Text>
@@ -285,7 +264,7 @@ export default function ActivityScreen({ route, navigation }) {
 
                 {selectedRequest.message ? (
                   <View style={styles.messageBox}>
-                    <Text style={styles.messageBoxTitle}>Applicant Note:</Text>
+                    <Text style={styles.messageBoxTitle}>Note:</Text>
                     <Text style={styles.messageBoxText}>"{selectedRequest.message}"</Text>
                   </View>
                 ) : null}
@@ -337,9 +316,10 @@ export default function ActivityScreen({ route, navigation }) {
   );
 }
 
-// ── Report / Response card ────────────────────────────────────────────────────
+// ── Report / Response card (Renders User Animal Photo) ─────────────────────────
 function ReportCard({ item, isAdvocate, navigation }) {
-  const urgencyColor = item.urgency === 'High' ? COLORS.danger : item.urgency === 'Medium' ? COLORS.warning : COLORS.success;
+  const photoUri = item.photoUri || (Array.isArray(item.photos) && item.photos[0]) || item.image || item.photo || null;
+
   return (
     <TouchableOpacity
       style={styles.card}
@@ -350,9 +330,15 @@ function ReportCard({ item, isAdvocate, navigation }) {
       activeOpacity={0.88}
     >
       <View style={styles.cardLeft}>
-        <View style={[styles.cardIconWrap, { backgroundColor: '#FCE8E8' }]}>
-          <Ionicons name="alert-circle" size={22} color={COLORS.danger} />
-        </View>
+        {photoUri ? (
+          <Image source={{ uri: photoUri }} style={styles.cardThumbPhoto} resizeMode="cover" />
+        ) : (
+          <View style={styles.cardThumbFallback}>
+            <Text style={styles.cardThumbInitials}>
+              {item.animalType ? item.animalType.slice(0, 2).toUpperCase() : 'AL'}
+            </Text>
+          </View>
+        )}
       </View>
       <View style={styles.cardBody}>
         <View style={styles.cardTopRow}>
@@ -363,37 +349,38 @@ function ReportCard({ item, isAdvocate, navigation }) {
             <StatusPill status={item.status} />
           </View>
         </View>
-        <View style={styles.cardMetaRow}>
-          <Ionicons name="location-outline" size={13} color={COLORS.textMuted} style={styles.cardMetaIcon} />
+
+        {item.location?.address ? (
           <Text style={styles.cardMeta} numberOfLines={1}>
-            {item.location?.address || 'No location specified'}
+            {item.location.address}
           </Text>
-        </View>
+        ) : null}
+
         <View style={styles.cardFooter}>
-          <View style={[styles.urgencyPill, { backgroundColor: urgencyColor + '18' }]}>
-            <View style={[styles.urgencyDot, { backgroundColor: urgencyColor }]} />
-            <Text style={[styles.urgencyText, { color: urgencyColor }]}>{item.urgency || 'Normal'}</Text>
-          </View>
+          <Text style={styles.urgencyText}>{item.urgency || 'Normal'} Priority</Text>
           <Text style={styles.cardDate}>{fmtDate(item.createdAt)}</Text>
         </View>
       </View>
-      <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} style={styles.cardChevron} />
     </TouchableOpacity>
   );
 }
 
 // ── Request card ──────────────────────────────────────────────────────────────
 function RequestCard({ item, isAdvocate, onPress }) {
-  const isAdoption = item.type === 'Adoption';
-  const typeColor  = isAdoption ? COLORS.primaryDeep : '#B45309';
-  const typeBg     = isAdoption ? COLORS.tagBg : '#FEF3DC';
+  const photoUri = item.animalPhoto || item.photo || item.photoUri || (Array.isArray(item.photos) && item.photos[0]) || null;
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.88}>
       <View style={styles.cardLeft}>
-        <View style={[styles.cardIconWrap, { backgroundColor: '#F3EEFF' }]}>
-          <Ionicons name={isAdoption ? 'home' : 'heart'} size={20} color={typeColor} />
-        </View>
+        {photoUri ? (
+          <Image source={{ uri: photoUri }} style={styles.cardThumbPhoto} resizeMode="cover" />
+        ) : (
+          <View style={styles.cardThumbFallback}>
+            <Text style={styles.cardThumbInitials}>
+              {item.animalName ? item.animalName.slice(0, 2).toUpperCase() : 'RQ'}
+            </Text>
+          </View>
+        )}
       </View>
       <View style={styles.cardBody}>
         <View style={styles.cardTopRow}>
@@ -403,19 +390,11 @@ function RequestCard({ item, isAdvocate, onPress }) {
           </View>
         </View>
         <View style={styles.cardMetaRow}>
-          <View style={[styles.typePill, { backgroundColor: typeBg }]}>
-            <Text style={[styles.typePillText, { color: typeColor }]}>{item.type || 'Request'}</Text>
-          </View>
+          <Text style={styles.typeTagText}>{item.type || 'Request'}</Text>
           <Text style={styles.cardMeta} numberOfLines={1}>
-            {isAdvocate ? `From: ${item.requesterName || 'Community Member'}` : `Via: ${item.advocateName || item.advocateId || 'Advocate'}`}
+            {isAdvocate ? `From: ${item.requesterName || 'Community Member'}` : `Advocate: ${item.advocateName || 'Advocate'}`}
           </Text>
         </View>
-        {item.commitDuration ? (
-          <View style={styles.durationPill}>
-            <Ionicons name="time-outline" size={11} color="#B45309" style={{ flexShrink: 0 }} />
-            <Text style={styles.durationText} numberOfLines={1}>Commit: {item.commitDuration}</Text>
-          </View>
-        ) : null}
         {item.message ? (
           <Text style={styles.cardQuote} numberOfLines={2}>"{item.message}"</Text>
         ) : null}
@@ -423,7 +402,6 @@ function RequestCard({ item, isAdvocate, onPress }) {
           <Text style={styles.cardDate}>{fmtDate(item.createdAt)}</Text>
         </View>
       </View>
-      <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} style={styles.cardChevron} />
     </TouchableOpacity>
   );
 }
@@ -432,17 +410,18 @@ function RequestCard({ item, isAdvocate, onPress }) {
 function DonationCard({ item, isAdvocate, onVerify, onPreviewReceipt }) {
   const isPending = item.status === 'Pending';
   const hasProof = Boolean(item.proofPhoto);
+  const photoUri = item.animalPhoto || item.photo || (hasProof ? item.proofPhoto : null);
 
   return (
     <View style={styles.card}>
       <View style={styles.cardLeft}>
-        <View style={[styles.cardIconWrap, { backgroundColor: item.status === 'Verified' ? '#E8F5EE' : COLORS.advocateBadge }]}>
-          <Ionicons
-            name={item.status === 'Verified' ? 'shield-checkmark' : 'gift'}
-            size={20}
-            color={item.status === 'Verified' ? '#2D9E5F' : COLORS.secondaryDark}
-          />
-        </View>
+        {photoUri ? (
+          <Image source={{ uri: photoUri }} style={styles.cardThumbPhoto} resizeMode="cover" />
+        ) : (
+          <View style={styles.cardThumbFallback}>
+            <Text style={styles.cardThumbInitials}>₱</Text>
+          </View>
+        )}
       </View>
       <View style={styles.cardBody}>
         <View style={styles.cardTopRow}>
@@ -451,17 +430,8 @@ function DonationCard({ item, isAdvocate, onVerify, onPreviewReceipt }) {
             <StatusPill status={item.status} />
           </View>
         </View>
-        <Text style={styles.cardSubTitle} numberOfLines={1}>{item.animalName || 'Rescue Patient Care'}</Text>
-        {isAdvocate && item.donorName ? (
-          <View style={styles.cardMetaRow}>
-            <Ionicons name="person-outline" size={12} color={COLORS.textMuted} style={styles.cardMetaIcon} />
-            <Text style={styles.cardMeta} numberOfLines={1}>
-              From: <Text style={{ fontWeight: '700', color: COLORS.brown }}>{item.donorName}</Text>
-            </Text>
-          </View>
-        ) : null}
+        <Text style={styles.cardSubTitle} numberOfLines={1}>{item.animalName || 'Rescue Support'}</Text>
         <View style={styles.cardMetaRow}>
-          <Ionicons name="card-outline" size={13} color={COLORS.textMuted} style={styles.cardMetaIcon} />
           <Text style={styles.cardMeta} numberOfLines={1}>
             {item.method || 'Payment'}{item.referenceNumber ? ` · Ref: ${item.referenceNumber}` : ''}
           </Text>
@@ -473,7 +443,6 @@ function DonationCard({ item, isAdvocate, onVerify, onPreviewReceipt }) {
           <Text style={styles.cardDate}>{fmtDate(item.createdAt)}</Text>
         </View>
 
-        {/* Proof of Payment Thumbnail if attached */}
         {hasProof ? (
           <TouchableOpacity
             style={styles.donationProofRow}
@@ -482,14 +451,12 @@ function DonationCard({ item, isAdvocate, onVerify, onPreviewReceipt }) {
           >
             <Image source={{ uri: item.proofPhoto }} style={styles.donationProofThumb} resizeMode="cover" />
             <View style={{ flex: 1, marginRight: 6 }}>
-              <Text style={styles.donationProofLabel} numberOfLines={1}>Transfer Receipt Attached</Text>
-              <Text style={styles.donationProofSub} numberOfLines={1}>Tap to inspect full screenshot</Text>
+              <Text style={styles.donationProofLabel} numberOfLines={1}>Transfer Receipt</Text>
+              <Text style={styles.donationProofSub} numberOfLines={1}>Tap to view screenshot</Text>
             </View>
-            <Ionicons name="eye-outline" size={16} color={COLORS.primaryDeep} style={{ flexShrink: 0 }} />
           </TouchableOpacity>
         ) : null}
 
-        {/* Advocate verification action buttons */}
         {isAdvocate && isPending ? (
           <View style={styles.advocateDonationActions}>
             <TouchableOpacity
@@ -497,7 +464,6 @@ function DonationCard({ item, isAdvocate, onVerify, onPreviewReceipt }) {
               onPress={() => onVerify && onVerify(item.id, 'Verified')}
               activeOpacity={0.82}
             >
-              <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" style={{ marginRight: 6, flexShrink: 0 }} />
               <Text style={styles.verifyDonationBtnText}>Verify Donation</Text>
             </TouchableOpacity>
 
@@ -517,6 +483,8 @@ function DonationCard({ item, isAdvocate, onVerify, onPreviewReceipt }) {
 
 // ── Animal card (advocate) ────────────────────────────────────────────────────
 function AnimalCard({ item, navigation }) {
+  const photoUri = item.photo || (Array.isArray(item.photos) && item.photos[0]) || null;
+
   return (
     <TouchableOpacity
       style={styles.card}
@@ -524,9 +492,15 @@ function AnimalCard({ item, navigation }) {
       activeOpacity={0.88}
     >
       <View style={styles.cardLeft}>
-        <View style={[styles.cardIconWrap, { backgroundColor: COLORS.tagBg }]}>
-          <Ionicons name="paw" size={20} color={COLORS.primaryDeep} />
-        </View>
+        {photoUri ? (
+          <Image source={{ uri: photoUri }} style={styles.cardThumbPhoto} resizeMode="cover" />
+        ) : (
+          <View style={styles.cardThumbFallback}>
+            <Text style={styles.cardThumbInitials}>
+              {item.name ? item.name.slice(0, 2).toUpperCase() : 'PA'}
+            </Text>
+          </View>
+        )}
       </View>
       <View style={styles.cardBody}>
         <View style={styles.cardTopRow}>
@@ -538,17 +512,10 @@ function AnimalCard({ item, navigation }) {
         <Text style={styles.cardMeta} numberOfLines={1}>
           {[item.species, item.breed, item.gender].filter(Boolean).join(' · ')}
         </Text>
-        {item.fosterDuration && (item.listingType === 'Foster' || item.listingType === 'Both') ? (
-          <View style={styles.durationPill}>
-            <Ionicons name="time-outline" size={11} color="#B45309" style={{ flexShrink: 0 }} />
-            <Text style={styles.durationText} numberOfLines={1}>Foster: {item.fosterDuration}</Text>
-          </View>
-        ) : null}
         <View style={styles.cardFooter}>
           <Text style={styles.cardDate}>{fmtDate(item.createdAt)}</Text>
         </View>
       </View>
-      <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} style={styles.cardChevron} />
     </TouchableOpacity>
   );
 }
@@ -568,105 +535,95 @@ function fmtDate(val) {
     d = new Date(val);
   }
   if (!d || isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('en-PH', { dateStyle: 'medium' });
+  return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.background },
+  root: { flex: 1, backgroundColor: '#FCF8E8' },
 
   // Header
   header: {
-    paddingHorizontal: SIZES.lg24,
-    paddingBottom: SIZES.sm8,
-    backgroundColor: COLORS.background,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
+    borderBottomColor: '#E8DEC5',
   },
   headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SIZES.md16,
+    marginBottom: 12,
   },
   headerBackBtn: {
-    marginRight: 10,
+    marginRight: 8,
     padding: 2,
     flexShrink: 0,
   },
   headerTitleWrap: {
     flex: 1,
-    marginRight: SIZES.sm8,
+    marginRight: 8,
   },
-  headerTitle: { fontSize: SIZES.xxl, fontWeight: '800', color: COLORS.brown },
-  headerSub:   { fontSize: SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  headerSub: {
+    fontSize: 12,
+    color: '#8C7D6A',
+    fontFamily: 'PlusJakartaSans_500Medium',
+    marginTop: 2,
+  },
   headerBadge: {
     flexShrink: 0,
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: COLORS.tagBg, paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: SIZES.radiusFull,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#EBF7FA',
+    borderWidth: 1,
+    borderColor: '#B8E4E5',
+    alignSelf: 'center',
   },
-  headerBadgeText: { fontSize: SIZES.xs, fontWeight: '800', color: COLORS.primaryDeep },
+  headerBadgeText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#2E7A99',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
 
   // Scrollable Tab bar
   tabScrollView: {
-    marginBottom: SIZES.sm8,
+    marginBottom: 6,
   },
   tabScrollContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingVertical: 2,
-    paddingRight: SIZES.md16,
+    paddingRight: 16,
   },
   tabPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: SIZES.radiusFull,
-    backgroundColor: COLORS.surface,
+    paddingVertical: 7,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#E8DEC5',
   },
   tabPillActive: {
-    backgroundColor: COLORS.primaryDeep,
-    borderColor: COLORS.primaryDeep,
-    ...SHADOWS.sm,
-  },
-  tabIcon: {
-    flexShrink: 0,
+    backgroundColor: '#2E7A99',
+    borderColor: '#2E7A99',
   },
   tabPillText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
-    color: COLORS.brown,
+    color: '#8C7D6A',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
   tabPillTextActive: {
-    color: '#FFFFFF',
-  },
-  tabBadge: {
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    paddingHorizontal: 5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  tabBadgeInactive: {
-    backgroundColor: COLORS.tagBg,
-  },
-  tabBadgeActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.28)',
-  },
-  tabBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: COLORS.primaryDeep,
-  },
-  tabBadgeTextActive: {
     color: '#FFFFFF',
   },
 
@@ -676,67 +633,106 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   subFilterChip: {
-    paddingHorizontal: 12, paddingVertical: 4,
-    borderRadius: SIZES.radiusFull, backgroundColor: COLORS.inputBg,
-    borderWidth: 1, borderColor: COLORS.border,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 14,
+    backgroundColor: '#FCF8E8',
+    borderWidth: 1,
+    borderColor: '#E8DEC5',
   },
   subFilterChipActive: {
-    backgroundColor: COLORS.tagBg, borderColor: COLORS.primaryLight,
+    backgroundColor: '#EBF7FA',
+    borderColor: '#B8E4E5',
   },
-  subFilterText: { fontSize: SIZES.xs, color: COLORS.textMuted, fontWeight: '600' },
-  subFilterTextActive: { color: COLORS.primaryDeep, fontWeight: '800' },
+  subFilterText: {
+    fontSize: 11,
+    color: '#8C7D6A',
+    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+  subFilterTextActive: {
+    color: '#2E7A99',
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
 
   // List
-  list: { padding: SIZES.md16, paddingBottom: 110 },
-  empty: { marginTop: SIZES.xl32 },
+  list: { padding: 16, paddingBottom: 100 },
+  empty: { marginTop: 24 },
 
   // Shared card shell
   card: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: COLORS.surface,
-    borderRadius: SIZES.r16,
-    padding: SIZES.md16,
-    marginBottom: SIZES.sm8 + 4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#E8DEC5',
+    shadowColor: '#473018',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
   cardLeft: {
     marginRight: 12,
     flexShrink: 0,
   },
-  cardIconWrap: {
-    width: 42, height: 42, borderRadius: 21,
-    alignItems: 'center', justifyContent: 'center',
+  cardThumbPhoto: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    backgroundColor: '#E8DEC5',
+  },
+  cardThumbFallback: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    backgroundColor: '#EBF7FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#B8E4E5',
+  },
+  cardThumbInitials: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#2E7A99',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   cardBody: {
     flex: 1,
     minWidth: 0,
-  },
-  cardChevron: {
-    marginLeft: SIZES.xs4,
-    marginTop: 4,
-    flexShrink: 0,
   },
 
   cardTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SIZES.xs4,
-    gap: SIZES.sm8,
+    marginBottom: 4,
+    gap: 8,
   },
   cardTitle: {
     flex: 1,
-    fontSize: SIZES.body,
-    fontWeight: '700',
-    color: COLORS.brown,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   cardSubTitle: {
-    fontSize: SIZES.body,
+    fontSize: 13,
     fontWeight: '700',
-    color: COLORS.brown,
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_700Bold',
     marginBottom: 4,
+  },
+  amountText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   cardPillWrap: {
     flexShrink: 0,
@@ -747,289 +743,220 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 4,
   },
-  cardMetaIcon: {
-    flexShrink: 0,
-  },
   cardMeta: {
-    flex: 1,
-    fontSize: SIZES.xs,
-    color: COLORS.textSecondary,
+    fontSize: 11.5,
+    color: '#685038',
+    fontFamily: 'PlusJakartaSans_400Regular',
   },
-  cardMetaDot: {
-    fontSize: SIZES.xs,
-    color: COLORS.textMuted,
-    flexShrink: 0,
-  },
-  cardDate: {
-    fontSize: SIZES.xsmall,
-    color: COLORS.textMuted,
+  typeTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2E7A99',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
   cardQuote: {
-    fontSize: SIZES.xs,
-    color: COLORS.textSecondary,
+    fontSize: 11,
+    color: '#685038',
     fontStyle: 'italic',
-    lineHeight: 17,
-    marginTop: 4,
     marginBottom: 4,
   },
   cardFooter: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: 4,
   },
-
-  // Urgency
-  urgencyPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 8, paddingVertical: 2,
-    borderRadius: SIZES.radiusFull,
-    flexShrink: 0,
+  urgencyText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#B45309',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
-  urgencyDot:  { width: 5, height: 5, borderRadius: 3 },
-  urgencyText: { fontSize: SIZES.xsmall, fontWeight: '700' },
-
-  // Request type pill
-  typePill: {
-    paddingHorizontal: 8, paddingVertical: 2,
-    borderRadius: SIZES.radiusFull,
-    flexShrink: 0,
-  },
-  typePillText: { fontSize: SIZES.xsmall, fontWeight: '700' },
-
-  // Amount (donations)
-  amountText: {
-    flex: 1,
-    fontSize: SIZES.medium,
-    fontWeight: '900',
-    color: COLORS.brown,
+  cardDate: {
+    fontSize: 10.5,
+    color: '#8C7D6A',
+    fontFamily: 'PlusJakartaSans_400Regular',
   },
 
-  // Duration (foster)
-  durationPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#FEF3DC',
-    paddingHorizontal: 8, paddingVertical: 3,
-    borderRadius: SIZES.radiusFull, alignSelf: 'flex-start',
-    marginTop: 2,
-    marginBottom: 4,
+  donationProofRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FCF8E8',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#E8DEC5',
   },
-  durationText: { fontSize: SIZES.xsmall, color: '#B45309', fontWeight: '600' },
+  donationProofThumb: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  donationProofLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  donationProofSub: {
+    fontSize: 10,
+    color: '#8C7D6A',
+  },
+
+  advocateDonationActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  verifyDonationBtn: {
+    backgroundColor: '#306B4D',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  verifyDonationBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  rejectDonationBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D94F4F',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  rejectDonationBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#D94F4F',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
 
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(45, 31, 18, 0.4)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 22,
-    paddingTop: 14,
-    paddingBottom: Platform.OS === 'ios' ? 38 : 24,
-    borderTopWidth: 1,
-    borderColor: '#E8DFC8',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
   },
   modalHandle: {
-    width: 38,
+    width: 36,
     height: 4,
+    backgroundColor: '#E8DEC5',
     borderRadius: 2,
-    backgroundColor: '#E8DFC8',
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  modalHeader: {
+  modalHeaderRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 12,
     marginBottom: 16,
-  },
-  modalIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#EBF7FA',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
   },
   modalTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: '#473018',
-  },
-  modalSub: {
-    fontSize: 12,
-    color: '#685038',
-    marginTop: 2,
-  },
-  modalClose: {
-    padding: 4,
-    flexShrink: 0,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   modalBody: {
-    gap: 12,
-    marginBottom: 20,
+    gap: 10,
+    marginBottom: 16,
   },
   modalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 12,
   },
   modalLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#8C7D6A',
-    fontWeight: '600',
-    flexShrink: 0,
   },
   modalVal: {
     fontSize: 13,
-    color: '#473018',
     fontWeight: '700',
-    flexShrink: 1,
-    textAlign: 'right',
+    color: '#473018',
   },
   messageBox: {
-    backgroundColor: '#FFFDF6',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 4,
-    borderWidth: 1,
-    borderColor: '#E8DFC8',
+    backgroundColor: '#FCF8E8',
+    padding: 10,
+    borderRadius: 10,
+    marginTop: 6,
   },
   messageBoxTitle: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#8C7D6A',
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   messageBoxText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#473018',
     fontStyle: 'italic',
-    lineHeight: 18,
   },
   doneBtn: {
-    backgroundColor: '#92CDE5',
-    borderRadius: 14,
-    height: 48,
+    backgroundColor: '#2E7A99',
+    paddingVertical: 10,
+    borderRadius: 16,
     alignItems: 'center',
-    justifyContent: 'center',
-    ...SHADOWS.sm,
   },
   doneBtnText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#473018',
-  },
-
-  // ── Donation proof and advocate actions ─────────────────
-  donationProofRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0F8FA',
-    borderWidth: 1,
-    borderColor: '#C5E2EE',
-    borderRadius: 12,
-    padding: 8,
-    marginTop: 10,
-    gap: 10,
-  },
-  donationProofThumb: {
-    width: 38,
-    height: 38,
-    borderRadius: 6,
-    flexShrink: 0,
-  },
-  donationProofLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#2E7A99',
-  },
-  donationProofSub: {
-    fontSize: 10.5,
-    color: '#8C7D6A',
-  },
-  advocateDonationActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 12,
-  },
-  verifyDonationBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2D9E5F',
-    paddingVertical: 9,
-    borderRadius: 12,
-  },
-  verifyDonationBtnText: {
-    fontSize: 12.5,
-    fontWeight: '800',
     color: '#FFFFFF',
-  },
-  rejectDonationBtn: {
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: '#FDE8E7',
-    flexShrink: 0,
-  },
-  rejectDonationBtnText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: '#D93025',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
-  // ── Receipt Modal ───────────────────────────────────────
+  // Receipt Modal
   receiptModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 18,
+    padding: 20,
   },
   receiptModalCard: {
-    width: '100%',
-    maxHeight: '85%',
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#473018',
     borderRadius: 20,
     padding: 16,
-    alignItems: 'center',
+    width: '100%',
+    maxWidth: 340,
   },
   receiptModalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    width: '100%',
+    alignItems: 'center',
     marginBottom: 12,
   },
   receiptModalTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',
   },
   receiptFullImage: {
     width: '100%',
-    height: 380,
-    borderRadius: 12,
-    marginBottom: 16,
+    height: 300,
+    borderRadius: 10,
+    backgroundColor: '#000000',
   },
   receiptCloseBtn: {
-    backgroundColor: '#2E7A99',
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    borderRadius: 20,
+    marginTop: 12,
+    alignItems: 'center',
+    paddingVertical: 8,
   },
   receiptCloseBtnText: {
+    fontSize: 12,
     color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
   },
 });
