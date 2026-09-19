@@ -25,7 +25,6 @@ export default function RescueCard({ report, onPress, style }) {
           <Image source={{ uri: report.photo }} style={styles.photo} resizeMode="cover" />
         ) : (
           <View style={styles.photoFallback}>
-            <Ionicons name="paw-outline" size={28} color={COLORS.primaryLight} />
             <Text style={styles.photoFallbackText}>No photo attached</Text>
           </View>
         )}
@@ -48,14 +47,13 @@ export default function RescueCard({ report, onPress, style }) {
         {/* Reporter row */}
         <View style={styles.topRow}>
           <Avatar name={report.reporterName} uri={report.reporterAvatar} userId={report.reporterId} size={24} />
-          <Text style={styles.reporterName} numberOfLines={1}>{report.reporterName}</Text>
+          <View style={styles.nameWrap}>
+            <Text style={styles.reporterName} numberOfLines={1}>{report.reporterName}</Text>
+          </View>
           <Text style={styles.dot}>·</Text>
           <Text style={styles.timeAgo}>{timeAgo}</Text>
           <View style={styles.spacer} />
-          <View style={styles.animalChip}>
-            <Ionicons name="paw-outline" size={10} color={COLORS.primaryDeep} />
-            <Text style={styles.animalChipText}>{report.animalType}</Text>
-          </View>
+          <Text style={styles.animalText}>{report.animalType}</Text>
         </View>
 
         {/* Description */}
@@ -63,7 +61,6 @@ export default function RescueCard({ report, onPress, style }) {
 
         {/* Location */}
         <View style={styles.locRow}>
-          <Ionicons name="location-outline" size={12} color={COLORS.textMuted} />
           <Text style={styles.locText} numberOfLines={1}>
             {report.location?.address || 'Location not set'}
           </Text>
@@ -72,17 +69,11 @@ export default function RescueCard({ report, onPress, style }) {
         {/* Footer */}
         <View style={styles.footer}>
           {report.comments?.length > 0 ? (
-            <View style={styles.commentRow}>
-              <Ionicons name="chatbubble-outline" size={11} color={COLORS.textMuted} />
-              <Text style={styles.commentText}>
-                {report.comments.length} comment{report.comments.length !== 1 ? 's' : ''}
-              </Text>
-            </View>
+            <Text style={styles.commentText}>
+              {report.comments.length} comment{report.comments.length !== 1 ? 's' : ''}
+            </Text>
           ) : <View />}
-          <View style={styles.viewRow}>
-            <Text style={styles.viewLabel}>View details</Text>
-            <Ionicons name="chevron-forward" size={12} color={COLORS.primaryDeep} />
-          </View>
+          <Text style={styles.viewLabel}>View details</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -100,10 +91,12 @@ function fmtAgo(iso) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.surface,
-    borderRadius: SIZES.r16,
+    borderRadius: SIZES.r12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     overflow: 'hidden',
     marginBottom: SIZES.md16,
-    ...SHADOWS.card,
+    // No shadow, flat clean look
   },
 
   // Photo — compact height so cards aren't bloated
@@ -139,22 +132,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     gap: SIZES.xs4 + 2, marginBottom: SIZES.xs4 + 2,
   },
+  nameWrap: { flexShrink: 1 },
   reporterName: {
     fontSize: SIZES.sm, fontWeight: '700',
-    color: COLORS.textPrimary, flexShrink: 1,
+    color: COLORS.textPrimary,
     fontFamily: 'PlusJakartaSans_700Bold',
   },
   dot:    { fontSize: SIZES.xs, color: COLORS.textMuted },
   timeAgo:{ fontSize: SIZES.xs, color: COLORS.textMuted, fontFamily: 'PlusJakartaSans_500Medium' },
   spacer: { flex: 1 },
 
-  animalChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: COLORS.tagBg,
-    paddingHorizontal: SIZES.sm8, paddingVertical: 2,
-    borderRadius: SIZES.r999,
+  animalText: { 
+    fontSize: SIZES.xs, fontWeight: '700', color: COLORS.primaryDeep, fontFamily: 'PlusJakartaSans_700Bold' 
   },
-  animalChipText: { fontSize: SIZES.xs, fontWeight: '700', color: COLORS.primaryDeep, fontFamily: 'PlusJakartaSans_700Bold' },
 
   desc: {
     fontSize: 13.5,
@@ -165,18 +155,17 @@ const styles = StyleSheet.create({
   },
 
   locRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
+    flexDirection: 'row', alignItems: 'center',
     marginBottom: SIZES.sm8,
   },
   locText: { fontSize: SIZES.xs, color: COLORS.textSecondary, flex: 1, fontFamily: 'PlusJakartaSans_500Medium' },
 
   footer: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingTop: SIZES.xs4 + 2,
-    borderTopWidth: 1, borderTopColor: COLORS.divider,
+    paddingTop: SIZES.sm8,
+    marginTop: SIZES.sm8,
+    borderTopWidth: 1, borderTopColor: COLORS.borderLight,
   },
-  commentRow:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
   commentText: { fontSize: SIZES.xs, color: COLORS.textMuted, fontFamily: 'PlusJakartaSans_500Medium' },
-  viewRow:     { flexDirection: 'row', alignItems: 'center', gap: 2 },
   viewLabel:   { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.primaryDeep, fontFamily: 'PlusJakartaSans_700Bold' },
 });

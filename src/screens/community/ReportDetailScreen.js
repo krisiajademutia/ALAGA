@@ -88,7 +88,6 @@ export default function ReportDetailScreen({ route, navigation }) {
           if (allPhotos.length === 0) {
             return (
               <View style={styles.photoPlaceholder}>
-                <Ionicons name="paw" size={48} color={COLORS.primaryLight} />
                 <Text style={styles.photoHint}>No photo attached</Text>
               </View>
             );
@@ -138,25 +137,22 @@ export default function ReportDetailScreen({ route, navigation }) {
         {/* Status + Urgency pills */}
         <View style={styles.pillRow}>
           <StatusPill status={report.status} />
-          <View style={[styles.urgencyPill, { backgroundColor: urgency.bg }]}>
-            <View style={[styles.urgencyDot, { backgroundColor: urgency.color }]} />
-            <Text style={[styles.urgencyText, { color: urgency.color }]}>
-              {report.urgency} Urgency
-            </Text>
-          </View>
+          <Text style={[styles.urgencyText, { color: urgency.color }]}>
+            {report.urgency} Urgency
+          </Text>
         </View>
 
         {/* Animal info */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Animal Details</Text>
-          <InfoRow icon="paw-outline"          label="Type"        value={report.animalType} />
-          <InfoRow icon="medical-outline"       label="Condition"   value={report.condition} />
-          <InfoRow icon="document-text-outline" label="Description" value={report.description} />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Animal Details</Text>
+          <InfoRow label="Type"        value={report.animalType} />
+          <InfoRow label="Condition"   value={report.condition} />
+          <InfoRow label="Description" value={report.description} />
         </View>
 
         {/* ── Location card with interactive map ─────────────── */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Location</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Location</Text>
           <MapCard
             location={report.location}
             title={`${report.animalType} reported here`}
@@ -165,8 +161,8 @@ export default function ReportDetailScreen({ route, navigation }) {
         </View>
 
         {/* Reporter — tappable avatar → PublicProfile */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Reported By</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Reported By</Text>
           <TouchableOpacity
             style={styles.userRow}
             onPress={() => navigation.navigate('PublicProfile', {
@@ -178,23 +174,21 @@ export default function ReportDetailScreen({ route, navigation }) {
           >
             <Avatar name={report.reporterName} uri={report.reporterAvatar} size={42} />
             <View style={styles.userInfo}>
-              <Text style={styles.userName}>{report.reporterName}</Text>
-              <Text style={styles.userSub}>
+              <Text style={styles.userName} numberOfLines={1}>{report.reporterName}</Text>
+              <Text style={styles.userSub} numberOfLines={1}>
                 {new Date(report.createdAt).toLocaleDateString('en-PH', { dateStyle: 'medium' })}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
           </TouchableOpacity>
         </View>
 
-        {/* Responder badge & direct chat */}
+        {/* Responder section */}
         {report.responderId && (
-          <View style={[styles.card, styles.responderCard]}>
+          <View style={styles.responderSection}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons name="shield-checkmark" size={20} color={COLORS.secondaryDark} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.responderText}>
-                  {report.responderName || 'An advocate'} has responded to this rescue!
+                  {report.responderName || 'An advocate'} has responded to this rescue.
                 </Text>
                 <Text style={{ fontSize: 11.5, color: '#685038', marginTop: 2 }}>
                   Coordinate live assistance and arrival with the advocate.
@@ -204,16 +198,7 @@ export default function ReportDetailScreen({ route, navigation }) {
 
             {report.responderId !== currentUser?.id && (
               <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: '#2E7A99',
-                  paddingVertical: 9,
-                  borderRadius: 12,
-                  marginTop: 10,
-                  gap: 6,
-                }}
+                style={styles.simpleBtn}
                 onPress={() => {
                   const convId = startConversation(report.responderId, report.responderName || 'Advocate');
                   navigation.navigate('Chat', {
@@ -224,8 +209,7 @@ export default function ReportDetailScreen({ route, navigation }) {
                   });
                 }}
               >
-                <Ionicons name="chatbubbles" size={15} color="#FFFFFF" />
-                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
+                <Text style={styles.simpleBtnText}>
                   Chat with {report.responderName || 'Advocate'}
                 </Text>
               </TouchableOpacity>
@@ -236,11 +220,10 @@ export default function ReportDetailScreen({ route, navigation }) {
         {/* Advocate action buttons */}
         {canRespond && (
           <Button
-            title="Respond — I'll Help!"
+            title="Respond — I'll Help"
             onPress={handleRespond}
             variant="secondary"
             style={styles.actionBtn}
-            icon={<Ionicons name="shield-checkmark-outline" size={18} color="#fff" />}
           />
         )}
         {canMarkRescued && (
@@ -248,13 +231,12 @@ export default function ReportDetailScreen({ route, navigation }) {
             title="Mark as Rescued"
             onPress={handleMarkRescued}
             style={styles.actionBtn}
-            icon={<Ionicons name="checkmark-circle-outline" size={18} color="#fff" />}
           />
         )}
 
         {/* Comments */}
         <Text style={styles.commentsTitle}>
-          Comments ({countComments(report.comments)})
+          Comments: {countComments(report.comments)}
         </Text>
         {(!report.comments || report.comments.length === 0) && (
           <Text style={styles.noComments}>No comments yet. Be the first to respond.</Text>
@@ -425,10 +407,9 @@ function CommentNode({ comment, onReply, onUserPress, depth = 0 }) {
   );
 }
 
-function InfoRow({ icon, label, value }) {
+function InfoRow({ label, value }) {
   return (
     <View style={styles.infoRow}>
-      <Ionicons name={icon} size={15} color={COLORS.textMuted} style={styles.infoIcon} />
       <View style={styles.infoContent}>
         <Text style={styles.infoLabel}>{label}</Text>
         <Text style={styles.infoValue}>{value}</Text>
@@ -440,18 +421,15 @@ function InfoRow({ icon, label, value }) {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: COLORS.background },
 
-  scroll: { padding: SIZES.paddingL, paddingBottom: 20 },
+  scroll: { paddingBottom: 40 },
 
   photoContainer: {
     position: 'relative',
-    borderRadius: SIZES.radiusLg,
     overflow: 'hidden',
-    marginBottom: SIZES.paddingM,
   },
   photo: {
     width: '100%',
-    height: 220,
-    borderRadius: SIZES.radiusLg,
+    height: 350,
     resizeMode: 'cover',
   },
   tapToExpandBadge: {
@@ -472,15 +450,13 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
   },
   multiPhotoWrap: {
-    marginBottom: SIZES.paddingM,
+    position: 'relative',
   },
   multiPhotoScroll: {
-    borderRadius: SIZES.radiusLg,
   },
   multiPhotoCard: {
-    width: PHOTO_CARD_WIDTH,
+    width: SCREEN_WIDTH,
     position: 'relative',
-    borderRadius: SIZES.radiusLg,
     overflow: 'hidden',
   },
   photoCountBadge: {
@@ -499,117 +475,138 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
   },
   multiPhotoHint: {
-    color: COLORS.textMuted,
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(20, 20, 20, 0.65)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     fontSize: SIZES.xsmall,
-    textAlign: 'center',
-    marginTop: 6,
     fontFamily: 'PlusJakartaSans_500Medium',
   },
   photoPlaceholder: {
-    height: 160,
-    backgroundColor: COLORS.tagBg,
-    borderRadius: SIZES.radiusLg,
+    height: 200,
+    backgroundColor: '#F0F0F0',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SIZES.paddingM,
   },
   photoHint: { color: COLORS.textMuted, fontSize: SIZES.small, marginTop: 8, fontFamily: 'PlusJakartaSans_500Medium' },
 
-  pillRow: { flexDirection: 'row', gap: 8, marginBottom: SIZES.paddingM },
-  urgencyPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: SIZES.radiusFull,
+  pillRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 8, 
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
-  urgencyDot:  { width: 8, height: 8, borderRadius: 4 },
-  urgencyText: { fontSize: SIZES.xsmall, fontWeight: '700', fontFamily: 'PlusJakartaSans_700Bold' },
+  urgencyText: { fontSize: SIZES.sm, fontWeight: '700', fontFamily: 'PlusJakartaSans_700Bold' },
 
-  card: {
-    backgroundColor: COLORS.surface, borderRadius: SIZES.radiusLg,
-    padding: SIZES.paddingM, marginBottom: SIZES.paddingM, ...SHADOWS.card,
+  section: {
+    backgroundColor: COLORS.surface,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderBottomWidth: 6,
+    borderBottomColor: '#F2F2F2',
   },
-  cardTitle: {
-    fontSize: SIZES.body, fontWeight: '800',
-    color: COLORS.brown, marginBottom: 12,
-    letterSpacing: -0.2,
+  sectionTitle: {
+    fontSize: 15, fontWeight: '700',
+    color: COLORS.textPrimary, marginBottom: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
-  mapCard: { borderRadius: SIZES.radius, overflow: 'hidden' },
+  mapCard: { borderRadius: 0, overflow: 'hidden' },
 
-  infoRow:    { flexDirection: 'row', marginBottom: 10 },
-  infoIcon:   { marginRight: 10, marginTop: 2 },
+  infoRow: { 
+    flexDirection: 'row', 
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E0E0E0',
+  },
   infoContent:{ flex: 1 },
   infoLabel:  {
-    fontSize: SIZES.xsmall, color: COLORS.textMuted,
-    fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6,
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12, color: '#666',
+    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    marginBottom: 4,
   },
-  infoValue:  { fontSize: SIZES.body, color: COLORS.brown, marginTop: 3, lineHeight: 20, fontFamily: 'PlusJakartaSans_500Medium' },
+  infoValue:  { fontSize: 14, color: COLORS.textPrimary, fontFamily: 'PlusJakartaSans_400Regular' },
 
   userRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  userInfo: { flex: 1 },
-  userName: { fontSize: SIZES.body, fontWeight: '700', color: COLORS.brown, fontFamily: 'PlusJakartaSans_700Bold' },
-  userSub:  { fontSize: SIZES.small, color: COLORS.textMuted, marginTop: 2, fontFamily: 'PlusJakartaSans_500Medium' },
+  userInfo: { flex: 1, flexShrink: 1 },
+  userName: { fontSize: 15, fontWeight: '700', color: COLORS.textPrimary, fontFamily: 'PlusJakartaSans_700Bold' },
+  userSub:  { fontSize: 13, color: COLORS.textMuted, marginTop: 2, fontFamily: 'PlusJakartaSans_400Regular' },
 
-  responderCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: COLORS.advocateBadge,
+  responderSection: {
+    backgroundColor: '#F0F8FF',
+    padding: 16,
+    borderBottomWidth: 6,
+    borderBottomColor: '#F2F2F2',
   },
-  responderText: { flex: 1, fontSize: SIZES.body, color: COLORS.secondaryDark, fontWeight: '600', fontFamily: 'PlusJakartaSans_600SemiBold' },
+  responderText: { flex: 1, fontSize: 14, color: '#004085', fontWeight: '600', fontFamily: 'PlusJakartaSans_600SemiBold' },
 
-  actionBtn: { marginBottom: SIZES.paddingM, borderRadius: SIZES.radiusFull },
+  simpleBtn: {
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#2E7A99',
+    paddingVertical: 10, borderRadius: SIZES.r8,
+    marginTop: 12,
+  },
+  simpleBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold' },
+
+  actionBtn: { marginHorizontal: 16, marginBottom: 12, borderRadius: SIZES.r8 },
 
   commentsTitle: {
-    fontSize: SIZES.medium, fontWeight: '800',
-    color: COLORS.brown, marginBottom: SIZES.paddingM,
-    letterSpacing: -0.2,
+    fontSize: 15, fontWeight: '700',
+    color: COLORS.textPrimary, 
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  noComments: { fontSize: SIZES.body, color: COLORS.textMuted, marginBottom: SIZES.paddingM, fontFamily: 'PlusJakartaSans_400Regular' },
+  noComments: { fontSize: SIZES.body, color: COLORS.textMuted, marginHorizontal: 16, marginBottom: SIZES.paddingM, fontFamily: 'PlusJakartaSans_400Regular' },
 
-  commentNodeWrap: { marginBottom: 8 },
+  commentNodeWrap: { marginBottom: 12, paddingHorizontal: 16 },
   replyIndent: {
-    marginLeft: 14,
-    paddingLeft: 8,
-    borderLeftWidth: 2,
-    borderLeftColor: COLORS.border,
-    marginTop: 6,
+    marginLeft: 38,
+    marginTop: 8,
   },
   repliesList: { marginTop: 4 },
   commentItem: { flexDirection: 'row', alignItems: 'flex-start' },
   commentBubble: {
-    flex: 1, marginLeft: 8, backgroundColor: COLORS.surface,
-    borderRadius: SIZES.r12, paddingHorizontal: 12, paddingVertical: 10,
-    borderWidth: 1, borderColor: COLORS.border,
+    flex: 1, marginLeft: 10,
   },
   commentBubbleReply: {
-    backgroundColor: COLORS.inputBg,
   },
-  commentUser: { fontSize: SIZES.small, fontWeight: '700', color: COLORS.brown, fontFamily: 'PlusJakartaSans_700Bold' },
-  commentText: { fontSize: SIZES.body, color: COLORS.textSecondary, marginTop: 2, lineHeight: 20, fontFamily: 'PlusJakartaSans_400Regular' },
-  commentMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
-  commentTime: { fontSize: SIZES.xsmall, color: COLORS.textMuted, fontFamily: 'PlusJakartaSans_500Medium' },
-  replyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 2 },
-  replyBtnText: { fontSize: SIZES.xsmall, fontWeight: '700', color: COLORS.primaryDeep, fontFamily: 'PlusJakartaSans_700Bold' },
+  commentUser: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', fontFamily: 'PlusJakartaSans_700Bold' },
+  commentText: { fontSize: 14, color: '#333333', marginTop: 2, lineHeight: 20, fontFamily: 'PlusJakartaSans_400Regular' },
+  commentMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 12 },
+  commentTime: { fontSize: 12, color: COLORS.textMuted, fontFamily: 'PlusJakartaSans_500Medium' },
+  replyBtn: { flexDirection: 'row', alignItems: 'center' },
+  replyBtnText: { fontSize: 12, fontWeight: '600', color: COLORS.textMuted, fontFamily: 'PlusJakartaSans_600SemiBold' },
 
   replyBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SIZES.paddingL, paddingVertical: 8,
-    backgroundColor: COLORS.tagBg, borderTopWidth: 1, borderTopColor: COLORS.divider,
+    backgroundColor: '#F5F5F5', borderTopWidth: 1, borderTopColor: COLORS.divider,
   },
-  replyBannerText: { fontSize: SIZES.small, color: COLORS.primaryDeep, fontFamily: 'PlusJakartaSans_600SemiBold' },
+  replyBannerText: { fontSize: SIZES.small, color: COLORS.textPrimary, fontFamily: 'PlusJakartaSans_600SemiBold' },
 
   inputBar: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: SIZES.paddingL, paddingVertical: 12,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-    backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.divider,
+    paddingHorizontal: 16, paddingVertical: 10,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 10,
+    backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: '#E0E0E0',
   },
   commentInput: {
-    flex: 1, minHeight: 40, backgroundColor: COLORS.inputBg,
+    flex: 1, minHeight: 40, backgroundColor: '#F0F2F5',
     borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8,
-    fontSize: SIZES.body, color: COLORS.brown,
-    borderWidth: 1.5, borderColor: COLORS.border,
+    fontSize: 14, color: '#1A1A1A',
     fontFamily: 'PlusJakartaSans_500Medium',
   },
   sendBtn:         { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
@@ -618,7 +615,7 @@ const styles = StyleSheet.create({
   // Full-Screen Image Preview Modal
   previewModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 28, 0.96)',
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
     justifyContent: 'space-between',
   },
   previewTopHeader: {
@@ -647,7 +644,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
   },
   previewFullImage: {
     width: '100%',

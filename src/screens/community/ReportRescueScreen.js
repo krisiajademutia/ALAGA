@@ -520,7 +520,7 @@ export default function ReportRescueScreen({ navigation }) {
             >
               <Ionicons name="camera-outline" size={20} color="#2E7A99" style={{ marginRight: 8 }} />
               <Text style={styles.addPhotoText}>Attach Photos</Text>
-              <Text style={styles.addPhotoSubText}>(Multiple photos allowed)</Text>
+              <Text style={styles.addPhotoSubText}>Multiple photos allowed</Text>
             </TouchableOpacity>
           )}
 
