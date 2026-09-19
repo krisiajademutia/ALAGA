@@ -310,3 +310,21 @@ export async function loginWithGoogleProfile({ email, name, photoURL, role = 'co
   }
 }
 
+/**
+ * Fetch a specific user's profile from Firestore (including their real payoutMethods)
+ */
+export async function getUserProfileFirebase(userId) {
+  if (isMockFirebase() || !db || !userId) return null;
+  try {
+    const userDocRef = doc(db, 'users', userId);
+    const userDocSnap = await getDoc(userDocRef);
+    if (userDocSnap.exists()) {
+      return { id: userId, ...userDocSnap.data() };
+    }
+    return null;
+  } catch (err) {
+    console.warn('[authService] Error fetching user profile:', err);
+    return null;
+  }
+}
+

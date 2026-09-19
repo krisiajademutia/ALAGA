@@ -371,17 +371,35 @@ export default function AnimalDetailScreen({ route, navigation }) {
             ))}
           </View>
 
-          {/* Donate shortcut — Community Supporters only (RBAC) */}
-          {!isOwner && isCommunity && animal.status !== 'Adopted' && (
+          {/* Donate shortcut — Any user can support animals they don't own (peer-to-peer) */}
+          {!isOwner && animal.status !== 'Adopted' && (
             <TouchableOpacity
               style={styles.donateBanner}
-              onPress={() => navigation.navigate('Donate', { animalId: animal.id, animalName: animal.name })}
+              onPress={() => navigation.navigate('Donate', {
+                animalId: animal.id,
+                animalName: animal.name,
+                advocateId: animal.advocateId,
+              })}
             >
               <Ionicons name="gift-outline" size={18} color={COLORS.primaryDeep} />
               <Text style={styles.donateBannerText}>
-                Want to support {animal.name}'s food & vet care? Donate here
+                Want to support {animal.name}'s food & care? Donate here
               </Text>
               <Ionicons name="chevron-forward" size={16} color={COLORS.primaryDeep} />
+            </TouchableOpacity>
+          )}
+
+          {/* Owner Payout Setup Shortcut */}
+          {isOwner && animal.status !== 'Adopted' && (
+            <TouchableOpacity
+              style={[styles.donateBanner, { backgroundColor: '#EBF4FF', borderColor: '#90CDF4' }]}
+              onPress={() => navigation.navigate('Profile', { openPayoutModal: true })}
+            >
+              <Ionicons name="card-outline" size={18} color="#007DFE" />
+              <Text style={[styles.donateBannerText, { color: '#0D3B66' }]}>
+                Want to receive donations for {animal.name}? Set up GCash/Maya in Profile
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color="#007DFE" />
             </TouchableOpacity>
           )}
         </View>

@@ -17,6 +17,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 LogBox.ignoreLogs([
   'Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go',
   '`expo-notifications` functionality is not fully supported in Expo Go',
+  "Response.blob() is using React Native's Blob",
 ]);
 
 export default function App() {

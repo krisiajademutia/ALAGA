@@ -10,30 +10,31 @@ import StatusPill from '../../components/StatusPill';
 import Header from '../../components/Header';
 
 export default function PublicProfileScreen({ route, navigation }) {
-  const { userId } = route.params || {};
+  const targetUserId = route?.params?.userId || route?.params?.advocateId;
   const { users, animals, rescueReports, currentUser, startConversation, getAnimalsByAdvocate } = useApp();
 
-  const user = users.find((u) => u.id === userId);
+  const activeUserId = targetUserId || currentUser?.id;
+  const user = (currentUser?.id === activeUserId ? currentUser : null) || users.find((u) => u.id === activeUserId);
   if (!user) return null;
 
   const isAdvocate  = user.role === 'advocate';
-  const isOwnProfile = currentUser?.id === userId;
+  const isOwnProfile = currentUser?.id === user.id;
 
-  const userAnimals   = getAnimalsByAdvocate(userId);
+  const userAnimals   = getAnimalsByAdvocate(user.id);
   const listedAnimals = userAnimals.filter(
     (a) => a.status === 'Available'
   );
-  const userReports   = rescueReports.filter((r) => r.responderId === userId && r.status === 'Rescued');
+  const userReports   = rescueReports.filter((r) => (r.responderId === user.id || r.userId === user.id) && r.status === 'Rescued');
 
   const handleMessage = () => {
     const convId = startConversation(
-      userId,
+      user.id,
       user.name
     );
     navigation.navigate('Chat', {
       conversationId: convId,
       otherName: user.name,
-      otherId: userId,
+      otherId: user.id,
       initialDraft: `Hi ${user.name}! I found your profile on ALAGA.`,
     });
   };
@@ -67,13 +68,13 @@ export default function PublicProfileScreen({ route, navigation }) {
             ) : (
               <View style={[styles.avatarImg, styles.avatarPlaceholder]}>
                 <Text style={styles.avatarInitials}>
-                  {user.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
+                  {user.name ? user.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase() : 'AL'}
                 </Text>
               </View>
             )}
           </View>
 
-          <Text style={styles.name}>{user.name}</Text>
+          <Text style={styles.name}>{user.name || 'Community Member'}</Text>
 
           {/* Role pill */}
           <View style={[
@@ -108,7 +109,7 @@ export default function PublicProfileScreen({ route, navigation }) {
             <View style={styles.metaChip}>
               <Ionicons name="calendar-outline" size={13} color={COLORS.textMuted} />
               <Text style={styles.metaText}>
-                Since {new Date(user.joinedAt).toLocaleDateString('en-PH', { month: 'short', year: 'numeric' })}
+                Since {new Date(user.joinedAt || Date.now()).toLocaleDateString('en-PH', { month: 'short', year: 'numeric' })}
               </Text>
             </View>
           </View>
@@ -139,7 +140,7 @@ export default function PublicProfileScreen({ route, navigation }) {
               <StatItem
                 icon="alert-circle"
                 label="Reports"
-                value={rescueReports.filter((r) => r.reporterId === userId).length}
+                value={rescueReports.filter((r) => r.reporterId === user.id || r.userId === user.id).length}
                 color={COLORS.danger}
               />
               <View style={styles.statDiv} />
@@ -217,7 +218,7 @@ export default function PublicProfileScreen({ route, navigation }) {
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Rescue Reports Filed</Text>
             </View>
-            {rescueReports.filter((r) => r.reporterId === userId).length === 0 ? (
+            {rescueReports.filter((r) => r.reporterId === user.id || r.userId === user.id).length === 0 ? (
               <EmptyState
                 icon="alert-circle-outline"
                 title="No reports yet"
@@ -225,7 +226,7 @@ export default function PublicProfileScreen({ route, navigation }) {
               />
             ) : (
               rescueReports
-                .filter((r) => r.reporterId === userId)
+                .filter((r) => r.reporterId === user.id || r.userId === user.id)
                 .slice(0, 5)
                 .map((r) => (
                   <TouchableOpacity

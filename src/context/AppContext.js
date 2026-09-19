@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -6,6 +6,7 @@ import {
   registerWithFirebase,
   logoutFromFirebase,
   updateUserProfile,
+  getUserProfileFirebase,
   loginWithGoogleCredential,
   loginWithGoogleProfile,
 } from '../services/authService';
@@ -31,6 +32,12 @@ import {
   markConversationReadFirebase,
   deleteConversationFirebase,
 } from '../services/chatService';
+import {
+  subscribeToDonations,
+  createDonationFirebase,
+  verifyDonationFirebase,
+} from '../services/donationService';
+import { uploadImageToStorage } from '../services/storageService';
 import { isMockFirebase } from '../config/firebaseConfig';
 import * as Location from 'expo-location';
 import {
@@ -59,6 +66,7 @@ const defaultContext = {
   loginWithGoogle: () => ({ success: false }),
   logout: () => {},
   updateUser: () => {},
+  getUserProfile: () => Promise.resolve(null),
   addRescueReport: () => {},
   respondToReport: () => {},
   markRescued: () => {},
@@ -76,6 +84,7 @@ const defaultContext = {
   deleteConversation: () => {},
   setActiveConversationId: () => {},
   submitDonation: () => {},
+  verifyDonation: () => {},
   getUserConversations: () => [],
   getUnreadMessagesCount: () => 0,
   markConversationRead: () => {},
@@ -87,6 +96,8 @@ const defaultContext = {
   getAdvocateAnimals: () => [],
   getAnimalsByAdvocate: () => [],
   getUserDonations: () => [],
+  getAdvocateDonations: () => [],
+  getAnimalDonations: () => [],
   getUserNotifications: () => [],
   getUnreadCount: () => 0,
   markNotificationRead: () => {},
@@ -119,6 +130,7 @@ export function AppProvider({ children }) {
   const notifiedReportIdsRef = useRef(new Set()); // Set of report IDs that have triggered phone alerts for active user
   const notifiedMessageIdsRef = useRef(new Set()); // Set of message IDs that have triggered alerts
   const activeConversationIdRef = useRef(null); // ID of chat screen currently active/focused
+  const userProfilesCacheRef = useRef(new Map()); // In-memory cache of fetched user profiles to prevent re-render loops
 
   const setActiveConversationId = (id) => {
     activeConversationIdRef.current = id;
@@ -220,7 +232,6 @@ export function AppProvider({ children }) {
       icon: notifData.icon || (notifData.type === 'rescue' ? 'shield-outline' : notifData.type === 'chat' ? 'chatbubble' : 'notifications'),
       iconBg: notifData.iconBg || (notifData.type === 'rescue' ? '#FDF0ED' : notifData.type === 'chat' ? '#E0F2FA' : '#FEF3E2'),
       iconColor: notifData.iconColor || (notifData.type === 'rescue' ? '#C23E3E' : notifData.type === 'chat' ? '#206B82' : '#F5A623'),
-      timeAgo: 'Just now',
       section: 'TODAY',
       ...notifData,
     };
@@ -537,6 +548,27 @@ export function AppProvider({ children }) {
     })();
   }, []);
 
+  // ── Load & Persist Donations ───────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem('@alaga_donations_v2');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setDonations(parsed);
+          }
+        }
+      } catch (e) {}
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (Array.isArray(donations) && donations.length > 0) {
+      AsyncStorage.setItem('@alaga_donations_v2', JSON.stringify(donations)).catch(() => {});
+    }
+  }, [donations]);
+
   useEffect(() => {
     if (Array.isArray(conversations) && conversations.length > 0) {
       AsyncStorage.setItem('@alaga_conversations_v2', JSON.stringify(conversations)).catch(() => {});
@@ -618,7 +650,7 @@ export function AppProvider({ children }) {
     }
   }, [currentUser?.id]);
 
-  // User-specific applications & conversations listener (runs only when authenticated)
+  // User-specific applications, conversations & donations listener (runs only when authenticated)
   useEffect(() => {
     if (!isMockFirebase() && currentUser?.id) {
       const unsubApps = subscribeToApplications(currentUser, (liveApps) => {
@@ -627,9 +659,15 @@ export function AppProvider({ children }) {
       const unsubConvos = subscribeToConversations(currentUser, (liveConvos) => {
         handleLiveConversations(liveConvos);
       });
+      const unsubDonations = subscribeToDonations((liveDonations) => {
+        if (Array.isArray(liveDonations)) {
+          setDonations(liveDonations);
+        }
+      });
       return () => {
         unsubApps?.();
         unsubConvos?.();
+        unsubDonations?.();
       };
     } else {
       setRequests([]);
@@ -685,15 +723,39 @@ export function AppProvider({ children }) {
   };
 
   // ── Update current user profile ───────────────────────────────────────────
-  const updateUser = (updates) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === currentUser?.id ? { ...u, ...updates } : u))
-    );
+  const updateUser = async (updates) => {
+    setUsers((prev) => {
+      const exists = (prev || []).some((u) => u.id === currentUser?.id);
+      if (exists) {
+        return prev.map((u) => (u.id === currentUser?.id ? { ...u, ...updates } : u));
+      }
+      return [...(prev || []), { ...currentUser, ...updates }];
+    });
     setCurrentUser((prev) => ({ ...prev, ...updates }));
     if (currentUser?.id) {
-      updateUserProfile(currentUser.id, updates);
+      userProfilesCacheRef.current.delete(currentUser.id);
+      await updateUserProfile(currentUser.id, updates);
     }
   };
+
+  const getUserProfile = useCallback(async (userId) => {
+    if (!userId) return null;
+    if (currentUser?.id === userId) return currentUser;
+    if (userProfilesCacheRef.current.has(userId)) {
+      return userProfilesCacheRef.current.get(userId);
+    }
+    const existing = (users || []).find((u) => u.id === userId);
+    if (existing?.payoutMethods) {
+      userProfilesCacheRef.current.set(userId, existing);
+      return existing;
+    }
+    const remote = await getUserProfileFirebase(userId);
+    if (remote) {
+      userProfilesCacheRef.current.set(userId, remote);
+      return remote;
+    }
+    return existing || null;
+  }, [currentUser, users]);
 
   // ── Rescue Reports ────────────────────────────────────────────────────────
   const addRescueReport = (reportData) => {
@@ -1179,17 +1241,112 @@ export function AppProvider({ children }) {
   };
 
   // ── Donations ─────────────────────────────────────────────────────────────
-  const submitDonation = (donationData) => {
+  const submitDonation = async (donationData) => {
+    const rawAmount = typeof donationData.amount === 'number'
+      ? donationData.amount
+      : parseFloat(String(donationData.amount || '0').replace(/[^0-9.]/g, '')) || 0;
+
+    let proofUrl = donationData.proofPhoto || null;
+    if (proofUrl && typeof proofUrl === 'string' && !proofUrl.startsWith('http') && !proofUrl.startsWith('data:')) {
+      try {
+        const uploaded = await uploadImageToStorage(proofUrl);
+        if (uploaded) proofUrl = uploaded;
+      } catch (e) {
+        console.warn('[AppContext] Receipt upload warning:', e.message);
+      }
+    }
+
+    const donorId = currentUser?.id || currentUser?.uid;
+    const docId = `d_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const newDonation = {
-      id: `d${Date.now()}`,
-      donorId: currentUser.id,
-      donorName: currentUser.name,
+      id: docId,
+      donorId,
+      donorName: currentUser?.name || 'Community Supporter',
+      donorEmail: currentUser?.email || '',
+      donorAvatar: currentUser?.avatar || '',
       status: 'Pending',
       createdAt: new Date().toISOString(),
       ...donationData,
+      amount: rawAmount,
+      amountDisplay: `₱${rawAmount.toLocaleString()}`,
+      proofPhoto: proofUrl,
     };
-    setDonations((prev) => [newDonation, ...prev]);
+
+    // Update local state immediately for responsive UI
+    setDonations((prev) => [newDonation, ...prev.filter((d) => d.id !== newDonation.id)]);
+
+    // Write to Firestore in real time
+    createDonationFirebase(newDonation).catch((err) => {
+      console.warn('[AppContext] createDonationFirebase warning:', err);
+    });
+
+    // Real-time notification for the recipient advocate (if applicable)
+    const advocateId = donationData.advocateId;
+    const recipientTitle = donationData.animalName || 'Rescue Patient Care';
+    if (advocateId && advocateId !== donorId) {
+      const notifTitle = '🎁 New Donation Received!';
+      const notifBody = `${newDonation.donorName} donated ₱${rawAmount.toLocaleString()} for ${recipientTitle}.`;
+      pushNotification({
+        userId: advocateId,
+        title: notifTitle,
+        body: notifBody,
+        message: notifBody,
+        type: 'donation',
+        donationId: newDonation.id,
+        icon: 'gift-outline',
+        iconBg: '#FEF3DC',
+        iconColor: '#B45309',
+      });
+      notifyPhoneSystem({
+        title: notifTitle,
+        body: notifBody,
+        data: { type: 'donation', donationId: newDonation.id },
+        channelId: 'default',
+      }).catch(() => {});
+    }
+
+    // Donor confirmation notification
+    pushNotification({
+      userId: donorId,
+      title: 'Donation Submitted 🐾',
+      body: `Thank you! Your donation of ₱${rawAmount.toLocaleString()} for ${recipientTitle} has been recorded (Ref: ${donationData.referenceNumber || 'Cash'}).`,
+      message: `Your donation of ₱${rawAmount.toLocaleString()} for ${recipientTitle} has been recorded.`,
+      type: 'donation',
+      donationId: newDonation.id,
+      icon: 'heart-outline',
+      iconBg: '#E8F5EE',
+      iconColor: '#2D9E5F',
+    });
+
     return newDonation;
+  };
+
+  const verifyDonation = async (donationId, status = 'Verified', notes = '') => {
+    setDonations((prev) =>
+      prev.map((d) => (d.id === donationId ? { ...d, status, advocateNotes: notes } : d))
+    );
+    await verifyDonationFirebase(donationId, status, notes);
+
+    const donation = donations.find((d) => d.id === donationId);
+    if (donation && donation.donorId) {
+      const isApproved = status === 'Verified';
+      const title = isApproved ? '✅ Donation Verified!' : 'Donation Update';
+      const body = isApproved
+        ? `Your donation of ₱${donation.amount?.toLocaleString()} for ${donation.animalName || 'ALAGA'} has been verified. Thank you for your generosity! 🐾`
+        : `Your donation for ${donation.animalName || 'ALAGA'} has been updated: ${status}.`;
+
+      pushNotification({
+        userId: donation.donorId,
+        title,
+        body,
+        message: body,
+        type: 'donation',
+        donationId,
+        icon: isApproved ? 'checkmark-circle-outline' : 'alert-circle-outline',
+        iconBg: isApproved ? '#E8F5EE' : '#FDE8E7',
+        iconColor: isApproved ? '#2D9E5F' : '#D93025',
+      });
+    }
   };
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -1330,6 +1487,12 @@ export function AppProvider({ children }) {
   const getUserDonations = () =>
     donations.filter((d) => d.donorId === currentUser?.id);
 
+  const getAdvocateDonations = () =>
+    donations.filter((d) => d.advocateId === currentUser?.id || !d.advocateId);
+
+  const getAnimalDonations = (animalId) =>
+    donations.filter((d) => d.animalId === animalId);
+
   // ── Notifications ─────────────────────────────────────────────────────────
   const getUserNotifications = () =>
     notifications
@@ -1404,6 +1567,7 @@ export function AppProvider({ children }) {
         setActiveConversationId,
         // donations
         submitDonation,
+        verifyDonation,
         // helpers
         getUserConversations,
         getUnreadMessagesCount,
@@ -1416,6 +1580,9 @@ export function AppProvider({ children }) {
         getAdvocateAnimals,
         getAnimalsByAdvocate,
         getUserDonations,
+        getAdvocateDonations,
+        getAnimalDonations,
+        getUserProfile,
         // notifications
         getUserNotifications,
         getUnreadCount,

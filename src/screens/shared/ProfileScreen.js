@@ -12,6 +12,7 @@ import {
   Modal,
   TextInput,
   KeyboardAvoidingView,
+  Switch,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,7 +24,7 @@ import AlertModal from '../../components/AlertModal';
 import PhotoPickerModal from '../../components/PhotoPickerModal';
 import { uploadImageToImgBB } from '../../services/storageService';
 
-export default function ProfileScreen({ navigation }) {
+export default function ProfileScreen({ route, navigation }) {
   const {
     currentUser,
     logout,
@@ -56,6 +57,127 @@ export default function ProfileScreen({ navigation }) {
   const [editOrg, setEditOrg] = useState(currentUser?.organization || '');
   const [editLocation, setEditLocation] = useState(currentUser?.location || '');
 
+  // Payout & Donation Accounts modal states
+  const [payoutModalVisible, setPayoutModalVisible] = useState(false);
+  const [savingPayout, setSavingPayout] = useState(false);
+
+  const [gcashEnabled, setGcashEnabled] = useState(false);
+  const [gcashName, setGcashName] = useState('');
+  const [gcashNumber, setGcashNumber] = useState('');
+  const [gcashQr, setGcashQr] = useState(null);
+
+  const [mayaEnabled, setMayaEnabled] = useState(false);
+  const [mayaName, setMayaName] = useState('');
+  const [mayaNumber, setMayaNumber] = useState('');
+  const [mayaQr, setMayaQr] = useState(null);
+
+  const [bankEnabled, setBankEnabled] = useState(false);
+  const [bankName, setBankName] = useState('');
+  const [bankAccountName, setBankAccountName] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+
+  // Auto-open payout modal if requested via navigation (e.g. from DonateScreen)
+  React.useEffect(() => {
+    if (route?.params?.openPayoutModal) {
+      setPayoutModalVisible(true);
+    }
+  }, [route?.params?.openPayoutModal]);
+
+  // Load payout methods when currentUser changes
+  React.useEffect(() => {
+    if (currentUser?.payoutMethods) {
+      const pm = currentUser.payoutMethods;
+      if (pm.gcash) {
+        setGcashEnabled(pm.gcash.enabled ?? Boolean(pm.gcash.accountNumber));
+        setGcashName(pm.gcash.accountName || '');
+        setGcashNumber(pm.gcash.accountNumber || '');
+        setGcashQr(pm.gcash.qrPhoto || null);
+      }
+      if (pm.maya) {
+        setMayaEnabled(pm.maya.enabled ?? Boolean(pm.maya.accountNumber));
+        setMayaName(pm.maya.accountName || '');
+        setMayaNumber(pm.maya.accountNumber || '');
+        setMayaQr(pm.maya.qrPhoto || null);
+      }
+      if (pm.bank) {
+        setBankEnabled(pm.bank.enabled ?? Boolean(pm.bank.accountNumber));
+        setBankName(pm.bank.bankName || '');
+        setBankAccountName(pm.bank.accountName || '');
+        setBankAccountNumber(pm.bank.accountNumber || '');
+      }
+    }
+  }, [currentUser]);
+
+  const handlePickQr = async (target) => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        showAlert('warning', 'Permission Required', 'Please grant photo library access to upload your payment QR code.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        quality: 0.85,
+        allowsEditing: false,
+      });
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        if (target === 'gcash') setGcashQr(result.assets[0].uri);
+        if (target === 'maya') setMayaQr(result.assets[0].uri);
+      }
+    } catch (e) {
+      console.warn('[ProfileScreen] Pick QR error:', e);
+    }
+  };
+
+  const handleSavePayoutMethods = async () => {
+    setSavingPayout(true);
+    try {
+      let uploadedGcashQr = gcashQr;
+      if (gcashQr && typeof gcashQr === 'string' && !gcashQr.startsWith('http') && !gcashQr.startsWith('data:')) {
+        const url = await uploadImageToImgBB(gcashQr);
+        if (url) uploadedGcashQr = url;
+      }
+
+      let uploadedMayaQr = mayaQr;
+      if (mayaQr && typeof mayaQr === 'string' && !mayaQr.startsWith('http') && !mayaQr.startsWith('data:')) {
+        const url = await uploadImageToImgBB(mayaQr);
+        if (url) uploadedMayaQr = url;
+      }
+
+      const payoutMethods = {
+        gcash: {
+          enabled: gcashEnabled,
+          accountName: gcashName.trim(),
+          accountNumber: gcashNumber.trim(),
+          qrPhoto: uploadedGcashQr,
+        },
+        maya: {
+          enabled: mayaEnabled,
+          accountName: mayaName.trim(),
+          accountNumber: mayaNumber.trim(),
+          qrPhoto: uploadedMayaQr,
+        },
+        bank: {
+          enabled: bankEnabled,
+          bankName: bankName.trim(),
+          accountName: bankAccountName.trim(),
+          accountNumber: bankAccountNumber.trim(),
+        },
+      };
+
+      await updateUser({ payoutMethods });
+      setSavingPayout(false);
+      setPayoutModalVisible(false);
+      showAlert(
+        'success',
+        'Accounts Saved! 💳',
+        'Your donation & payout methods have been updated in real time. Community members will now see your verified payment details and QR code when donating to your animals.'
+      );
+    } catch (err) {
+      setSavingPayout(false);
+      showAlert('error', 'Save Failed', 'Could not save payment accounts. Please check your network and try again.');
+    }
+  };
+
   const showAlert = (type, title, message, onPrimary = null, primaryText = 'OK', secondaryText = null, onSecondary = null) => {
     setAlertConfig({
       visible: true,
@@ -86,7 +208,7 @@ export default function ProfileScreen({ navigation }) {
         {
           label: 'Requests',
           value: getAdvocateRequests().length,
-          onPress: () => navigation.navigate('Activity', { tab: 'requests' }),
+          onPress: () => navigation.navigate('AdvocateRequests'),
         },
       ]
     : [
@@ -125,6 +247,14 @@ export default function ProfileScreen({ navigation }) {
       bg: '#EBF4EF',
     },
     {
+      icon: 'card-outline',
+      label: 'Donation & Payout Accounts',
+      desc: 'Set up your GCash, Maya, Bank & QR code to receive support',
+      onPress: () => setPayoutModalVisible(true),
+      color: '#007DFE',
+      bg: '#EBF4FF',
+    },
+    {
       icon: 'gift-outline',
       label: 'Donations & Support',
       desc: 'View your verified contributions',
@@ -144,6 +274,14 @@ export default function ProfileScreen({ navigation }) {
             bg: '#DDF1F8',
           },
           {
+            icon: 'heart-outline',
+            label: 'Adoption & Foster Requests',
+            desc: 'Review, approve & coordinate pet requests',
+            screen: 'AdvocateRequests',
+            color: '#B45309',
+            bg: '#FEF3DC',
+          },
+          {
             icon: 'notifications-outline',
             label: 'Rescue Alerts Hub',
             desc: 'Emergency reports in your area',
@@ -156,7 +294,7 @@ export default function ProfileScreen({ navigation }) {
             label: 'Public Profile Card',
             desc: 'Preview how community members see you',
             screen: 'PublicProfile',
-            params: { advocateId: currentUser?.id },
+            params: { userId: currentUser?.id, advocateId: currentUser?.id },
             color: '#306B4D',
             bg: '#EBF4EF',
           },
@@ -177,6 +315,15 @@ export default function ProfileScreen({ navigation }) {
             screen: 'Listings',
             color: '#2E7A99',
             bg: '#DDF1F8',
+          },
+          {
+            icon: 'person-outline',
+            label: 'Public Profile Card',
+            desc: 'Preview your public profile',
+            screen: 'PublicProfile',
+            params: { userId: currentUser?.id, advocateId: currentUser?.id },
+            color: '#306B4D',
+            bg: '#EBF4EF',
           },
         ]),
   ];
@@ -350,7 +497,7 @@ export default function ProfileScreen({ navigation }) {
             <TouchableOpacity
               key={item.label}
               style={[styles.menuRow, idx === menuItems.length - 1 && styles.menuRowLast]}
-              onPress={() => navigation.navigate(item.screen, item.params)}
+              onPress={() => (item.onPress ? item.onPress() : navigation.navigate(item.screen, item.params))}
               activeOpacity={0.7}
             >
               <View style={[styles.iconCircle, { backgroundColor: item.bg }]}>
@@ -481,6 +628,229 @@ export default function ProfileScreen({ navigation }) {
             )}
           </View>
         </View>
+      </Modal>
+
+      {/* ── Donation & Payout Accounts Modal Sheet ───────────── */}
+      <Modal
+        visible={payoutModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPayoutModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={[styles.modalSheet, { maxHeight: '90%' }]}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>Donation & Payout Accounts</Text>
+                <Text style={styles.payoutModalSub}>
+                  Set up where community supporters can transfer funds directly to you when donating.
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setPayoutModalVisible(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={20} color="#8C7D6A" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              {/* ── GCASH SECTION ───────────────────────── */}
+              <View style={styles.payoutSectionCard}>
+                <View style={styles.payoutSectionHeader}>
+                  <View style={styles.payoutSectionTitleRow}>
+                    <View style={[styles.methodDot, { backgroundColor: '#007DFE' }]} />
+                    <Text style={styles.payoutSectionTitle}>GCash Account</Text>
+                  </View>
+                  <Switch
+                    value={gcashEnabled}
+                    onValueChange={setGcashEnabled}
+                    trackColor={{ false: '#E8DFC8', true: '#007DFE' }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+
+                {gcashEnabled && (
+                  <View style={styles.payoutFieldsWrap}>
+                    <Text style={styles.formLabel}>GCASH ACCOUNT NAME</Text>
+                    <TextInput
+                      style={styles.formTextInput}
+                      value={gcashName}
+                      onChangeText={setGcashName}
+                      placeholder="e.g. Maria Santos"
+                      placeholderTextColor="#947E68"
+                    />
+
+                    <Text style={[styles.formLabel, { marginTop: 10 }]}>GCASH MOBILE NUMBER</Text>
+                    <TextInput
+                      style={styles.formTextInput}
+                      value={gcashNumber}
+                      onChangeText={setGcashNumber}
+                      placeholder="e.g. 0917 123 4567"
+                      placeholderTextColor="#947E68"
+                      keyboardType="phone-pad"
+                    />
+
+                    <Text style={[styles.formLabel, { marginTop: 10 }]}>GCASH QR CODE (RECOMMENDED)</Text>
+                    {gcashQr ? (
+                      <View style={styles.qrPreviewWrap}>
+                        <Image source={{ uri: gcashQr }} style={styles.qrThumbImage} resizeMode="contain" />
+                        <View style={styles.qrPreviewMeta}>
+                          <Text style={styles.qrAttachedText}>QR Code Attached</Text>
+                          <View style={styles.qrBtnRow}>
+                            <TouchableOpacity onPress={() => handlePickQr('gcash')}>
+                              <Text style={styles.qrChangeBtnText}>Change Photo</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setGcashQr(null)}>
+                              <Text style={styles.qrRemoveBtnText}>Remove</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.uploadQrBox}
+                        onPress={() => handlePickQr('gcash')}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="qr-code-outline" size={20} color="#007DFE" style={{ marginRight: 6 }} />
+                        <Text style={styles.uploadQrText}>Upload GCash QR Screenshot</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              </View>
+
+              {/* ── MAYA SECTION ────────────────────────── */}
+              <View style={styles.payoutSectionCard}>
+                <View style={styles.payoutSectionHeader}>
+                  <View style={styles.payoutSectionTitleRow}>
+                    <View style={[styles.methodDot, { backgroundColor: '#22B573' }]} />
+                    <Text style={styles.payoutSectionTitle}>Maya Account</Text>
+                  </View>
+                  <Switch
+                    value={mayaEnabled}
+                    onValueChange={setMayaEnabled}
+                    trackColor={{ false: '#E8DFC8', true: '#22B573' }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+
+                {mayaEnabled && (
+                  <View style={styles.payoutFieldsWrap}>
+                    <Text style={styles.formLabel}>MAYA ACCOUNT NAME</Text>
+                    <TextInput
+                      style={styles.formTextInput}
+                      value={mayaName}
+                      onChangeText={setMayaName}
+                      placeholder="e.g. Maria Santos"
+                      placeholderTextColor="#947E68"
+                    />
+
+                    <Text style={[styles.formLabel, { marginTop: 10 }]}>MAYA MOBILE NUMBER</Text>
+                    <TextInput
+                      style={styles.formTextInput}
+                      value={mayaNumber}
+                      onChangeText={setMayaNumber}
+                      placeholder="e.g. 0917 123 4567"
+                      placeholderTextColor="#947E68"
+                      keyboardType="phone-pad"
+                    />
+
+                    <Text style={[styles.formLabel, { marginTop: 10 }]}>MAYA QR CODE (RECOMMENDED)</Text>
+                    {mayaQr ? (
+                      <View style={styles.qrPreviewWrap}>
+                        <Image source={{ uri: mayaQr }} style={styles.qrThumbImage} resizeMode="contain" />
+                        <View style={styles.qrPreviewMeta}>
+                          <Text style={styles.qrAttachedText}>QR Code Attached</Text>
+                          <View style={styles.qrBtnRow}>
+                            <TouchableOpacity onPress={() => handlePickQr('maya')}>
+                              <Text style={styles.qrChangeBtnText}>Change Photo</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setMayaQr(null)}>
+                              <Text style={styles.qrRemoveBtnText}>Remove</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.uploadQrBox}
+                        onPress={() => handlePickQr('maya')}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="qr-code-outline" size={20} color="#22B573" style={{ marginRight: 6 }} />
+                        <Text style={[styles.uploadQrText, { color: '#22B573' }]}>Upload Maya QR Screenshot</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              </View>
+
+              {/* ── BANK TRANSFER SECTION ───────────────── */}
+              <View style={styles.payoutSectionCard}>
+                <View style={styles.payoutSectionHeader}>
+                  <View style={styles.payoutSectionTitleRow}>
+                    <View style={[styles.methodDot, { backgroundColor: '#0D3B66' }]} />
+                    <Text style={styles.payoutSectionTitle}>Bank Account Transfer</Text>
+                  </View>
+                  <Switch
+                    value={bankEnabled}
+                    onValueChange={setBankEnabled}
+                    trackColor={{ false: '#E8DFC8', true: '#0D3B66' }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+
+                {bankEnabled && (
+                  <View style={styles.payoutFieldsWrap}>
+                    <Text style={styles.formLabel}>BANK NAME</Text>
+                    <TextInput
+                      style={styles.formTextInput}
+                      value={bankName}
+                      onChangeText={setBankName}
+                      placeholder="e.g. BDO Unibank / BPI / UnionBank"
+                      placeholderTextColor="#947E68"
+                    />
+
+                    <Text style={[styles.formLabel, { marginTop: 10 }]}>ACCOUNT HOLDER NAME</Text>
+                    <TextInput
+                      style={styles.formTextInput}
+                      value={bankAccountName}
+                      onChangeText={setBankAccountName}
+                      placeholder="e.g. Maria Santos"
+                      placeholderTextColor="#947E68"
+                    />
+
+                    <Text style={[styles.formLabel, { marginTop: 10 }]}>ACCOUNT NUMBER</Text>
+                    <TextInput
+                      style={styles.formTextInput}
+                      value={bankAccountNumber}
+                      onChangeText={setBankAccountNumber}
+                      placeholder="e.g. 0012 3456 7890"
+                      placeholderTextColor="#947E68"
+                      keyboardType="number-pad"
+                    />
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.modalSaveBtn, savingPayout && { opacity: 0.7 }]}
+              onPress={handleSavePayoutMethods}
+              disabled={savingPayout}
+              activeOpacity={0.85}
+            >
+              {savingPayout ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.modalSaveBtnText}>Save Payout Accounts</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Branded Alert Modal ──────────────────────────────── */}
@@ -817,8 +1187,106 @@ const styles = StyleSheet.create({
   modalSaveBtnText: {
     fontSize: 14,
     fontWeight: '800',
+    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+
+  // ── Payout Modal Styles ──────────────────────────────────
+  payoutModalSub: {
+    fontSize: 12,
+    color: '#8C7D6A',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  payoutSectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E8DFC8',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+  },
+  payoutSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  payoutSectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  methodDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  payoutSectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
     color: '#473018',
     fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  payoutFieldsWrap: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F0E8D6',
+  },
+  uploadQrBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F7FBFD',
+    borderWidth: 1.5,
+    borderColor: '#92CDE5',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  uploadQrText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#007DFE',
+  },
+  qrPreviewWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9F6EE',
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
+    borderRadius: 12,
+    padding: 10,
+    gap: 12,
+  },
+  qrThumbImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  qrPreviewMeta: {
+    flex: 1,
+  },
+  qrAttachedText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2E7D32',
+    marginBottom: 4,
+  },
+  qrBtnRow: {
+    flexDirection: 'row',
+    gap: 14,
+  },
+  qrChangeBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#2E7A99',
+  },
+  qrRemoveBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#D94F4F',
   },
 
   // Full-Screen Image Preview Modal

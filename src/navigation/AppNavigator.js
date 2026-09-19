@@ -179,6 +179,7 @@ function RootStack() {
       {/* Shared */}
       <Stack.Screen name="AnimalDetail"   component={AnimalDetailScreen} />
       <Stack.Screen name="Chat"           component={ChatScreen} />
+      <Stack.Screen name="Messages"       component={MessagesScreen} />
       <Stack.Screen name="Activity"       component={ActivityScreen} />
       <Stack.Screen name="Donate"         component={DonateScreen} />
       <Stack.Screen name="Profile"        component={ProfileScreen} />

@@ -42,14 +42,19 @@ export async function uploadImageToImgBB(imageInput) {
       }
     }
 
-    // 2. Blob fallback for local URI if base64 wasn't provided or failed
+    // 2. Native FormData fallback for local URI if base64 wasn't provided or failed
     if (localUri) {
-      const blobRes = await fetch(localUri);
-      const blob = await blobRes.blob();
-
       const formData = new FormData();
       const filename = localUri.split('/').pop() || 'upload.jpg';
-      formData.append('image', blob, filename);
+      const match = /\.(\w+)$/.exec(filename);
+      const ext = match ? match[1].toLowerCase() : 'jpg';
+      const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+
+      formData.append('image', {
+        uri: localUri,
+        name: filename,
+        type: mimeType,
+      });
 
       const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
         method: 'POST',
@@ -58,7 +63,7 @@ export async function uploadImageToImgBB(imageInput) {
 
       const result = await response.json();
       if (result.success && result.data?.url) {
-        console.log('[ImgBB] Image uploaded successfully via blob:', result.data.url);
+        console.log('[ImgBB] Image uploaded successfully via native FormData:', result.data.url);
         return result.data.url;
       }
     }

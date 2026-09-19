@@ -11,16 +11,28 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import Header from '../../components/Header';
 
-function formatTimeAgo(isoString) {
-  if (!isoString) return 'Just now';
-  const diffMs = Date.now() - new Date(isoString).getTime();
+function formatTimeAgo(timestamp) {
+  if (!timestamp) return 'Recently';
+  let date;
+  if (timestamp?.toDate && typeof timestamp.toDate === 'function') {
+    date = timestamp.toDate();
+  } else if (typeof timestamp === 'number') {
+    date = new Date(timestamp);
+  } else {
+    date = new Date(timestamp);
+  }
+  if (!date || isNaN(date.getTime())) return 'Recently';
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return 'Just now';
   const diffMin = Math.floor(diffMs / 60000);
   if (diffMin < 1) return 'Just now';
   if (diffMin < 60) return `${diffMin}m ago`;
   const diffHours = Math.floor(diffMin / 60);
   if (diffHours < 24) return `${diffHours}h ago`;
   const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
 }
 
 const FILTER_TABS = [
@@ -260,7 +272,7 @@ export default function NotificationScreen({ navigation }) {
                     {item.title}
                   </Text>
                   <Text style={styles.timeText}>
-                    {item.timeAgo || formatTimeAgo(item.createdAt)}
+                    {formatTimeAgo(item.createdAt)}
                   </Text>
                 </View>
 
