@@ -131,16 +131,6 @@ export default function ActivityScreen({ route, navigation }) {
       {/* ── Header Bar ────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: safeTopPadding }]}>
         <View style={styles.headerTop}>
-          {navigation.canGoBack() && (
-            <TouchableOpacity
-              style={styles.headerBackBtn}
-              onPress={() => navigation.goBack()}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="arrow-back" size={22} color="#473018" />
-            </TouchableOpacity>
-          )}
           <View style={styles.headerTitleWrap}>
             <Text style={styles.headerTitle} numberOfLines={1}>Activity Dashboard</Text>
             <Text style={styles.headerSub} numberOfLines={1}>

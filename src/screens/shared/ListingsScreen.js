@@ -55,9 +55,6 @@ export default function ListingsScreen({ navigation }) {
             <Text style={styles.title}>Adopt &amp; Foster</Text>
             <Text style={styles.subtitle}>Find pets available for adoption and care</Text>
           </View>
-          <View style={styles.countBadge}>
-            <Text style={styles.countNum}>{filtered.length} Available</Text>
-          </View>
         </View>
 
         {/* Segmented Type Filter */}

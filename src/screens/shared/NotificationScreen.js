@@ -150,7 +150,6 @@ export default function NotificationScreen({ navigation }) {
 
       {/* Header */}
       <Header
-        onBack={() => navigation.goBack()}
         centerComponent={
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle}>Notifications</Text>

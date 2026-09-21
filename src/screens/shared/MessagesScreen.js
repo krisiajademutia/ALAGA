@@ -136,7 +136,7 @@ export default function MessagesScreen({ navigation }) {
       {/* ── Header Bar ─────────────────────────────────────── */}
       <View style={[styles.headerWrap, { paddingTop: safeTopPadding }]}>
         <View style={styles.topRow}>
-          <Text style={styles.messengerTitle}>Chats</Text>
+          <Text style={styles.messengerTitle}>ALAGA Chat</Text>
           <View style={styles.headerActions}>
             <TouchableOpacity
               style={styles.actionCircleBtn}
