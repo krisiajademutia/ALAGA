@@ -472,7 +472,7 @@ function fmtDate(val) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FCF8E8',
+    backgroundColor: '#FFFFFF',
   },
   topBar: {
     flexDirection: 'row',
