@@ -83,6 +83,7 @@ const defaultContext = {
   sendMessage: () => {},
   startConversation: () => '',
   startGroupConversation: () => '',
+  updateGroupInfo: () => {},
   clearConversation: () => {},
   deleteConversation: () => {},
   setActiveConversationId: () => {},
@@ -1327,6 +1328,22 @@ export function AppProvider({ children }) {
     deleteConversationFirebase(conversationId);
   };
 
+  const updateGroupInfo = (conversationId, { groupName, groupPhoto } = {}) => {
+    if (!conversationId) return;
+    setConversations((prev) =>
+      prev.map((c) => {
+        if (c.id !== conversationId || !c.isGroup) return c;
+        const updated = {
+          ...c,
+          ...(groupName !== undefined ? { groupName } : {}),
+          ...(groupPhoto !== undefined ? { groupPhoto } : {}),
+        };
+        saveConversationFirebase(updated);
+        return updated;
+      })
+    );
+  };
+
   // ── Donations ─────────────────────────────────────────────────────────────
   const submitDonation = async (donationData) => {
     const rawAmount = typeof donationData.amount === 'number'
@@ -1665,6 +1682,7 @@ export function AppProvider({ children }) {
         sendMessage,
         startConversation,
         startGroupConversation,
+        updateGroupInfo,
         clearConversation,
         deleteConversation,
         setActiveConversationId,

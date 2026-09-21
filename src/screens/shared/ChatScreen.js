@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  ScrollView,
   TouchableOpacity,
   TextInput,
   KeyboardAvoidingView,
@@ -43,31 +44,51 @@ export default function ChatScreen({ route, navigation }) {
     initialDraft,
   } = route.params || {};
   const resolvedOtherName = otherName || routeUserName;
-  const { conversations, currentUser, sendMessage, clearConversation, markConversationRead, setActiveConversationId, showAlert } = useApp();
+  const { conversations, currentUser, sendMessage, clearConversation, markConversationRead,
+    setActiveConversationId, showAlert, updateGroupInfo } = useApp();
   const [text, setText] = useState(initialDraft || '');
   const [attachModalVisible, setAttachModalVisible] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [activeVideo, setActiveVideo] = useState(null);
+  // Group info modal state
+  const [groupInfoVisible, setGroupInfoVisible] = useState(false);
+  const [editGroupName, setEditGroupName] = useState('');
+  const [editGroupPhoto, setEditGroupPhoto] = useState(null);
 
   const flatRef = useRef(null);
   const inputRef = useRef(null);
 
   const convo = conversations.find((c) => c.id === conversationId);
+  const isGroup = convo?.isGroup || false;
   const detectedOtherId = convo?.participants?.find((p) => p !== currentUser?.id);
-  const otherId = routeOtherId || detectedOtherId || null;
+  const otherId = isGroup ? null : (routeOtherId || detectedOtherId || null);
   const otherAvatar =
     routeOtherAvatar ||
     routeUserAvatar ||
     (detectedOtherId && convo?.participantAvatars?.[detectedOtherId]) ||
     (otherId && convo?.participantAvatars?.[otherId]) ||
     null;
-  const name =
-    resolvedOtherName ||
-    (detectedOtherId && convo?.participantNames?.[detectedOtherId]) ||
-    (convo?.participant1 === currentUser?.id ? convo?.participant2Name : convo?.participant1Name) ||
-    'Chat';
+  // For groups, use the stored groupName; for 1-on-1 use other person's name
+  const groupName = convo?.groupName || resolvedOtherName || 'Group Chat';
+  const groupPhoto = editGroupPhoto || convo?.groupPhoto || null;
+  const name = isGroup
+    ? groupName
+    : (resolvedOtherName ||
+        (detectedOtherId && convo?.participantNames?.[detectedOtherId]) ||
+        (convo?.participant1 === currentUser?.id ? convo?.participant2Name : convo?.participant1Name) ||
+        'Chat');
   const messages = convo ? convo.messages : [];
+
+  // Build member list for group chats
+  const groupMembers = isGroup && convo?.participants
+    ? convo.participants.map((pid) => ({
+        id: pid,
+        name: convo.participantNames?.[pid] || 'Member',
+        avatar: convo.participantAvatars?.[pid] || null,
+        isMe: pid === currentUser?.id,
+      }))
+    : [];
 
   // Register active conversation for auto-read and heads-up notification suppression while actively in chat
   useEffect(() => {
@@ -287,6 +308,12 @@ export default function ChatScreen({ route, navigation }) {
   };
 
   const handleOpenMenu = () => {
+    if (isGroup) {
+      setEditGroupName(groupName);
+      setEditGroupPhoto(convo?.groupPhoto || null);
+      setGroupInfoVisible(true);
+      return;
+    }
     showAlert({
       title: name,
       message: 'Conversation Options',
@@ -303,52 +330,118 @@ export default function ChatScreen({ route, navigation }) {
             secondaryText: 'Cancel',
             primaryText: 'Clear All',
             onPrimaryPress: () => {
-              if (convo?.id) {
-                clearConversation(convo.id);
-              }
+              if (convo?.id) clearConversation(convo.id);
             },
           });
         }, 200);
       },
       primaryText: otherId ? 'View Profile' : 'OK',
-      onPrimaryPress: otherId ? () => navigation.navigate('PublicProfile', { userId: otherId, userName: name, userAvatar: otherAvatar }) : null,
+      onPrimaryPress: otherId
+        ? () => navigation.navigate('PublicProfile', { userId: otherId, userName: name, userAvatar: otherAvatar })
+        : null,
     });
   };
 
-  // Render empty state with friendly intro and quick chips
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <View style={styles.emptyAvatarWrap}>
-        <Avatar name={name} userId={otherId} uri={otherAvatar} size={68} />
-      </View>
-      <Text style={styles.emptyName}>{name}</Text>
-      <View style={styles.emptyRoleBadge}>
-        <Ionicons name="shield-checkmark" size={13} color="#2E7A99" />
-        <Text style={styles.emptyRoleText}>ALAGA Community Member</Text>
-      </View>
-      <Text style={styles.emptyNote}>
-        This is the start of your private 1-on-1 chat with {name}. Send a message, animal photo, video, or location pin to coordinate!
-      </Text>
+  const handlePickGroupPhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') return;
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setEditGroupPhoto(result.assets[0].uri);
+      }
+    } catch (e) { /* ignore */ }
+  };
 
-      {/* Suggested Quick Prompts */}
-      <View style={styles.promptsSection}>
-        <Text style={styles.promptsHeader}>Suggested quick messages:</Text>
-        <View style={styles.promptsWrap}>
-          {QUICK_PROMPTS.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.promptChip}
-              onPress={() => handleSelectPrompt(item.text)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name={item.icon} size={14} color="#2E7A99" style={{ marginRight: 6 }} />
-              <Text style={styles.promptText}>{item.text}</Text>
-            </TouchableOpacity>
-          ))}
+  const handleSaveGroupInfo = () => {
+    if (!convo?.id) return;
+    updateGroupInfo(convo.id, {
+      groupName: editGroupName.trim() || groupName,
+      groupPhoto: editGroupPhoto,
+    });
+    setGroupInfoVisible(false);
+  };
+
+  // Render empty state with friendly intro and quick chips
+  const renderEmptyState = () => {
+    if (isGroup) {
+      return (
+        <View style={styles.emptyContainer}>
+          {/* Group Photo */}
+          <TouchableOpacity
+            style={styles.groupEmptyAvatarWrap}
+            onPress={() => { setEditGroupName(groupName); setEditGroupPhoto(convo?.groupPhoto || null); setGroupInfoVisible(true); }}
+            activeOpacity={0.8}
+          >
+            {groupPhoto
+              ? <Image source={{ uri: groupPhoto }} style={styles.groupEmptyAvatar} />
+              : <View style={styles.groupEmptyAvatarPlaceholder}>
+                  <Ionicons name="people" size={36} color="#2E7A99" />
+                </View>
+            }
+            <View style={styles.groupEmptyCameraBtn}>
+              <Ionicons name="camera" size={14} color="#FFFFFF" />
+            </View>
+          </TouchableOpacity>
+
+          <Text style={styles.emptyName}>{name}</Text>
+          <View style={styles.groupEmptyBadge}>
+            <Ionicons name="people" size={13} color="#2E7A99" />
+            <Text style={styles.emptyRoleText}>Group · {groupMembers.length} members</Text>
+          </View>
+          <Text style={styles.emptyNote}>This is the beginning of your group chat. Say hi!</Text>
+
+          {/* Members */}
+          <View style={styles.membersSection}>
+            <Text style={styles.membersSectionTitle}>Members</Text>
+            {groupMembers.map((m) => (
+              <View key={m.id} style={styles.memberRow}>
+                <Avatar name={m.name} userId={m.id} uri={m.avatar} size={36} />
+                <Text style={styles.memberName}>{m.name}{m.isMe ? ' (You)' : ''}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      );
+    }
+    return (
+      <View style={styles.emptyContainer}>
+        <View style={styles.emptyAvatarWrap}>
+          <Avatar name={name} userId={otherId} uri={otherAvatar} size={68} />
+        </View>
+        <Text style={styles.emptyName}>{name}</Text>
+        <View style={styles.emptyRoleBadge}>
+          <Ionicons name="shield-checkmark" size={13} color="#2E7A99" />
+          <Text style={styles.emptyRoleText}>ALAGA Community Member</Text>
+        </View>
+        <Text style={styles.emptyNote}>
+          This is the start of your private 1-on-1 chat with {name}. Send a message, animal photo, video, or location pin to coordinate!
+        </Text>
+        {/* Suggested Quick Prompts */}
+        <View style={styles.promptsSection}>
+          <Text style={styles.promptsHeader}>Suggested quick messages:</Text>
+          <View style={styles.promptsWrap}>
+            {QUICK_PROMPTS.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.promptChip}
+                onPress={() => handleSelectPrompt(item.text)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name={item.icon} size={14} color="#2E7A99" style={{ marginRight: 6 }} />
+                <Text style={styles.promptText}>{item.text}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <KeyboardAvoidingView
@@ -364,22 +457,36 @@ export default function ChatScreen({ route, navigation }) {
           <TouchableOpacity
             style={styles.navCenter}
             onPress={() => {
-              if (otherId) {
+              if (isGroup) {
+                setEditGroupName(groupName);
+                setEditGroupPhoto(convo?.groupPhoto || null);
+                setGroupInfoVisible(true);
+              } else if (otherId) {
                 navigation.navigate('PublicProfile', { userId: otherId, userName: name, userAvatar: otherAvatar });
               }
             }}
             activeOpacity={0.75}
           >
             <View style={styles.navAvatarWrap}>
-              <Avatar name={name} userId={otherId} uri={otherAvatar} size={38} />
+              {isGroup
+                ? (groupPhoto
+                    ? <Image source={{ uri: groupPhoto }} style={styles.navGroupAvatar} />
+                    : <View style={styles.navGroupAvatarPlaceholder}>
+                        <Ionicons name="people" size={20} color="#2E7A99" />
+                      </View>
+                  )
+                : <Avatar name={name} userId={otherId} uri={otherAvatar} size={38} />
+              }
             </View>
             <View style={styles.navTextWrap}>
-              <Text style={styles.navName} numberOfLines={1}>
-                {name}
-              </Text>
+              <Text style={styles.navName} numberOfLines={1}>{name}</Text>
               <View style={styles.navSubRow}>
-                <Ionicons name="paw" size={11} color="#2E7A99" style={{ marginRight: 3 }} />
-                <Text style={styles.navSub}>ALAGA Direct Chat</Text>
+                {isGroup
+                  ? <><Ionicons name="people" size={11} color="#2E7A99" style={{ marginRight: 3 }} />
+                      <Text style={styles.navSub}>{groupMembers.length} members</Text></>
+                  : <><Ionicons name="paw" size={11} color="#2E7A99" style={{ marginRight: 3 }} />
+                      <Text style={styles.navSub}>ALAGA Direct Chat</Text></>
+                }
               </View>
             </View>
           </TouchableOpacity>
@@ -431,6 +538,10 @@ export default function ChatScreen({ route, navigation }) {
           const prevMsg = index > 0 ? messages[index - 1] : null;
           const isSameSenderAsPrev = prevMsg?.senderId === item.senderId;
 
+          const senderName = isGroup && !isMine && !isSameSenderAsPrev
+            ? (convo?.participantNames?.[item.senderId] || 'Member')
+            : null;
+
           return (
             <View
               style={[
@@ -442,21 +553,30 @@ export default function ChatScreen({ route, navigation }) {
               {!isMine && (
                 <View style={styles.senderAvatarWrap}>
                   {!isSameSenderAsPrev ? (
-                    <Avatar name={name} userId={item.senderId || otherId} uri={item.senderAvatar || otherAvatar} size={30} />
+                    <Avatar
+                      name={convo?.participantNames?.[item.senderId] || name}
+                      userId={item.senderId || otherId}
+                      uri={item.senderAvatar || (item.senderId && convo?.participantAvatars?.[item.senderId]) || otherAvatar}
+                      size={30}
+                    />
                   ) : (
                     <View style={{ width: 30 }} />
                   )}
                 </View>
               )}
 
-              <View
-                style={[
-                  styles.bubble,
-                  isMine ? styles.bubbleMine : styles.bubbleTheirs,
-                  item.type === 'image' && styles.bubbleImageContainer,
-                  item.type === 'location' && styles.bubbleLocationContainer,
-                ]}
-              >
+              <View style={[styles.bubbleColumn, isMine && styles.bubbleColumnMine]}>
+                {senderName && (
+                  <Text style={styles.groupSenderName}>{senderName}</Text>
+                )}
+                <View
+                  style={[
+                    styles.bubble,
+                    isMine ? styles.bubbleMine : styles.bubbleTheirs,
+                    item.type === 'image' && styles.bubbleImageContainer,
+                    item.type === 'location' && styles.bubbleLocationContainer,
+                  ]}
+                >
                 {/* ── Image Message ────────────────────────── */}
                 {item.type === 'image' && (
                   <TouchableOpacity
@@ -568,6 +688,7 @@ export default function ChatScreen({ route, navigation }) {
                       style={{ marginLeft: 4 }}
                     />
                   )}
+                </View>
                 </View>
               </View>
             </View>
@@ -727,6 +848,111 @@ export default function ChatScreen({ route, navigation }) {
         videoUri={activeVideo}
         onClose={() => setActiveVideo(null)}
       />
+
+      {/* ── Group Info Modal ───────────────────────────────────── */}
+      <Modal
+        visible={groupInfoVisible}
+        animationType="slide"
+        onRequestClose={() => setGroupInfoVisible(false)}
+      >
+        <SafeAreaView style={styles.groupInfoContainer}>
+          {/* Header */}
+          <View style={styles.groupInfoHeader}>
+            <TouchableOpacity
+              style={styles.groupInfoCloseBtn}
+              onPress={() => setGroupInfoVisible(false)}
+            >
+              <Ionicons name="close" size={22} color="#473018" />
+            </TouchableOpacity>
+            <Text style={styles.groupInfoTitle}>Group Info</Text>
+            <TouchableOpacity
+              style={styles.groupInfoSaveBtn}
+              onPress={handleSaveGroupInfo}
+            >
+              <Text style={styles.groupInfoSaveTxt}>Save</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+            {/* Group Photo */}
+            <View style={styles.groupInfoPhotoSection}>
+              <TouchableOpacity
+                style={styles.groupInfoAvatarWrap}
+                onPress={handlePickGroupPhoto}
+                activeOpacity={0.8}
+              >
+                {editGroupPhoto
+                  ? <Image source={{ uri: editGroupPhoto }} style={styles.groupInfoAvatar} />
+                  : <View style={styles.groupInfoAvatarPlaceholder}>
+                      <Ionicons name="people" size={42} color="#2E7A99" />
+                    </View>
+                }
+                <View style={styles.groupInfoCameraBtn}>
+                  <Ionicons name="camera" size={16} color="#FFFFFF" />
+                </View>
+              </TouchableOpacity>
+              <Text style={styles.groupInfoPhotoHint}>Tap to change group photo</Text>
+            </View>
+
+            {/* Group Name */}
+            <View style={styles.groupInfoFieldSection}>
+              <Text style={styles.groupInfoFieldLabel}>GROUP NAME</Text>
+              <View style={styles.groupInfoNameWrap}>
+                <Ionicons name="people-outline" size={18} color="#8C7D6A" style={{ marginRight: 8 }} />
+                <TextInput
+                  style={styles.groupInfoNameInput}
+                  value={editGroupName}
+                  onChangeText={setEditGroupName}
+                  placeholder="Group name..."
+                  placeholderTextColor="#8C7D6A"
+                  maxLength={60}
+                />
+              </View>
+            </View>
+
+            {/* Members */}
+            <View style={styles.groupInfoFieldSection}>
+              <Text style={styles.groupInfoFieldLabel}>
+                MEMBERS · {groupMembers.length}
+              </Text>
+              {groupMembers.map((m) => (
+                <View key={m.id} style={styles.groupInfoMemberRow}>
+                  <Avatar name={m.name} userId={m.id} uri={m.avatar} size={42} />
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.groupInfoMemberName}>{m.name}</Text>
+                    {m.isMe && (
+                      <Text style={styles.groupInfoMemberYou}>You</Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {/* Danger Zone */}
+            <TouchableOpacity
+              style={styles.groupInfoDangerBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                setGroupInfoVisible(false);
+                setTimeout(() => {
+                  showAlert({
+                    title: 'Clear Group Messages',
+                    message: 'Remove all messages from this group chat?',
+                    type: 'warning',
+                    customIcon: 'alert-circle',
+                    secondaryText: 'Cancel',
+                    primaryText: 'Clear All',
+                    onPrimaryPress: () => { if (convo?.id) clearConversation(convo.id); },
+                  });
+                }, 200);
+              }}
+            >
+              <Ionicons name="trash-outline" size={18} color="#C0392B" />
+              <Text style={styles.groupInfoDangerTxt}>Clear Chat History</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -827,6 +1053,21 @@ const styles = StyleSheet.create({
     borderColor: '#E8DFC8',
     borderRadius: 22,
     padding: 1,
+  },
+  navGroupAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
+  navGroupAvatarPlaceholder: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#EBF7FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#B8E4E5',
   },
   navTextWrap: {
     flex: 1,
@@ -995,10 +1236,258 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 2,
   },
+  bubbleColumn: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    maxWidth: '78%',
+  },
+  bubbleColumnMine: {
+    alignItems: 'flex-end',
+  },
+  groupSenderName: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2E7A99',
+    marginBottom: 3,
+    marginLeft: 4,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+
+  // \u2500\u2500 Group Empty State \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  groupEmptyAvatarWrap: {
+    width: 88,
+    height: 88,
+    marginBottom: 12,
+    position: 'relative',
+  },
+  groupEmptyAvatar: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+  },
+  groupEmptyAvatarPlaceholder: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#EBF7FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#92CDE5',
+  },
+  groupEmptyCameraBtn: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#2E7A99',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FAF7EE',
+  },
+  groupEmptyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#EBF7FA',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    marginBottom: 10,
+  },
+  membersSection: {
+    width: '100%',
+    marginTop: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  membersSectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#8C7D6A',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    gap: 10,
+  },
+  memberName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+
+  // \u2500\u2500 Group Info Modal \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  groupInfoContainer: {
+    flex: 1,
+    backgroundColor: '#FAF7EE',
+  },
+  groupInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8DFC8',
+    backgroundColor: '#FAF7EE',
+  },
+  groupInfoCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EFE8D6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupInfoTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  groupInfoSaveBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    backgroundColor: '#2E7A99',
+    borderRadius: 14,
+  },
+  groupInfoSaveTxt: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  groupInfoPhotoSection: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  groupInfoAvatarWrap: {
+    width: 100,
+    height: 100,
+    position: 'relative',
+    marginBottom: 10,
+  },
+  groupInfoAvatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  groupInfoAvatarPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#EBF7FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#92CDE5',
+  },
+  groupInfoCameraBtn: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#2E7A99',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FAF7EE',
+  },
+  groupInfoPhotoHint: {
+    fontSize: 12,
+    color: '#8C7D6A',
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  groupInfoFieldSection: {
+    marginHorizontal: 16,
+    marginBottom: 20,
+  },
+  groupInfoFieldLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#8C7D6A',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 8,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  groupInfoNameWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
+  },
+  groupInfoNameInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  groupInfoMemberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#EFE6D4',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  groupInfoMemberName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+  groupInfoMemberYou: {
+    fontSize: 11,
+    color: '#2E7A99',
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  groupInfoDangerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  groupInfoDangerTxt: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#C0392B',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
 
   // Bubbles
   bubble: {
-    maxWidth: '78%',
     paddingHorizontal: 15,
     paddingVertical: 10,
     borderRadius: 18,

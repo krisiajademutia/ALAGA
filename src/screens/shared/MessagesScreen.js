@@ -145,14 +145,6 @@ export default function MessagesScreen({ navigation }) {
             >
               <Ionicons name="people-outline" size={20} color="#473018" />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionCircleBtn}
-              onPress={() => setNewChatVisible(true)}
-              activeOpacity={0.75}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="create-outline" size={20} color="#473018" />
-            </TouchableOpacity>
           </View>
         </View>
 
