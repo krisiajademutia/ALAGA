@@ -541,13 +541,13 @@ function fmtDate(val) {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F7F7F7' },
+  root: { flex: 1, backgroundColor: COLORS.background },
 
   // Header
   header: {
     paddingHorizontal: 20,
     paddingBottom: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.background,
     borderBottomWidth: 1,
     borderBottomColor: '#E8DEC5',
   },
@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.background,
     borderWidth: 1,
     borderColor: '#E8DEC5',
   },
