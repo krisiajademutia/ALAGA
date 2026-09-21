@@ -157,18 +157,19 @@ export default function RescueAlertsScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#FFFFFF',
   },
   header: {
     paddingHorizontal: 16,
     paddingBottom: 10,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#FFFFFF',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '800',
     color: '#473018',
     letterSpacing: -0.3,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   headerSub: {
     fontSize: 13,

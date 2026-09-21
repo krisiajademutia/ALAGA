@@ -166,6 +166,8 @@ function RootStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={isAdvocate ? AdvocateTabs : CommunityTabs} />
 
+      {/* Stack-only screens — pushed on top of tabs, no tab bar */}
+
       {/* Community */}
       <Stack.Screen name="ReportRescue" component={ReportRescueScreen} />
       <Stack.Screen name="ReportDetail" component={ReportDetailScreen} />
@@ -179,15 +181,9 @@ function RootStack() {
       {/* Shared */}
       <Stack.Screen name="AnimalDetail"   component={AnimalDetailScreen} />
       <Stack.Screen name="Chat"           component={ChatScreen} />
-      <Stack.Screen name="Messages"       component={MessagesScreen} />
-      <Stack.Screen name="Activity"       component={ActivityScreen} />
       <Stack.Screen name="Donate"         component={DonateScreen} />
-      <Stack.Screen name="Profile"        component={ProfileScreen} />
       <Stack.Screen name="PublicProfile"  component={PublicProfileScreen} />
       <Stack.Screen name="Notifications"  component={NotificationScreen} />
-      <Stack.Screen name="Listings"       component={ListingsScreen} />
-      <Stack.Screen name="RescueAlerts"   component={RescueAlertsScreen} />
-      <Stack.Screen name="MyAnimals"      component={MyAnimalsScreen} />
     </Stack.Navigator>
   );
 }

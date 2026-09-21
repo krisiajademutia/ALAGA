@@ -1865,7 +1865,7 @@ const styles = StyleSheet.create({
   // ── Full Media Gallery styles ─────────────────────────────────────────
   galleryContainer: {
     flex: 1,
-    backgroundColor: '#FAF7EE',
+    backgroundColor: '#FFFFFF',
   },
   galleryHeader: {
     flexDirection: 'row',
@@ -2140,7 +2140,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   attachSheet: {
-    backgroundColor: '#FCF8E8',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
