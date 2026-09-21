@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import AnimalCard from '../../components/AnimalCard';
@@ -13,9 +12,9 @@ import EmptyState from '../../components/EmptyState';
 
 const SPECIES = ['All', 'Dog', 'Cat', 'Bird', 'Rabbit', 'Other'];
 const TYPE_FILTERS = [
-  { key: 'All',      label: 'All Pets',  icon: 'grid-outline'  },
-  { key: 'Adoption', label: 'Adopt',     icon: 'home-outline'  },
-  { key: 'Foster',   label: 'Foster',    icon: 'heart-outline' },
+  { key: 'All',      label: 'All Pets' },
+  { key: 'Adoption', label: 'Adopt'    },
+  { key: 'Foster',   label: 'Foster'   },
 ];
 
 export default function ListingsScreen({ navigation }) {
@@ -32,6 +31,12 @@ export default function ListingsScreen({ navigation }) {
       a.listingType === 'Both';
     return matchSpecies && matchType;
   });
+
+  // Pair items into rows of 2
+  const rows = [];
+  for (let i = 0; i < filtered.length; i += 2) {
+    rows.push([filtered[i], filtered[i + 1] || null]);
+  }
 
   const insets = useSafeAreaInsets();
   const safeTop = Platform.OS === 'ios'
@@ -98,7 +103,7 @@ export default function ListingsScreen({ navigation }) {
         </ScrollView>
       </View>
 
-      {/* ── List ──────────────────────────────────────────────── */}
+      {/* ── Grid ──────────────────────────────────────────────── */}
       {filtered.length === 0 ? (
         <EmptyState
           icon="heart-outline"
@@ -108,15 +113,29 @@ export default function ListingsScreen({ navigation }) {
         />
       ) : (
         <FlatList
-          data={filtered}
-          keyExtractor={(a) => a.id}
-          contentContainerStyle={styles.list}
+          data={rows}
+          keyExtractor={(_, i) => String(i)}
+          contentContainerStyle={styles.grid}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <AnimalCard
-              animal={item}
-              onPress={() => navigation.navigate('AnimalDetail', { animalId: item.id })}
-            />
+          renderItem={({ item: [left, right] }) => (
+            <View style={styles.gridRow}>
+              <AnimalCard
+                animal={left}
+                horizontal
+                onPress={() => navigation.navigate('AnimalDetail', { animalId: left.id })}
+                style={styles.gridCard}
+              />
+              {right ? (
+                <AnimalCard
+                  animal={right}
+                  horizontal
+                  onPress={() => navigation.navigate('AnimalDetail', { animalId: right.id })}
+                  style={styles.gridCard}
+                />
+              ) : (
+                <View style={styles.gridCard} />
+              )}
+            </View>
           )}
         />
       )}
@@ -133,7 +152,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.divider,
   },
-
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -209,8 +227,8 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   speciesChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: SIZES.radiusFull,
     backgroundColor: COLORS.inputBg,
     borderWidth: 1,
@@ -232,6 +250,8 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
 
-  list:  { paddingHorizontal: SIZES.lg24, paddingTop: 16, paddingBottom: 110 },
-  empty: { flex: 1 },
+  grid:    { padding: 12, paddingBottom: 110 },
+  gridRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  gridCard:{ flex: 1 },
+  empty:   { flex: 1 },
 });

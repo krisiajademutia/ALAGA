@@ -208,7 +208,7 @@ export default function AnimalCard({ animal, onPress, style, horizontal = false 
 }
 
 const styles = StyleSheet.create({
-  // Grid card mode (Professional rectangular card architecture)
+  // Grid card mode
   gridCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
@@ -217,13 +217,13 @@ const styles = StyleSheet.create({
     borderColor: '#E8DEC5',
     flex: 1,
     shadowColor: '#473018',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 5,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 3,
   },
   gridVisualBox: {
-    height: 130,
+    height: 170,
     position: 'relative',
     overflow: 'hidden',
     backgroundColor: '#F4EDE0',
@@ -315,29 +315,29 @@ const styles = StyleSheet.create({
   },
 
   gridContent: {
-    padding: 10,
+    padding: 12,
     backgroundColor: '#FFFFFF',
   },
   petName: {
-    fontSize: 14.5,
+    fontSize: 15,
     fontWeight: '800',
     color: '#473018',
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   petBreed: {
-    fontSize: 11,
+    fontSize: 11.5,
     color: '#8C7D6A',
     fontFamily: 'PlusJakartaSans_500Medium',
-    marginBottom: 4,
+    marginBottom: 5,
   },
   locRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   locText: {
-    fontSize: 11,
+    fontSize: 11.5,
     color: '#685038',
     fontFamily: 'PlusJakartaSans_400Regular',
   },
