@@ -38,6 +38,7 @@ export default function CommunityHomeScreen({ navigation }) {
   const safeTopPadding = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
 
   const filteredAnimals = animals.filter((a) => {
+    if (a.status !== 'Available') return false;
     if (activeCategory === 'cats' && a.species !== 'Cat') return false;
     if (activeCategory === 'dogs' && a.species !== 'Dog') return false;
     if (activeSegment === 'Urgent / Foster' && !a.fosterNeeded && a.listingType !== 'Foster') return false;
@@ -224,7 +225,7 @@ export default function CommunityHomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#FFFFFF',
   },
   scroll: {
     paddingBottom: 90,

@@ -144,10 +144,10 @@ export default function ListingsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.background },
+  root: { flex: 1, backgroundColor: '#FFFFFF' },
 
   header: {
-    backgroundColor: COLORS.background,
+    backgroundColor: '#FFFFFF',
     paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.divider,
