@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Platform, StatusBar as RNStatusBar } from 'react-native';
+import {
+  View, Text, StyleSheet, FlatList,
+  TouchableOpacity, ScrollView, Platform,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,19 +13,17 @@ import EmptyState from '../../components/EmptyState';
 
 const SPECIES = ['All', 'Dog', 'Cat', 'Bird', 'Rabbit', 'Other'];
 const TYPE_FILTERS = [
-  { key: 'All',      label: 'All',       icon: 'grid-outline' },
-  { key: 'Adoption', label: 'Adopt',     icon: 'home-outline' },
+  { key: 'All',      label: 'All Pets',  icon: 'grid-outline'  },
+  { key: 'Adoption', label: 'Adopt',     icon: 'home-outline'  },
   { key: 'Foster',   label: 'Foster',    icon: 'heart-outline' },
 ];
 
 export default function ListingsScreen({ navigation }) {
   const { animals } = useApp();
-  const [species, setSpecies] = useState('All');
+  const [species, setSpecies]       = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
 
-  // Only show animals that are actively available
-  const listed = animals.filter((a) => a.status === 'Available');
-
+  const listed   = animals.filter((a) => a.status === 'Available');
   const filtered = listed.filter((a) => {
     const matchSpecies = species === 'All' || a.species === species;
     const matchType =
@@ -32,29 +33,25 @@ export default function ListingsScreen({ navigation }) {
     return matchSpecies && matchType;
   });
 
-  const rows = [];
-  for (let i = 0; i < filtered.length; i += 2) {
-    rows.push([filtered[i], filtered[i + 1] || null]);
-  }
-
   const insets = useSafeAreaInsets();
-  const safeTopPadding = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
+  const safeTop = Platform.OS === 'ios'
+    ? Math.max(insets.top, 16) + 4
+    : insets.top > 24 ? insets.top + 6 : 14;
 
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
 
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: safeTopPadding }]}>
+      {/* ── Header ──────────────────────────────────────────── */}
+      <View style={[styles.header, { paddingTop: safeTop }]}>
+        {/* Title Row */}
         <View style={styles.titleRow}>
-          <View style={{ flex: 1, paddingRight: 8 }}>
-            <Text style={styles.title} numberOfLines={1}>Adopt & Foster</Text>
-            <Text style={styles.subtitle} numberOfLines={1}>
-              Find pets available for adoption and temporary care
-            </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>Adopt &amp; Foster</Text>
+            <Text style={styles.subtitle}>Find pets available for adoption and care</Text>
           </View>
           <View style={styles.countBadge}>
-            <Text style={styles.countNum} numberOfLines={1}>{filtered.length} Available</Text>
+            <Text style={styles.countNum}>{filtered.length} Available</Text>
           </View>
         </View>
 
@@ -78,33 +75,30 @@ export default function ListingsScreen({ navigation }) {
         </View>
 
         {/* Species Filter Carousel */}
-        <View style={styles.speciesContainer}>
-          <Text style={styles.sectionLabel}>Species</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.speciesContent}
-          >
-            {SPECIES.map((s) => {
-              const isActive = species === s;
-              const speciesLabel = s === 'All' ? 'All Pets' : s;
-              return (
-                <TouchableOpacity
-                  key={s}
-                  style={[styles.speciesChip, isActive && styles.speciesChipActive]}
-                  onPress={() => setSpecies(s)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.speciesText, isActive && styles.speciesTextActive]}>
-                    {speciesLabel}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.speciesContent}
+        >
+          {SPECIES.map((s) => {
+            const isActive = species === s;
+            return (
+              <TouchableOpacity
+                key={s}
+                style={[styles.speciesChip, isActive && styles.speciesChipActive]}
+                onPress={() => setSpecies(s)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.speciesText, isActive && styles.speciesTextActive]}>
+                  {s === 'All' ? 'All Pets' : s}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
+      {/* ── List ──────────────────────────────────────────────── */}
       {filtered.length === 0 ? (
         <EmptyState
           icon="heart-outline"
@@ -114,29 +108,15 @@ export default function ListingsScreen({ navigation }) {
         />
       ) : (
         <FlatList
-          data={rows}
-          keyExtractor={(_, i) => String(i)}
-          contentContainerStyle={styles.grid}
+          data={filtered}
+          keyExtractor={(a) => a.id}
+          contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item: [left, right] }) => (
-            <View style={styles.gridRow}>
-              <AnimalCard
-                animal={left}
-                horizontal
-                onPress={() => navigation.navigate('AnimalDetail', { animalId: left.id })}
-                style={styles.gridCard}
-              />
-              {right ? (
-                <AnimalCard
-                  animal={right}
-                  horizontal
-                  onPress={() => navigation.navigate('AnimalDetail', { animalId: right.id })}
-                  style={styles.gridCard}
-                />
-              ) : (
-                <View style={styles.gridCard} />
-              )}
-            </View>
+          renderItem={({ item }) => (
+            <AnimalCard
+              animal={item}
+              onPress={() => navigation.navigate('AnimalDetail', { animalId: item.id })}
+            />
           )}
         />
       )}
@@ -146,28 +126,49 @@ export default function ListingsScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
+
   header: {
     backgroundColor: COLORS.background,
-    paddingBottom: SIZES.sm8,
-    borderBottomWidth: 1, borderBottomColor: COLORS.divider,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.divider,
   },
+
   titleRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: SIZES.lg24, marginBottom: SIZES.md16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SIZES.lg24,
+    marginBottom: SIZES.md16,
   },
-  title:    { fontSize: SIZES.xxl, fontWeight: '800', color: COLORS.brown },
-  subtitle: { fontSize: SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
+  title: {
+    fontSize: SIZES.xxl,
+    fontWeight: '800',
+    color: COLORS.brown,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  subtitle: {
+    fontSize: SIZES.sm,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+    fontFamily: 'PlusJakartaSans_400Regular',
+  },
   countBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: 12,
     backgroundColor: '#EBF7FA',
     borderWidth: 1,
     borderColor: '#B8E4E5',
-    flexShrink: 0,
     alignSelf: 'center',
+    marginLeft: 8,
   },
-  countNum: { fontSize: 11.5, fontWeight: '700', color: '#2E7A99' },
+  countNum: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2E7A99',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
 
   segmentedContainer: {
     flexDirection: 'row',
@@ -175,17 +176,15 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.r12,
     marginHorizontal: SIZES.lg24,
     padding: 3,
-    marginBottom: SIZES.sm8 + 4,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
   segmentBtn: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: SIZES.radius,
   },
   segmentBtnActive: {
@@ -196,32 +195,22 @@ const styles = StyleSheet.create({
     fontSize: SIZES.small,
     fontWeight: '600',
     color: COLORS.textMuted,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
   },
   segmentTextActive: {
     fontWeight: '800',
     color: COLORS.brown,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
 
-  speciesContainer: {
-    marginBottom: 6,
-  },
-  sectionLabel: {
-    fontSize: SIZES.xsmall,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginHorizontal: SIZES.lg24,
-    marginBottom: 6,
-  },
   speciesContent: {
     paddingHorizontal: SIZES.lg24,
     gap: 8,
-    paddingBottom: 4,
+    paddingBottom: 10,
   },
   speciesChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: SIZES.radiusFull,
     backgroundColor: COLORS.inputBg,
     borderWidth: 1,
@@ -235,27 +224,14 @@ const styles = StyleSheet.create({
     fontSize: SIZES.small,
     fontWeight: '600',
     color: COLORS.textSecondary,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
   },
   speciesTextActive: {
     fontWeight: '800',
     color: COLORS.primaryDeep,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
 
-  legendBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: SIZES.lg24,
-    paddingTop: 6,
-    paddingBottom: 2,
-  },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot: { fontSize: SIZES.xsmall, color: COLORS.textMuted },
-  legendText: { fontSize: SIZES.xsmall, color: COLORS.textMuted, fontWeight: '500' },
-
-  grid:    { padding: SIZES.md16, paddingBottom: 110 },
-  gridRow: { flexDirection: 'row', gap: SIZES.md16, marginBottom: SIZES.md16 },
-  gridCard:{ flex: 1 },
-  empty:   { flex: 1 },
+  list:  { paddingHorizontal: SIZES.lg24, paddingTop: 16, paddingBottom: 110 },
+  empty: { flex: 1 },
 });
