@@ -10,6 +10,7 @@ import {
   Platform,
   Modal,
   SafeAreaView,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -295,6 +296,7 @@ export default function MessagesScreen({ navigation }) {
             ? (item.groupName || 'Group Chat')
             : (item.participantNames?.[otherId] || 'Community Member');
           const otherAvatar = (!isGroup && otherId && item.participantAvatars?.[otherId]) || null;
+          const groupPhoto = isGroup ? (item.groupPhoto || null) : null;
           const lastMsg = item.lastMessage || (isGroup ? 'Group created' : 'Sent a message');
           const time = formatTime(item.lastMessageTime);
           const uId = currentUser?.id;
@@ -322,9 +324,11 @@ export default function MessagesScreen({ navigation }) {
             >
               <View style={styles.rowAvatarWrap}>
                 {isGroup ? (
-                  <View style={styles.groupAvatar}>
-                    <Ionicons name="people" size={26} color="#2E7A99" />
-                  </View>
+                  groupPhoto
+                    ? <Image source={{ uri: groupPhoto }} style={styles.groupAvatarPhoto} />
+                    : <View style={styles.groupAvatar}>
+                        <Ionicons name="people" size={26} color="#2E7A99" />
+                      </View>
                 ) : (
                   <Avatar name={displayName} userId={otherId} uri={otherAvatar} size={54} />
                 )}
@@ -773,6 +777,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#B8E4E5',
+  },
+  groupAvatarPhoto: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    resizeMode: 'cover',
   },
   rowContentWrap: { flex: 1, justifyContent: 'center' },
   rowTopBar: {

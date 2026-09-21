@@ -45,7 +45,7 @@ export default function ChatScreen({ route, navigation }) {
   } = route.params || {};
   const resolvedOtherName = otherName || routeUserName;
   const { conversations, currentUser, sendMessage, clearConversation, markConversationRead,
-    setActiveConversationId, showAlert, updateGroupInfo } = useApp();
+    setActiveConversationId, showAlert, updateGroupInfo, getAllKnownUsers } = useApp();
   const [text, setText] = useState(initialDraft || '');
   const [attachModalVisible, setAttachModalVisible] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
@@ -55,6 +55,12 @@ export default function ChatScreen({ route, navigation }) {
   const [groupInfoVisible, setGroupInfoVisible] = useState(false);
   const [editGroupName, setEditGroupName] = useState('');
   const [editGroupPhoto, setEditGroupPhoto] = useState(null);
+  // Add members state
+  const [addMembersVisible, setAddMembersVisible] = useState(false);
+  const [selectedNewMembers, setSelectedNewMembers] = useState([]);
+  // Media gallery state
+  const [mediaGalleryVisible, setMediaGalleryVisible] = useState(false);
+  const [galleryPreview, setGalleryPreview] = useState(null);
 
   const flatRef = useRef(null);
   const inputRef = useRef(null);
@@ -88,6 +94,16 @@ export default function ChatScreen({ route, navigation }) {
         avatar: convo.participantAvatars?.[pid] || null,
         isMe: pid === currentUser?.id,
       }))
+    : [];
+
+  // All images/videos sent in this conversation (for media gallery)
+  const mediaMessages = messages.filter((m) => m.type === 'image' || m.type === 'video');
+
+  // All known users NOT already in this group (for Add Members picker)
+  const nonMembers = isGroup
+    ? (getAllKnownUsers?.() || []).filter(
+        (u) => u.id !== currentUser?.id && !(convo?.participants || []).includes(u.id)
+      )
     : [];
 
   // Register active conversation for auto-read and heads-up notification suppression while actively in chat
@@ -365,6 +381,26 @@ export default function ChatScreen({ route, navigation }) {
       groupPhoto: editGroupPhoto,
     });
     setGroupInfoVisible(false);
+  };
+
+  const handleSaveNewMembers = () => {
+    if (!convo?.id || selectedNewMembers.length === 0) {
+      setAddMembersVisible(false);
+      return;
+    }
+    updateGroupInfo(convo.id, {
+      addParticipants: selectedNewMembers,
+    });
+    setSelectedNewMembers([]);
+    setAddMembersVisible(false);
+  };
+
+  const toggleSelectMember = (user) => {
+    setSelectedNewMembers((prev) => {
+      const already = prev.find((u) => u.id === user.id);
+      if (already) return prev.filter((u) => u.id !== user.id);
+      return [...prev, { id: user.id, name: user.name, avatar: user.avatar || null }];
+    });
   };
 
   // Render empty state with friendly intro and quick chips
@@ -912,9 +948,19 @@ export default function ChatScreen({ route, navigation }) {
 
             {/* Members */}
             <View style={styles.groupInfoFieldSection}>
-              <Text style={styles.groupInfoFieldLabel}>
-                MEMBERS · {groupMembers.length}
-              </Text>
+              <View style={styles.groupInfoSectionHeader}>
+                <Text style={styles.groupInfoFieldLabel}>
+                  MEMBERS · {groupMembers.length}
+                </Text>
+                <TouchableOpacity
+                  style={styles.addMemberBtn}
+                  onPress={() => { setSelectedNewMembers([]); setAddMembersVisible(true); }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="person-add-outline" size={14} color="#2E7A99" />
+                  <Text style={styles.addMemberBtnTxt}>Add</Text>
+                </TouchableOpacity>
+              </View>
               {groupMembers.map((m) => (
                 <View key={m.id} style={styles.groupInfoMemberRow}>
                   <Avatar name={m.name} userId={m.id} uri={m.avatar} size={42} />
@@ -927,6 +973,44 @@ export default function ChatScreen({ route, navigation }) {
                 </View>
               ))}
             </View>
+
+            {/* Media Gallery */}
+            {mediaMessages.length > 0 && (
+              <View style={styles.groupInfoFieldSection}>
+                <View style={styles.groupInfoSectionHeader}>
+                  <Text style={styles.groupInfoFieldLabel}>
+                    MEDIA · {mediaMessages.length}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setMediaGalleryVisible(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.seeAllTxt}>See all</Text>
+                  </TouchableOpacity>
+                </View>
+                {/* Preview grid — first 6 */}
+                <View style={styles.mediaPreviewGrid}>
+                  {mediaMessages.slice(0, 6).map((m, i) => (
+                    <TouchableOpacity
+                      key={m.id || i}
+                      style={styles.mediaPreviewCell}
+                      onPress={() => setGalleryPreview(m.uri || m.url || m.content)}
+                      activeOpacity={0.85}
+                    >
+                      <Image
+                        source={{ uri: m.uri || m.url || m.content }}
+                        style={styles.mediaPreviewImg}
+                      />
+                      {m.type === 'video' && (
+                        <View style={styles.mediaVideoOverlay}>
+                          <Ionicons name="play-circle" size={22} color="#FFFFFF" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
 
             {/* Danger Zone */}
             <TouchableOpacity
@@ -951,6 +1035,127 @@ export default function ChatScreen({ route, navigation }) {
               <Text style={styles.groupInfoDangerTxt}>Clear Chat History</Text>
             </TouchableOpacity>
           </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ── Add Members Modal ───────────────────────────────────── */}
+      <Modal
+        visible={addMembersVisible}
+        animationType="slide"
+        onRequestClose={() => setAddMembersVisible(false)}
+      >
+        <SafeAreaView style={styles.groupInfoContainer}>
+          <View style={styles.groupInfoHeader}>
+            <TouchableOpacity
+              style={styles.groupInfoCloseBtn}
+              onPress={() => setAddMembersVisible(false)}
+            >
+              <Ionicons name="close" size={22} color="#473018" />
+            </TouchableOpacity>
+            <Text style={styles.groupInfoTitle}>Add Members</Text>
+            <TouchableOpacity
+              style={[
+                styles.groupInfoSaveBtn,
+                selectedNewMembers.length === 0 && { backgroundColor: '#C9B99A' },
+              ]}
+              onPress={handleSaveNewMembers}
+              disabled={selectedNewMembers.length === 0}
+            >
+              <Text style={styles.groupInfoSaveTxt}>
+                {selectedNewMembers.length > 0 ? `Add (${selectedNewMembers.length})` : 'Add'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 16 }}>
+            {nonMembers.length === 0 ? (
+              <View style={styles.noMembersWrap}>
+                <Ionicons name="people-outline" size={40} color="#C9B99A" />
+                <Text style={styles.noMembersTxt}>No more users to add</Text>
+              </View>
+            ) : (
+              nonMembers.map((u) => {
+                const isSelected = selectedNewMembers.some((s) => s.id === u.id);
+                return (
+                  <TouchableOpacity
+                    key={u.id}
+                    style={[styles.addMemberRow, isSelected && styles.addMemberRowSelected]}
+                    onPress={() => toggleSelectMember(u)}
+                    activeOpacity={0.8}
+                  >
+                    <Avatar name={u.name} userId={u.id} uri={u.avatar} size={44} />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.addMemberName}>{u.name}</Text>
+                      {u.role && u.role !== 'community' && (
+                        <Text style={styles.addMemberRole}>{u.role}</Text>
+                      )}
+                    </View>
+                    <View style={[styles.checkCircle, isSelected && styles.checkCircleSelected]}>
+                      {isSelected && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ── Full-Screen Media Gallery Modal ────────────────────── */}
+      <Modal
+        visible={mediaGalleryVisible}
+        animationType="slide"
+        onRequestClose={() => { setMediaGalleryVisible(false); setGalleryPreview(null); }}
+      >
+        <SafeAreaView style={styles.galleryContainer}>
+          <View style={styles.galleryHeader}>
+            <TouchableOpacity
+              style={styles.groupInfoCloseBtn}
+              onPress={() => { setMediaGalleryVisible(false); setGalleryPreview(null); }}
+            >
+              <Ionicons name="close" size={22} color="#473018" />
+            </TouchableOpacity>
+            <Text style={styles.groupInfoTitle}>Shared Media</Text>
+            <View style={{ width: 36 }} />
+          </View>
+
+          {/* Full image preview */}
+          {galleryPreview ? (
+            <View style={styles.galleryFullPreview}>
+              <Image
+                source={{ uri: galleryPreview }}
+                style={styles.galleryFullImg}
+                resizeMode="contain"
+              />
+              <TouchableOpacity
+                style={styles.galleryBackBtn}
+                onPress={() => setGalleryPreview(null)}
+              >
+                <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <ScrollView contentContainerStyle={styles.galleryGrid}>
+              {mediaMessages.map((m, i) => (
+                <TouchableOpacity
+                  key={m.id || i}
+                  style={styles.galleryCell}
+                  onPress={() => setGalleryPreview(m.uri || m.url || m.content)}
+                  activeOpacity={0.85}
+                >
+                  <Image
+                    source={{ uri: m.uri || m.url || m.content }}
+                    style={styles.galleryCellImg}
+                  />
+                  {m.type === 'video' && (
+                    <View style={styles.mediaVideoOverlay}>
+                      <Ionicons name="play-circle" size={28} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
         </SafeAreaView>
       </Modal>
     </KeyboardAvoidingView>
@@ -1484,6 +1689,167 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#C0392B',
     fontFamily: 'PlusJakartaSans_700Bold',
+  },
+
+  // ── Group Info section header (label + action button row) ──────────────
+  groupInfoSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  addMemberBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EBF7FA',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  addMemberBtnTxt: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2E7A99',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  seeAllTxt: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2E7A99',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+
+  // ── Media preview grid (inside Group Info modal) ──────────────────────
+  mediaPreviewGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  mediaPreviewCell: {
+    width: '31.5%',
+    aspectRatio: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#E8DFC8',
+    position: 'relative',
+  },
+  mediaPreviewImg: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  mediaVideoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Add Members picker styles ─────────────────────────────────────────
+  noMembersWrap: {
+    alignItems: 'center',
+    paddingTop: 60,
+    gap: 14,
+  },
+  noMembersTxt: {
+    fontSize: 15,
+    color: '#8C7D6A',
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  addMemberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#EFE6D4',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  addMemberRowSelected: {
+    borderColor: '#2E7A99',
+    backgroundColor: '#F0F9FC',
+  },
+  addMemberName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+  addMemberRole: {
+    fontSize: 11,
+    color: '#8C7D6A',
+    marginTop: 1,
+    textTransform: 'capitalize',
+    fontFamily: 'PlusJakartaSans_400Regular',
+  },
+  checkCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: '#C9B99A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkCircleSelected: {
+    backgroundColor: '#2E7A99',
+    borderColor: '#2E7A99',
+  },
+
+  // ── Full Media Gallery styles ─────────────────────────────────────────
+  galleryContainer: {
+    flex: 1,
+    backgroundColor: '#FAF7EE',
+  },
+  galleryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8DFC8',
+  },
+  galleryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 3,
+    padding: 3,
+  },
+  galleryCell: {
+    width: '33%',
+    aspectRatio: 1,
+    overflow: 'hidden',
+    backgroundColor: '#E8DFC8',
+    position: 'relative',
+  },
+  galleryCellImg: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  galleryFullPreview: {
+    flex: 1,
+    backgroundColor: '#000000',
+    position: 'relative',
+  },
+  galleryFullImg: {
+    flex: 1,
+    width: '100%',
+  },
+  galleryBackBtn: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Bubbles

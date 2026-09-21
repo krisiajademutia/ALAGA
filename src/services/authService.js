@@ -339,10 +339,14 @@ export function cacheUserProfile(user) {
  * Get synchronously cached avatar URL by userId or user's display name
  */
 export function getCachedUserAvatar(userId, name) {
+  // Always prefer an id-keyed hit
   if (userId && userAvatarCache.has(userId)) {
     return userAvatarCache.get(userId);
   }
-  if (name && typeof name === 'string') {
+  // Only fall back to name lookup when we have NO userId at all.
+  // If userId was supplied but not found, we intentionally return null to
+  // prevent a different user's cached avatar from leaking in via a name match.
+  if (!userId && name && typeof name === 'string') {
     const lowerName = name.trim().toLowerCase();
     if (userAvatarCache.has(lowerName)) {
       return userAvatarCache.get(lowerName);

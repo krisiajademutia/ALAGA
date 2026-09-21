@@ -1328,13 +1328,31 @@ export function AppProvider({ children }) {
     deleteConversationFirebase(conversationId);
   };
 
-  const updateGroupInfo = (conversationId, { groupName, groupPhoto } = {}) => {
+  const updateGroupInfo = (conversationId, { groupName, groupPhoto, addParticipants } = {}) => {
     if (!conversationId) return;
     setConversations((prev) =>
       prev.map((c) => {
         if (c.id !== conversationId || !c.isGroup) return c;
+        let participants = c.participants ? [...c.participants] : [];
+        let participantNames = { ...(c.participantNames || {}) };
+        let participantAvatars = { ...(c.participantAvatars || {}) };
+
+        // Merge in new participants (avoid duplicates)
+        if (Array.isArray(addParticipants) && addParticipants.length > 0) {
+          addParticipants.forEach(({ id, name, avatar }) => {
+            if (id && !participants.includes(id)) {
+              participants.push(id);
+              if (name) participantNames[id] = name;
+              if (avatar) participantAvatars[id] = avatar;
+            }
+          });
+        }
+
         const updated = {
           ...c,
+          participants,
+          participantNames,
+          participantAvatars,
           ...(groupName !== undefined ? { groupName } : {}),
           ...(groupPhoto !== undefined ? { groupPhoto } : {}),
         };
