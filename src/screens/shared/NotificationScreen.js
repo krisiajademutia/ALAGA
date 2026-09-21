@@ -291,7 +291,7 @@ export default function NotificationScreen({ navigation }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FCF8E8',
+    backgroundColor: '#FFFFFF',
   },
   headerCenter: {
     flexDirection: 'row',
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#FCF8E8',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E8DFC8',
     gap: 8,
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 6,
-    backgroundColor: '#FCF8E8',
+    backgroundColor: '#FFFFFF',
   },
   sectionLabel: {
     fontSize: 11,
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingVertical: 13,
     paddingHorizontal: 16,
-    backgroundColor: '#FCF8E8',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#EDE5DC',
   },
