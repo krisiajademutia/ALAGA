@@ -382,12 +382,12 @@ function AnimalManageCard({ animal, onPress, onActions }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.background },
+  root: { flex: 1, backgroundColor: '#FFFFFF' },
 
   header: {
     paddingHorizontal: 20,
     paddingBottom: 14,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#FFFFFF',
   },
   headerTopRow: {
     flexDirection: 'row',

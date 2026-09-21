@@ -891,7 +891,7 @@ export default function DonateScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: '#FCF8E8',
+    backgroundColor: '#FFFFFF',
   },
   scroll: {
     paddingHorizontal: 20,
@@ -1422,7 +1422,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   recipientModalSheet: {
-    backgroundColor: '#FCF8E8',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,

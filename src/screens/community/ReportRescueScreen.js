@@ -659,7 +659,7 @@ export default function ReportRescueScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FCF8E8',
+    backgroundColor: '#FFFFFF',
   },
   keyboardView: {
     flex: 1,
@@ -676,7 +676,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingBottom: 12,
-    backgroundColor: '#FCF8E8',
+    backgroundColor: '#FFFFFF',
   },
   backBtn: {
     width: 36,

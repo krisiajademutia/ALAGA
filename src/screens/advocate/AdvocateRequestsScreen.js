@@ -216,7 +216,7 @@ function RequestCard({ request, onApprove, onReject, onMessage, onViewProfile })
 }
 
 const styles = StyleSheet.create({
-  root:  { flex: 1, backgroundColor: COLORS.background },
+  root:  { flex: 1, backgroundColor: '#FFFFFF' },
 
   filterRow: {
     flexDirection: 'row', paddingHorizontal: SIZES.lg24,

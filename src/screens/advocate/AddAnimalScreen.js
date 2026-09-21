@@ -691,7 +691,7 @@ const tr = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: COLORS.background },
+  flex: { flex: 1, backgroundColor: '#FFFFFF' },
   scroll: { paddingHorizontal: SIZES.lg24, paddingTop: SIZES.md16, paddingBottom: 48 },
 
   photoHeaderRow: {

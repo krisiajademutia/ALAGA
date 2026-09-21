@@ -419,7 +419,7 @@ function InfoRow({ label, value }) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: COLORS.background },
+  flex: { flex: 1, backgroundColor: '#FFFFFF' },
 
   scroll: { paddingBottom: 40 },
 
