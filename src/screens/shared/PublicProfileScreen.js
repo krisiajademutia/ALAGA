@@ -110,8 +110,10 @@ export default function PublicProfileScreen({ route, navigation }) {
   const isAdvocate = user.role === 'advocate';
   const effectiveUserId = isOwnProfile ? currentUid : targetId;
 
-  // Filter ONLY public data (animals posted & animals rescued)
-  const userAnimals = effectiveUserId ? getAnimalsByAdvocate(effectiveUserId) : [];
+  // Filter ONLY public data — only show animals that are currently Available (not hidden/adopted)
+  const userAnimals = effectiveUserId
+    ? getAnimalsByAdvocate(effectiveUserId).filter((a) => a.status === 'Available')
+    : [];
   const rescueCases = rescueReports.filter(
     (r) => (effectiveUserId && (r.reporterId === effectiveUserId || r.userId === effectiveUserId || r.responderId === effectiveUserId))
   );

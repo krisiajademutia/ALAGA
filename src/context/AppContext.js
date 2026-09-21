@@ -1631,7 +1631,7 @@ export function AppProvider({ children }) {
     );
 
   const getAnimalsByAdvocate = (userId) =>
-    animals.filter((a) => a.advocateId === userId);
+    animals.filter((a) => a.advocateId === userId && a.status === 'Available');
 
   const getUserDonations = () =>
     donations.filter((d) => d.donorId === currentUser?.id);

@@ -61,12 +61,12 @@ export default function MessagesScreen({ navigation }) {
 
   const matchedUsers = isSearching
     ? allUsers.filter((u) => {
-        const q = searchQuery.toLowerCase();
-        return (
-          (u.name || '').toLowerCase().includes(q) ||
-          (u.location || '').toLowerCase().includes(q)
-        );
-      })
+      const q = searchQuery.toLowerCase();
+      return (
+        (u.name || '').toLowerCase().includes(q) ||
+        (u.location || '').toLowerCase().includes(q)
+      );
+    })
     : [];
 
   const insets = useSafeAreaInsets();
@@ -327,8 +327,8 @@ export default function MessagesScreen({ navigation }) {
                   groupPhoto
                     ? <Image source={{ uri: groupPhoto }} style={styles.groupAvatarPhoto} />
                     : <View style={styles.groupAvatar}>
-                        <Ionicons name="people" size={26} color="#2E7A99" />
-                      </View>
+                      <Ionicons name="people" size={26} color="#2E7A99" />
+                    </View>
                 ) : (
                   <Avatar name={displayName} userId={otherId} uri={otherAvatar} size={54} />
                 )}
