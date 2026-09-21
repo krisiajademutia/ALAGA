@@ -670,7 +670,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
   },
   scroll: {
-    paddingBottom: 110,
+    paddingBottom: 160,
   },
 
   heroWrap: {
@@ -956,12 +956,12 @@ const styles = StyleSheet.create({
   donateBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.inputBg,
+    backgroundColor: COLORS.primaryLight,
     borderRadius: SIZES.r14,
-    padding: 12,
-    gap: 8,
+    padding: 14,
+    gap: 10,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.primaryDark,
     marginTop: 4,
   },
   donateBannerText: {
