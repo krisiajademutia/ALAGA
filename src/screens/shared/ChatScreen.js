@@ -590,18 +590,16 @@ export default function ChatScreen({ route, navigation }) {
               ]}
             >
               {!isMine && (
-                <View style={styles.senderAvatarWrap}>
-                  {!isSameSenderAsPrev ? (
-                    <Avatar
-                      name={convo?.participantNames?.[item.senderId] || name}
-                      userId={item.senderId || otherId}
-                      uri={item.senderAvatar || (item.senderId && convo?.participantAvatars?.[item.senderId]) || otherAvatar}
-                      size={30}
-                    />
-                  ) : (
-                    <View style={{ width: 30 }} />
-                  )}
-                </View>
+                !isSameSenderAsPrev ? (
+                  <Avatar
+                    name={convo?.participantNames?.[item.senderId] || name}
+                    userId={item.senderId || otherId}
+                    size={30}
+                    style={styles.senderAvatar}
+                  />
+                ) : (
+                  <View style={styles.senderAvatarSpacer} />
+                )
               )}
 
               <View style={[styles.bubbleColumn, isMine && styles.bubbleColumnMine]}>
@@ -698,7 +696,7 @@ export default function ChatScreen({ route, navigation }) {
                       activeOpacity={0.85}
                     >
                       <Ionicons name="navigate" size={14} color="#FFFFFF" />
-                      <Text style={styles.openMapBtnText}>Open in Google Maps / Directions</Text>
+                      <Text style={styles.openMapBtnText}>Open in Maps</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -1477,9 +1475,14 @@ const styles = StyleSheet.create({
   msgRowTheirs: {
     justifyContent: 'flex-start',
   },
-  senderAvatarWrap: {
+  senderAvatar: {
     marginRight: 8,
     marginBottom: 2,
+    alignSelf: 'flex-end',
+  },
+  senderAvatarSpacer: {
+    width: 30,
+    marginRight: 8,
   },
   bubbleColumn: {
     flexDirection: 'column',
