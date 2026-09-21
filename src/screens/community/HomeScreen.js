@@ -25,13 +25,11 @@ const CATEGORIES = [
   { id: 'birds', label: 'Other Animals', icon: 'heart-outline' },
 ];
 
-const SEGMENTS = ['All Pets', 'Urgent / Foster', 'Nearby (<3km)'];
 
 export default function CommunityHomeScreen({ navigation }) {
   const { currentUser, animals, getUnreadCount } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
-  const [activeSegment, setActiveSegment] = useState('All Pets');
 
   const unreadNotifs = getUnreadCount();
   const insets = useSafeAreaInsets();
@@ -41,7 +39,6 @@ export default function CommunityHomeScreen({ navigation }) {
     if (a.status !== 'Available') return false;
     if (activeCategory === 'cats' && a.species !== 'Cat') return false;
     if (activeCategory === 'dogs' && a.species !== 'Dog') return false;
-    if (activeSegment === 'Urgent / Foster' && !a.fosterNeeded && a.listingType !== 'Foster') return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       return (
@@ -174,25 +171,6 @@ export default function CommunityHomeScreen({ navigation }) {
             );
           })}
         </ScrollView>
-
-        {/* ── Segmented Tabs ────────────────────────────────── */}
-        <View style={styles.segmentContainer}>
-          {SEGMENTS.map((seg) => {
-            const active = activeSegment === seg;
-            return (
-              <TouchableOpacity
-                key={seg}
-                style={[styles.segBtn, active && styles.segBtnActive]}
-                onPress={() => setActiveSegment(seg)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.segText, active && styles.segTextActive]}>
-                  {seg}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
 
         {/* ── Available for Adoption Section ────────────────── */}
         <View style={styles.sectionHeader}>
