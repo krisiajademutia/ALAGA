@@ -1280,7 +1280,7 @@ function formatMessageTime(timeStr) {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: '#FAF7EE',
+    backgroundColor: '#FFFFFF',
   },
 
   // Header Center & Right
@@ -1581,7 +1581,7 @@ const styles = StyleSheet.create({
   // \u2500\u2500 Group Info Modal \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   groupInfoContainer: {
     flex: 1,
-    backgroundColor: '#FAF7EE',
+    backgroundColor: '#FFFFFF',
   },
   groupInfoHeader: {
     flexDirection: 'row',
@@ -1591,7 +1591,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#E8DFC8',
-    backgroundColor: '#FAF7EE',
+    backgroundColor: '#FFFFFF',
   },
   groupInfoCloseBtn: {
     width: 36,

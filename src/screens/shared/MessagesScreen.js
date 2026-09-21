@@ -636,13 +636,13 @@ function formatTime(isoString) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FCF8E8' },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
 
   // ── Header ───────────────────────────────────────────────
   headerWrap: {
     paddingHorizontal: 18,
     paddingBottom: 10,
-    backgroundColor: '#FCF8E8',
+    backgroundColor: '#FFFFFF',
   },
   topRow: {
     flexDirection: 'row',
@@ -687,7 +687,7 @@ const styles = StyleSheet.create({
 
   // ── User Search Results ──────────────────────────────────
   userResultsSection: {
-    backgroundColor: '#FCF8E8',
+    backgroundColor: '#FFFFFF',
     paddingTop: 6,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E8DFC8',
@@ -895,7 +895,7 @@ const styles = StyleSheet.create({
   },
 
   // ── Modal ────────────────────────────────────────────────
-  modalContainer: { flex: 1, backgroundColor: '#FCF8E8' },
+  modalContainer: { flex: 1, backgroundColor: '#FFFFFF' },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
