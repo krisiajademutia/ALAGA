@@ -58,6 +58,7 @@ export default function ChatScreen({ route, navigation }) {
   // Add members state
   const [addMembersVisible, setAddMembersVisible] = useState(false);
   const [selectedNewMembers, setSelectedNewMembers] = useState([]);
+  const [memberSearch, setMemberSearch] = useState('');
   // Media gallery state
   const [mediaGalleryVisible, setMediaGalleryVisible] = useState(false);
   const [galleryPreview, setGalleryPreview] = useState(null);
@@ -385,6 +386,7 @@ export default function ChatScreen({ route, navigation }) {
 
   const handleSaveNewMembers = () => {
     if (!convo?.id || selectedNewMembers.length === 0) {
+      setMemberSearch('');
       setAddMembersVisible(false);
       return;
     }
@@ -392,6 +394,7 @@ export default function ChatScreen({ route, navigation }) {
       addParticipants: selectedNewMembers,
     });
     setSelectedNewMembers([]);
+    setMemberSearch('');
     setAddMembersVisible(false);
   };
 
@@ -994,11 +997,11 @@ export default function ChatScreen({ route, navigation }) {
                     <TouchableOpacity
                       key={m.id || i}
                       style={styles.mediaPreviewCell}
-                      onPress={() => setGalleryPreview(m.uri || m.url || m.content)}
+                      onPress={() => setGalleryPreview(m.mediaUri)}
                       activeOpacity={0.85}
                     >
                       <Image
-                        source={{ uri: m.uri || m.url || m.content }}
+                        source={{ uri: m.mediaUri }}
                         style={styles.mediaPreviewImg}
                       />
                       {m.type === 'video' && (
@@ -1042,13 +1045,13 @@ export default function ChatScreen({ route, navigation }) {
       <Modal
         visible={addMembersVisible}
         animationType="slide"
-        onRequestClose={() => setAddMembersVisible(false)}
+        onRequestClose={() => { setMemberSearch(''); setAddMembersVisible(false); }}
       >
         <SafeAreaView style={styles.groupInfoContainer}>
           <View style={styles.groupInfoHeader}>
             <TouchableOpacity
               style={styles.groupInfoCloseBtn}
-              onPress={() => setAddMembersVisible(false)}
+              onPress={() => { setMemberSearch(''); setAddMembersVisible(false); }}
             >
               <Ionicons name="close" size={22} color="#473018" />
             </TouchableOpacity>
@@ -1067,14 +1070,51 @@ export default function ChatScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
 
-          <ScrollView contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 16 }}>
-            {nonMembers.length === 0 ? (
-              <View style={styles.noMembersWrap}>
-                <Ionicons name="people-outline" size={40} color="#C9B99A" />
-                <Text style={styles.noMembersTxt}>No more users to add</Text>
-              </View>
-            ) : (
-              nonMembers.map((u) => {
+          {/* Search bar */}
+          <View style={styles.memberSearchWrap}>
+            <Ionicons name="search" size={16} color="#8C7D6A" style={{ marginRight: 8 }} />
+            <TextInput
+              style={styles.memberSearchInput}
+              value={memberSearch}
+              onChangeText={setMemberSearch}
+              placeholder="Search people..."
+              placeholderTextColor="#8C7D6A"
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+            />
+            {memberSearch.length > 0 && (
+              <TouchableOpacity onPress={() => setMemberSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close-circle" size={16} color="#8C7D6A" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 16 }} keyboardShouldPersistTaps="handled">
+            {(() => {
+              const query = memberSearch.trim().toLowerCase();
+              const filtered = query
+                ? nonMembers.filter((u) => u.name?.toLowerCase().includes(query))
+                : nonMembers;
+
+              if (nonMembers.length === 0) {
+                return (
+                  <View style={styles.noMembersWrap}>
+                    <Ionicons name="people-outline" size={40} color="#C9B99A" />
+                    <Text style={styles.noMembersTxt}>No more users to add</Text>
+                  </View>
+                );
+              }
+
+              if (filtered.length === 0) {
+                return (
+                  <View style={styles.noMembersWrap}>
+                    <Ionicons name="search" size={40} color="#C9B99A" />
+                    <Text style={styles.noMembersTxt}>No results for "{memberSearch}"</Text>
+                  </View>
+                );
+              }
+
+              return filtered.map((u) => {
                 const isSelected = selectedNewMembers.some((s) => s.id === u.id);
                 return (
                   <TouchableOpacity
@@ -1095,8 +1135,8 @@ export default function ChatScreen({ route, navigation }) {
                     </View>
                   </TouchableOpacity>
                 );
-              })
-            )}
+              });
+            })()}
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -1140,11 +1180,11 @@ export default function ChatScreen({ route, navigation }) {
                 <TouchableOpacity
                   key={m.id || i}
                   style={styles.galleryCell}
-                  onPress={() => setGalleryPreview(m.uri || m.url || m.content)}
+                  onPress={() => setGalleryPreview(m.mediaUri)}
                   activeOpacity={0.85}
                 >
                   <Image
-                    source={{ uri: m.uri || m.url || m.content }}
+                    source={{ uri: m.mediaUri }}
                     style={styles.galleryCellImg}
                   />
                   {m.type === 'video' && (
@@ -1747,6 +1787,26 @@ const styles = StyleSheet.create({
   },
 
   // ── Add Members picker styles ─────────────────────────────────────────
+  memberSearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3EDE0',
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
+  },
+  memberSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_400Regular',
+    paddingVertical: 0,
+  },
   noMembersWrap: {
     alignItems: 'center',
     paddingTop: 60,
