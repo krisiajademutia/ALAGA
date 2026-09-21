@@ -32,6 +32,7 @@ export default function ActivityScreen({ route, navigation }) {
     getAdvocateAnimals, getUserDonations,
     getAdvocateDonations, verifyDonation,
     showAlert,
+    animals,
   } = useApp();
 
   const isAdvocate = currentUser?.role === 'advocate';
@@ -84,7 +85,7 @@ export default function ActivityScreen({ route, navigation }) {
       return <ReportCard item={item} isAdvocate={isAdvocate} navigation={navigation} />;
     }
     if (activeTab === 'requests') {
-      return <RequestCard item={item} isAdvocate={isAdvocate} onPress={() => setSelectedRequest(item)} />;
+      return <RequestCard item={item} isAdvocate={isAdvocate} onPress={() => setSelectedRequest(item)} animals={animals} />;
     }
     if (activeTab === 'donations') {
       return (
@@ -229,57 +230,77 @@ export default function ActivityScreen({ route, navigation }) {
       />
 
       {/* ── Request Detail Modal ───────────────────────────── */}
-      {selectedRequest && (
-        <Modal visible transparent animationType="slide" onRequestClose={() => setSelectedRequest(null)}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalSheet}>
-              <View style={styles.modalHandle} />
-              <View style={styles.modalHeaderRow}>
-                <Text style={styles.modalTitle}>Request Details</Text>
-                <TouchableOpacity onPress={() => setSelectedRequest(null)}>
-                  <Ionicons name="close" size={20} color="#8C7D6A" />
+      {selectedRequest && (() => {
+        const modalAnimal = animals && selectedRequest.animalId
+          ? animals.find((a) => a.id === selectedRequest.animalId)
+          : null;
+        const modalPhotoUri =
+          selectedRequest.animalPhoto ||
+          selectedRequest.photo ||
+          modalAnimal?.photo ||
+          (Array.isArray(modalAnimal?.photos) && modalAnimal.photos[0]) ||
+          null;
+        return (
+          <Modal visible transparent animationType="slide" onRequestClose={() => setSelectedRequest(null)}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalSheet}>
+                <View style={styles.modalHandle} />
+                <View style={styles.modalHeaderRow}>
+                  <Text style={styles.modalTitle}>Request Details</Text>
+                  <TouchableOpacity onPress={() => setSelectedRequest(null)}>
+                    <Ionicons name="close" size={20} color="#8C7D6A" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Animal photo in modal */}
+                {modalPhotoUri ? (
+                  <Image
+                    source={{ uri: modalPhotoUri }}
+                    style={styles.modalAnimalImage}
+                    resizeMode="cover"
+                  />
+                ) : null}
+
+                <View style={styles.modalBody}>
+                  <View style={styles.modalRow}>
+                    <Text style={styles.modalLabel}>Type:</Text>
+                    <Text style={styles.modalVal}>{selectedRequest.type || 'Adoption'}</Text>
+                  </View>
+
+                  <View style={styles.modalRow}>
+                    <Text style={styles.modalLabel}>Status:</Text>
+                    <StatusPill status={selectedRequest.status} />
+                  </View>
+
+                  <View style={styles.modalRow}>
+                    <Text style={styles.modalLabel}>Animal:</Text>
+                    <Text style={styles.modalVal}>{selectedRequest.animalName || 'Animal'}</Text>
+                  </View>
+
+                  <View style={styles.modalRow}>
+                    <Text style={styles.modalLabel}>Date Submitted:</Text>
+                    <Text style={styles.modalVal}>{fmtDate(selectedRequest.createdAt)}</Text>
+                  </View>
+
+                  {selectedRequest.message ? (
+                    <View style={styles.messageBox}>
+                      <Text style={styles.messageBoxTitle}>Note:</Text>
+                      <Text style={styles.messageBoxText}>"{selectedRequest.message}"</Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                <TouchableOpacity
+                  style={styles.doneBtn}
+                  onPress={() => setSelectedRequest(null)}
+                >
+                  <Text style={styles.doneBtnText}>Close</Text>
                 </TouchableOpacity>
               </View>
-
-              <View style={styles.modalBody}>
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Type:</Text>
-                  <Text style={styles.modalVal}>{selectedRequest.type || 'Adoption'}</Text>
-                </View>
-
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Status:</Text>
-                  <StatusPill status={selectedRequest.status} />
-                </View>
-
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Animal:</Text>
-                  <Text style={styles.modalVal}>{selectedRequest.animalName || 'Animal'}</Text>
-                </View>
-
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalLabel}>Date Submitted:</Text>
-                  <Text style={styles.modalVal}>{fmtDate(selectedRequest.createdAt)}</Text>
-                </View>
-
-                {selectedRequest.message ? (
-                  <View style={styles.messageBox}>
-                    <Text style={styles.messageBoxTitle}>Note:</Text>
-                    <Text style={styles.messageBoxText}>"{selectedRequest.message}"</Text>
-                  </View>
-                ) : null}
-              </View>
-
-              <TouchableOpacity
-                style={styles.doneBtn}
-                onPress={() => setSelectedRequest(null)}
-              >
-                <Text style={styles.doneBtnText}>Close</Text>
-              </TouchableOpacity>
             </View>
-          </View>
-        </Modal>
-      )}
+          </Modal>
+        );
+      })()}
 
       {/* ── Receipt Proof Modal ──────────────────────────────── */}
       {Boolean(previewReceiptUrl) && (
@@ -316,7 +337,7 @@ export default function ActivityScreen({ route, navigation }) {
   );
 }
 
-// ── Report / Response card (Renders User Animal Photo) ─────────────────────────
+// ── Report / Response card ─────────────────────────────────────────────────────
 function ReportCard({ item, isAdvocate, navigation }) {
   const photoUri = item.photoUri || (Array.isArray(item.photos) && item.photos[0]) || item.image || item.photo || null;
 
@@ -327,16 +348,14 @@ function ReportCard({ item, isAdvocate, navigation }) {
         isAdvocate ? 'RescueAlertDetail' : 'ReportDetail',
         { reportId: item.id }
       )}
-      activeOpacity={0.88}
+      activeOpacity={0.85}
     >
       <View style={styles.cardLeft}>
         {photoUri ? (
           <Image source={{ uri: photoUri }} style={styles.cardThumbPhoto} resizeMode="cover" />
         ) : (
           <View style={styles.cardThumbFallback}>
-            <Text style={styles.cardThumbInitials}>
-              {item.animalType ? item.animalType.slice(0, 2).toUpperCase() : 'AL'}
-            </Text>
+            <Ionicons name="paw" size={28} color="#2E7A99" />
           </View>
         )}
       </View>
@@ -345,17 +364,13 @@ function ReportCard({ item, isAdvocate, navigation }) {
           <Text style={styles.cardTitle} numberOfLines={1}>
             {item.animalType || 'Animal'} · {item.condition || 'Rescue Alert'}
           </Text>
-          <View style={styles.cardPillWrap}>
-            <StatusPill status={item.status} />
-          </View>
+          <StatusPill status={item.status} />
         </View>
-
         {item.location?.address ? (
           <Text style={styles.cardMeta} numberOfLines={1}>
-            {item.location.address}
+            <Ionicons name="location-outline" size={11} color="#8C7D6A" /> {item.location.address}
           </Text>
         ) : null}
-
         <View style={styles.cardFooter}>
           <Text style={styles.urgencyText}>{item.urgency || 'Normal'} Priority</Text>
           <Text style={styles.cardDate}>{fmtDate(item.createdAt)}</Text>
@@ -366,41 +381,44 @@ function ReportCard({ item, isAdvocate, navigation }) {
 }
 
 // ── Request card ──────────────────────────────────────────────────────────────
-function RequestCard({ item, isAdvocate, onPress }) {
-  const photoUri = item.animalPhoto || item.photo || item.photoUri || (Array.isArray(item.photos) && item.photos[0]) || null;
+function RequestCard({ item, isAdvocate, onPress, animals }) {
+  // Look up animal photo: check item fields first, then find in animals array by animalId
+  const linkedAnimal = animals && item.animalId
+    ? animals.find((a) => a.id === item.animalId)
+    : null;
+  const photoUri =
+    item.animalPhoto ||
+    item.photo ||
+    item.photoUri ||
+    (Array.isArray(item.photos) && item.photos[0]) ||
+    linkedAnimal?.photo ||
+    (Array.isArray(linkedAnimal?.photos) && linkedAnimal.photos[0]) ||
+    null;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.88}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.cardLeft}>
         {photoUri ? (
           <Image source={{ uri: photoUri }} style={styles.cardThumbPhoto} resizeMode="cover" />
         ) : (
           <View style={styles.cardThumbFallback}>
-            <Text style={styles.cardThumbInitials}>
-              {item.animalName ? item.animalName.slice(0, 2).toUpperCase() : 'RQ'}
-            </Text>
+            <Ionicons name="heart-outline" size={28} color="#2E7A99" />
           </View>
         )}
       </View>
       <View style={styles.cardBody}>
         <View style={styles.cardTopRow}>
           <Text style={styles.cardTitle} numberOfLines={1}>{item.animalName || 'Animal Request'}</Text>
-          <View style={styles.cardPillWrap}>
-            <StatusPill status={item.status} />
-          </View>
+          <StatusPill status={item.status} />
         </View>
-        <View style={styles.cardMetaRow}>
-          <Text style={styles.typeTagText}>{item.type || 'Request'}</Text>
-          <Text style={styles.cardMeta} numberOfLines={1}>
-            {isAdvocate ? `From: ${item.requesterName || 'Community Member'}` : `Advocate: ${item.advocateName || 'Advocate'}`}
-          </Text>
-        </View>
+        <Text style={styles.typeTagText}>{item.type || 'Request'}</Text>
+        <Text style={styles.cardMeta} numberOfLines={1}>
+          {isAdvocate ? `From: ${item.requesterName || 'Community Member'}` : `To: ${item.advocateName || 'Advocate'}`}
+        </Text>
         {item.message ? (
-          <Text style={styles.cardQuote} numberOfLines={2}>"{item.message}"</Text>
+          <Text style={styles.cardQuote} numberOfLines={1}>"{item.message}"</Text>
         ) : null}
-        <View style={styles.cardFooter}>
-          <Text style={styles.cardDate}>{fmtDate(item.createdAt)}</Text>
-        </View>
+        <Text style={styles.cardDate}>{fmtDate(item.createdAt)}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -410,7 +428,7 @@ function RequestCard({ item, isAdvocate, onPress }) {
 function DonationCard({ item, isAdvocate, onVerify, onPreviewReceipt }) {
   const isPending = item.status === 'Pending';
   const hasProof = Boolean(item.proofPhoto);
-  const photoUri = item.animalPhoto || item.photo || (hasProof ? item.proofPhoto : null);
+  const photoUri = item.animalPhoto || item.photo || null;
 
   return (
     <View style={styles.card}>
@@ -418,44 +436,34 @@ function DonationCard({ item, isAdvocate, onVerify, onPreviewReceipt }) {
         {photoUri ? (
           <Image source={{ uri: photoUri }} style={styles.cardThumbPhoto} resizeMode="cover" />
         ) : (
-          <View style={styles.cardThumbFallback}>
-            <Text style={styles.cardThumbInitials}>₱</Text>
+          <View style={[styles.cardThumbFallback, styles.donationThumbBg]}>
+            <Text style={styles.donationThumbAmount}>₱</Text>
           </View>
         )}
       </View>
       <View style={styles.cardBody}>
         <View style={styles.cardTopRow}>
-          <Text style={styles.amountText} numberOfLines={1}>₱{Number(item.amount || 0).toLocaleString()}</Text>
-          <View style={styles.cardPillWrap}>
-            <StatusPill status={item.status} />
-          </View>
+          <Text style={styles.amountText}>₱{Number(item.amount || 0).toLocaleString()}</Text>
+          <StatusPill status={item.status} />
         </View>
         <Text style={styles.cardSubTitle} numberOfLines={1}>{item.animalName || 'Rescue Support'}</Text>
-        <View style={styles.cardMetaRow}>
-          <Text style={styles.cardMeta} numberOfLines={1}>
-            {item.method || 'Payment'}{item.referenceNumber ? ` · Ref: ${item.referenceNumber}` : ''}
-          </Text>
-        </View>
+        <Text style={styles.cardMeta} numberOfLines={1}>
+          {item.method || 'Payment'}{item.referenceNumber ? ` · #${item.referenceNumber}` : ''}
+        </Text>
         {item.message ? (
-          <Text style={styles.cardQuote} numberOfLines={2}>"{item.message}"</Text>
+          <Text style={styles.cardQuote} numberOfLines={1}>"{item.message}"</Text>
         ) : null}
         <View style={styles.cardFooter}>
           <Text style={styles.cardDate}>{fmtDate(item.createdAt)}</Text>
+          {hasProof ? (
+            <TouchableOpacity
+              onPress={() => onPreviewReceipt && onPreviewReceipt(item.proofPhoto)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.viewReceiptText}>View Receipt</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
-
-        {hasProof ? (
-          <TouchableOpacity
-            style={styles.donationProofRow}
-            onPress={() => onPreviewReceipt && onPreviewReceipt(item.proofPhoto)}
-            activeOpacity={0.8}
-          >
-            <Image source={{ uri: item.proofPhoto }} style={styles.donationProofThumb} resizeMode="cover" />
-            <View style={{ flex: 1, marginRight: 6 }}>
-              <Text style={styles.donationProofLabel} numberOfLines={1}>Transfer Receipt</Text>
-              <Text style={styles.donationProofSub} numberOfLines={1}>Tap to view screenshot</Text>
-            </View>
-          </TouchableOpacity>
-        ) : null}
 
         {isAdvocate && isPending ? (
           <View style={styles.advocateDonationActions}>
@@ -464,9 +472,8 @@ function DonationCard({ item, isAdvocate, onVerify, onPreviewReceipt }) {
               onPress={() => onVerify && onVerify(item.id, 'Verified')}
               activeOpacity={0.82}
             >
-              <Text style={styles.verifyDonationBtnText}>Verify Donation</Text>
+              <Text style={styles.verifyDonationBtnText}>Verify</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
               style={styles.rejectDonationBtn}
               onPress={() => onVerify && onVerify(item.id, 'Rejected')}
@@ -489,32 +496,26 @@ function AnimalCard({ item, navigation }) {
     <TouchableOpacity
       style={styles.card}
       onPress={() => navigation.navigate('AnimalDetail', { animalId: item.id })}
-      activeOpacity={0.88}
+      activeOpacity={0.85}
     >
       <View style={styles.cardLeft}>
         {photoUri ? (
           <Image source={{ uri: photoUri }} style={styles.cardThumbPhoto} resizeMode="cover" />
         ) : (
           <View style={styles.cardThumbFallback}>
-            <Text style={styles.cardThumbInitials}>
-              {item.name ? item.name.slice(0, 2).toUpperCase() : 'PA'}
-            </Text>
+            <Ionicons name="paw-outline" size={28} color="#2E7A99" />
           </View>
         )}
       </View>
       <View style={styles.cardBody}>
         <View style={styles.cardTopRow}>
           <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
-          <View style={styles.cardPillWrap}>
-            <StatusPill status={item.status} />
-          </View>
+          <StatusPill status={item.status} />
         </View>
         <Text style={styles.cardMeta} numberOfLines={1}>
           {[item.species, item.breed, item.gender].filter(Boolean).join(' · ')}
         </Text>
-        <View style={styles.cardFooter}>
-          <Text style={styles.cardDate}>{fmtDate(item.createdAt)}</Text>
-        </View>
+        <Text style={styles.cardDate}>{fmtDate(item.createdAt)}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -540,7 +541,7 @@ function fmtDate(val) {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#FCF8E8' },
+  root: { flex: 1, backgroundColor: '#F7F7F7' },
 
   // Header
   header: {
@@ -657,47 +658,39 @@ const styles = StyleSheet.create({
   },
 
   // List
-  list: { padding: 16, paddingBottom: 100 },
+  list: { paddingTop: 0, paddingBottom: 100 },
   empty: { marginTop: 24 },
 
-  // Shared card shell
+  // Shared card shell — flat, divider-based
   card: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#E8DEC5',
-    shadowColor: '#473018',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EFECE6',
   },
   cardLeft: {
-    marginRight: 12,
+    marginRight: 14,
     flexShrink: 0,
   },
   cardThumbPhoto: {
-    width: 52,
-    height: 52,
-    borderRadius: 10,
+    width: 68,
+    height: 68,
+    borderRadius: 8,
     backgroundColor: '#E8DEC5',
   },
   cardThumbFallback: {
-    width: 52,
-    height: 52,
-    borderRadius: 10,
+    width: 68,
+    height: 68,
+    borderRadius: 8,
     backgroundColor: '#EBF7FA',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#B8E4E5',
   },
   cardThumbInitials: {
-    fontSize: 16,
+    fontSize: 22,
     fontWeight: '800',
     color: '#2E7A99',
     fontFamily: 'PlusJakartaSans_800ExtraBold',
@@ -741,24 +734,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   cardMeta: {
-    fontSize: 11.5,
-    color: '#685038',
+    fontSize: 12,
+    color: '#8C7D6A',
     fontFamily: 'PlusJakartaSans_400Regular',
+    marginBottom: 2,
   },
   typeTagText: {
     fontSize: 11,
     fontWeight: '700',
     color: '#2E7A99',
     fontFamily: 'PlusJakartaSans_700Bold',
+    marginBottom: 2,
   },
   cardQuote: {
-    fontSize: 11,
-    color: '#685038',
+    fontSize: 11.5,
+    color: '#8C7D6A',
     fontStyle: 'italic',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   cardFooter: {
     flexDirection: 'row',
@@ -767,42 +762,29 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   urgencyText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '700',
     color: '#B45309',
     fontFamily: 'PlusJakartaSans_700Bold',
   },
   cardDate: {
-    fontSize: 10.5,
-    color: '#8C7D6A',
+    fontSize: 11,
+    color: '#AAAAAA',
     fontFamily: 'PlusJakartaSans_400Regular',
   },
-
-  donationProofRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FCF8E8',
-    padding: 8,
-    borderRadius: 8,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#E8DEC5',
-  },
-  donationProofThumb: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    marginRight: 8,
-  },
-  donationProofLabel: {
+  viewReceiptText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#473018',
+    color: '#2E7A99',
     fontFamily: 'PlusJakartaSans_700Bold',
   },
-  donationProofSub: {
-    fontSize: 10,
-    color: '#8C7D6A',
+  donationThumbBg: {
+    backgroundColor: '#EDF6F1',
+  },
+  donationThumbAmount: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#2B8259',
   },
 
   advocateDonationActions: {
@@ -872,6 +854,13 @@ const styles = StyleSheet.create({
   modalBody: {
     gap: 10,
     marginBottom: 16,
+  },
+  modalAnimalImage: {
+    width: '100%',
+    height: 160,
+    borderRadius: 12,
+    backgroundColor: '#E8DEC5',
+    marginBottom: 14,
   },
   modalRow: {
     flexDirection: 'row',

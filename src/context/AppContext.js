@@ -82,6 +82,7 @@ const defaultContext = {
   updateRequestStatus: () => {},
   sendMessage: () => {},
   startConversation: () => '',
+  startGroupConversation: () => '',
   clearConversation: () => {},
   deleteConversation: () => {},
   setActiveConversationId: () => {},
@@ -1267,6 +1268,42 @@ export function AppProvider({ children }) {
     return newConv.id;
   };
 
+  const startGroupConversation = (memberIds, groupName) => {
+    if (!memberIds || memberIds.length < 2 || !currentUser?.id) return '';
+    const allIds = [currentUser.id, ...memberIds.filter((id) => id !== currentUser.id)];
+    const names = {};
+    const avatars = {};
+    const unreadCounts = {};
+    allIds.forEach((id) => {
+      if (id === currentUser.id) {
+        names[id] = currentUser.name || 'You';
+        avatars[id] = currentUser.avatar || null;
+      } else {
+        const found = getAllKnownUsers().find((u) => u.id === id);
+        names[id] = found?.name || 'Member';
+        avatars[id] = found?.avatar || null;
+      }
+      unreadCounts[id] = 0;
+    });
+    const newConv = {
+      id: `grp${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      isGroup: true,
+      groupName: groupName || allIds.map((id) => names[id].split(' ')[0]).join(', '),
+      participants: allIds,
+      participantNames: names,
+      participantAvatars: avatars,
+      lastMessage: '',
+      lastMessageTime: new Date().toISOString(),
+      lastSenderId: '',
+      messages: [],
+      unreadCounts,
+      unread: false,
+    };
+    setConversations((prev) => [newConv, ...prev]);
+    saveConversationFirebase(newConv);
+    return newConv.id;
+  };
+
   const clearConversation = (conversationId) => {
     if (!conversationId) return;
     let updatedConvo = null;
@@ -1627,6 +1664,7 @@ export function AppProvider({ children }) {
         // messages
         sendMessage,
         startConversation,
+        startGroupConversation,
         clearConversation,
         deleteConversation,
         setActiveConversationId,
