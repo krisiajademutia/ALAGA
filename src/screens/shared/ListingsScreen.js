@@ -157,9 +157,10 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.md16,
   },
   title: {
-    fontSize: SIZES.xxl,
+    fontSize: 20,
     fontWeight: '800',
     color: COLORS.brown,
+    letterSpacing: -0.3,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   subtitle: {

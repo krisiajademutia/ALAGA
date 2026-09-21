@@ -298,10 +298,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
     color: '#473018',
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   unreadBadge: {
     backgroundColor: '#C23E3E',

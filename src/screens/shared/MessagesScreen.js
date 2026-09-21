@@ -651,10 +651,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   messengerTitle: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: '800',
     color: '#473018',
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
     fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
