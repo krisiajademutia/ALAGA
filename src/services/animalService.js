@@ -30,12 +30,14 @@ export function subscribeToAnimals(onUpdate, onError) {
     return onSnapshot(
       q,
       (snapshot) => {
+        const seen = new Set();
         const animals = [];
         snapshot.forEach((docSnap) => {
-          animals.push({
-            id: docSnap.id,
-            ...docSnap.data(),
-          });
+          const id = docSnap.id;
+          if (!seen.has(id)) {
+            seen.add(id);
+            animals.push({ id, ...docSnap.data() });
+          }
         });
         onUpdate(animals);
       },

@@ -594,7 +594,14 @@ export function AppProvider({ children }) {
       });
 
       const unsubAnimals = subscribeToAnimals((liveAnimals) => {
-        const animalsList = liveAnimals || [];
+        const raw = liveAnimals || [];
+        // Deduplicate by id — guards against Firestore snapshot races
+        const seen = new Set();
+        const animalsList = raw.filter((a) => {
+          if (!a.id || seen.has(a.id)) return false;
+          seen.add(a.id);
+          return true;
+        });
         setAnimals(animalsList);
         animalsList.forEach((a) => {
           if (a.advocateId && a.advocateAvatar) {
@@ -885,7 +892,12 @@ export function AppProvider({ children }) {
       fosterName: null,
       ...animalData,
     };
-    setAnimals((prev) => [newAnimal, ...prev]);
+    // Guard: skip if this id is already in state (Firestore listener may have
+    // already added it via a fast snapshot)
+    setAnimals((prev) => {
+      if (prev.some((a) => a.id === newAnimal.id)) return prev;
+      return [newAnimal, ...prev];
+    });
     addAnimalFirebase(newAnimal);
     return newAnimal;
   };
