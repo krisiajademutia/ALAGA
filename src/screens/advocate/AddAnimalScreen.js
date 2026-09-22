@@ -14,13 +14,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../../context/AppContext';
-import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
+import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
-import Header from '../../components/Header';
 import PhotoPickerModal from '../../components/PhotoPickerModal';
 import { ANIMAL_SPECIES, FOSTER_DURATIONS } from '../../data/mockData';
 import { uploadImageToImgBB } from '../../services/storageService';
@@ -29,13 +29,13 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const GENDERS = ['Male', 'Female', 'Unknown'];
 const LISTING_TYPES = [
-  { key: 'Adoption', label: 'Adoption only',  icon: 'home-outline',  desc: 'Looking for a permanent home' },
-  { key: 'Foster',   label: 'Foster only',    icon: 'heart-outline', desc: 'Need temporary care' },
-  { key: 'Both',     label: 'Open to either', icon: 'paw-outline',   desc: 'Adoption or foster welcome' },
+  { key: 'Adoption', label: 'Adoption only', icon: 'home-outline', desc: 'Looking for a permanent home' },
+  { key: 'Foster', label: 'Foster only', icon: 'heart-outline', desc: 'Need temporary care' },
+  { key: 'Both', label: 'Open to either', icon: 'paw-outline', desc: 'Adoption or foster welcome' },
 ];
 const READINESS = [
-  { key: 'Available',   label: 'Available now',   icon: 'checkmark-circle', color: COLORS.success },
-  { key: 'Under Care',  label: 'Not ready yet',   icon: 'time',             color: COLORS.warning },
+  { key: 'Available', label: 'Available now', icon: 'checkmark-circle', color: COLORS.success },
+  { key: 'Under Care', label: 'Not ready yet', icon: 'time', color: COLORS.warning },
 ];
 
 export default function AddAnimalScreen({ route, navigation }) {
@@ -43,36 +43,44 @@ export default function AddAnimalScreen({ route, navigation }) {
   const rescueReportId = route.params?.rescueReportId || null;
   const rescuedCases = (getAdvocateRescuedCases ? getAdvocateRescuedCases() : []) || [];
 
-  const [name, setName]               = useState('');
-  const [species, setSpecies]         = useState('');
+  const [name, setName] = useState('');
+  const [species, setSpecies] = useState('');
   const [otherSpecies, setOtherSpecies] = useState('');
-  const [breed, setBreed]             = useState('');
-  const [age, setAge]                 = useState('');
-  const [size, setSize]               = useState('');
-  const [gender, setGender]           = useState('');
-  const [color, setColor]             = useState('');
-  const [condition, setCondition]     = useState('');
+  const [breed, setBreed] = useState('');
+  const [age, setAge] = useState('');
+  const [size, setSize] = useState('');
+  const [gender, setGender] = useState('');
+  const [color, setColor] = useState('');
+  const [condition, setCondition] = useState('');
   const [specialNeeds, setSpecialNeeds] = useState('');
   const [description, setDescription] = useState('');
   const [listingType, setListingType] = useState('Adoption');
-  const [readiness, setReadiness]     = useState('Available');
+  const [readiness, setReadiness] = useState('Available');
   const [fosterDuration, setFosterDuration] = useState('');
-  const [vaccinated, setVaccinated]   = useState(false);
-  const [neutered, setNeutered]       = useState(false);
+  const [vaccinated, setVaccinated] = useState(false);
+  const [neutered, setNeutered] = useState(false);
 
   // Multi-image state: Array of { uri: string, base64?: string }
-  const [photos, setPhotos]           = useState([]);
+  const [photos, setPhotos] = useState([]);
   const [photoPickerVisible, setPhotoPickerVisible] = useState(false);
   const [activePreviewIndex, setActivePreviewIndex] = useState(null);
 
-  const [tagsText, setTagsText]       = useState('');
-  const [loading, setLoading]         = useState(false);
+  const [tagsText, setTagsText] = useState('');
+  const [loading, setLoading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
-  const [errors, setErrors]           = useState({});
-  
+  const [errors, setErrors] = useState({});
+
   // Rescue linking state
   const [selectedRescueId, setSelectedRescueId] = useState(rescueReportId);
   const [showRescueSelector, setShowRescueSelector] = useState(false);
+
+  const insets = useSafeAreaInsets();
+  const safeTopPadding =
+    Platform.OS === 'ios'
+      ? Math.max(insets.top, 16) + 4
+      : insets.top > 24
+        ? insets.top + 6
+        : 14;
 
   const needsFosterDuration = listingType === 'Foster' || listingType === 'Both';
 
@@ -188,12 +196,12 @@ export default function AddAnimalScreen({ route, navigation }) {
 
   const validate = () => {
     const e = {};
-    if (!name.trim())        e.name    = 'Animal name is required.';
-    if (!species)            e.species = 'Select the species.';
+    if (!name.trim()) e.name = 'Animal name is required.';
+    if (!species) e.species = 'Select the species.';
     else if (species === 'Other' && !otherSpecies.trim()) e.species = 'Please specify the species.';
-    if (!gender)             e.gender  = 'Select gender.';
-    if (!size)               e.size    = 'Select size.';
-    if (!description.trim()) e.desc    = 'Add a description.';
+    if (!gender) e.gender = 'Select gender.';
+    if (!size) e.size = 'Select size.';
+    if (!description.trim()) e.desc = 'Add a description.';
     setErrors(e);
     return !Object.keys(e).length;
   };
@@ -202,7 +210,7 @@ export default function AddAnimalScreen({ route, navigation }) {
     if (!validate()) return;
     setLoading(true);
     setUploadStatus('Preparing upload...');
-    
+
     try {
       const uploadedUrls = [];
       for (let i = 0; i < photos.length; i++) {
@@ -216,7 +224,6 @@ export default function AddAnimalScreen({ route, navigation }) {
         }
       }
 
-      // Default fallback photo if none provided
       let primaryPhoto = uploadedUrls[0] || null;
       if (!primaryPhoto) {
         primaryPhoto = species === 'Cat'
@@ -228,13 +235,13 @@ export default function AddAnimalScreen({ route, navigation }) {
       const tags = tagsText.split(',').map((t) => t.trim()).filter(Boolean);
       addAnimal({
         name: name.trim(),
-        species:  species === 'Other' ? otherSpecies.trim() : species,
-        breed:    breed.trim()    || 'Unknown',
-        age:      age.trim()      || 'Unknown',
+        species: species === 'Other' ? otherSpecies.trim() : species,
+        breed: breed.trim() || 'Unknown',
+        age: age.trim() || 'Unknown',
         size,
         gender,
-        color:    color.trim()    || 'Unknown',
-        condition:condition.trim()|| 'Healthy',
+        color: color.trim() || 'Unknown',
+        condition: condition.trim() || 'Healthy',
         specialNeeds: specialNeeds.trim() || null,
         description: description.trim(),
         status: readiness,
@@ -247,9 +254,8 @@ export default function AddAnimalScreen({ route, navigation }) {
         tags,
         rescueReportId: selectedRescueId,
       });
-      
+
       setLoading(false);
-      // Cleanly switch to Advocates' "My Animals" tab
       navigation.navigate('MainTabs', { screen: 'MyAnimals' });
     } catch (err) {
       setLoading(false);
@@ -265,10 +271,10 @@ export default function AddAnimalScreen({ route, navigation }) {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <StatusBar style="dark" />
 
-      <Header
-        title="New Animal Profile"
-        onBack={() => navigation.goBack()}
-      />
+      {/* ── Title-Only Clean Header ─────────────────────────── */}
+      <View style={[styles.header, { paddingTop: safeTopPadding }]}>
+        <Text style={styles.headerTitle}>New Animal Profile</Text>
+      </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
@@ -394,7 +400,7 @@ export default function AddAnimalScreen({ route, navigation }) {
 
         {/* ── Link to Rescue Case ───────────────────────────── */}
         <Label text="LINK TO RESCUE CASE (OPTIONAL)" />
-        <LinkToRescueSection 
+        <LinkToRescueSection
           rescuedCases={rescuedCases}
           selectedRescueId={selectedRescueId}
           onSelectRescue={handleSelectRescue}
@@ -429,7 +435,7 @@ export default function AddAnimalScreen({ route, navigation }) {
         )}
 
         <Input label="Breed (optional)" placeholder="e.g. Aspin, Puspin" value={breed} onChangeText={setBreed} autoCapitalize="words" />
-        <Input label="Estimated Age"   placeholder="e.g. 2 years, 3 months" value={age} onChangeText={setAge} />
+        <Input label="Estimated Age" placeholder="e.g. 2 years, 3 months" value={age} onChangeText={setAge} />
 
         <Label text="GENDER" error={errors.gender} />
         <View style={styles.scrollRow}>
@@ -438,7 +444,7 @@ export default function AddAnimalScreen({ route, navigation }) {
               onPress={() => { setGender(g); setErrors((e) => ({ ...e, gender: null })); }} />
           ))}
         </View>
-        
+
         <Label text="SIZE" error={errors.size} />
         <View style={styles.scrollRow}>
           {['Small', 'Medium', 'Large'].map((sz) => (
@@ -447,7 +453,7 @@ export default function AddAnimalScreen({ route, navigation }) {
           ))}
         </View>
 
-        <Input label="Color / Markings"  placeholder="e.g. Brown and white"  value={color}     onChangeText={setColor}     autoCapitalize="words" />
+        <Input label="Color / Markings" placeholder="e.g. Brown and white" value={color} onChangeText={setColor} autoCapitalize="words" />
         <Input label="Current Condition" placeholder="e.g. Recovering, Healthy" value={condition} onChangeText={setCondition} autoCapitalize="words" />
         <Input label="Special Needs (optional)" placeholder="e.g. Requires daily medication" value={specialNeeds} onChangeText={setSpecialNeeds} autoCapitalize="sentences" />
         <Input label="Description" placeholder="Tell adopters about this animal's personality and story..." value={description}
@@ -459,9 +465,9 @@ export default function AddAnimalScreen({ route, navigation }) {
         {/* ── Health ─────────────────────────────────────────── */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Health</Text>
-          <ToggleRow label="Vaccinated"     icon="shield-checkmark-outline" value={vaccinated} onToggle={setVaccinated} />
+          <ToggleRow label="Vaccinated" icon="shield-checkmark-outline" value={vaccinated} onToggle={setVaccinated} />
           <View style={styles.divider} />
-          <ToggleRow label="Neutered / Spayed" icon="medkit-outline"       value={neutered}   onToggle={setNeutered} />
+          <ToggleRow label="Neutered / Spayed" icon="medkit-outline" value={neutered} onToggle={setNeutered} />
         </View>
 
         {/* ── Listing type ───────────────────────────────────── */}
@@ -572,7 +578,7 @@ export default function AddAnimalScreen({ route, navigation }) {
       >
         <View style={styles.previewModalOverlay}>
           <StatusBar style="light" />
-          
+
           <View style={styles.previewModalTopBar}>
             <TouchableOpacity
               style={styles.previewModalCloseBtn}
@@ -669,14 +675,14 @@ function ToggleRow({ label, icon, value, onToggle }) {
 
 const lbl = StyleSheet.create({
   text: { fontSize: SIZES.xs, fontWeight: '700', color: COLORS.textSecondary, letterSpacing: 0.7, textTransform: 'uppercase', marginBottom: SIZES.sm8, marginTop: SIZES.xs4 },
-  err:  { color: COLORS.danger },
+  err: { color: COLORS.danger },
 });
 const ch = StyleSheet.create({
   base: {
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: SIZES.r12,
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: COLORS.border,
     ...SHADOWS.card,
@@ -686,13 +692,27 @@ const ch = StyleSheet.create({
   text: { fontSize: SIZES.sm, fontWeight: '600', color: COLORS.textSecondary },
 });
 const tr = StyleSheet.create({
-  row:   { flexDirection: 'row', alignItems: 'center', gap: SIZES.sm8 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: SIZES.sm8 },
   label: { flex: 1, fontSize: SIZES.body, fontWeight: '600', color: COLORS.textPrimary },
 });
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#FFFFFF' },
-  scroll: { paddingHorizontal: SIZES.lg24, paddingTop: SIZES.md16, paddingBottom: 48 },
+
+  // ── Matched Clean Header (Title Only) ─────────────────────
+  header: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  headerTitle: {
+    ...FONTS.titleXl,
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.brown,
+  },
+
+  scroll: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 48 },
 
   photoHeaderRow: {
     flexDirection: 'row',
@@ -708,7 +728,6 @@ const styles = StyleSheet.create({
 
   photoSection: { marginBottom: SIZES.md16 },
 
-  // Gallery container when photos exist
   galleryContainer: {
     marginBottom: SIZES.xs4,
   },
@@ -791,7 +810,7 @@ const styles = StyleSheet.create({
     width: 74,
     height: 74,
     borderRadius: SIZES.r12,
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: COLORS.border,
     overflow: 'hidden',
@@ -846,7 +865,7 @@ const styles = StyleSheet.create({
     width: 74,
     height: 74,
     borderRadius: SIZES.r12,
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: COLORS.primaryDeep + '66',
     borderStyle: 'dashed',
@@ -876,10 +895,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // Empty State
   photoEmpty: {
     height: 135,
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: SIZES.r16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -897,17 +915,22 @@ const styles = StyleSheet.create({
   scrollRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SIZES.paddingM, marginTop: 4 },
 
   card: {
-    backgroundColor: COLORS.surface, borderRadius: SIZES.r16,
-    padding: SIZES.md16, marginBottom: SIZES.md16, ...SHADOWS.card,
+    backgroundColor: '#FFFFFF',
+    borderRadius: SIZES.r16,
+    padding: SIZES.md16,
+    marginBottom: SIZES.md16,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight || '#E8DFC8',
+    ...SHADOWS.card,
   },
   cardTitle: { fontSize: SIZES.body, fontWeight: '800', color: COLORS.brown, marginBottom: SIZES.sm8 },
-  divider:   { height: 1, backgroundColor: COLORS.divider, marginVertical: SIZES.sm8 + 2 },
+  divider: { height: 1, backgroundColor: COLORS.divider, marginVertical: SIZES.sm8 + 2 },
 
   listingCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: SIZES.r16,
     padding: SIZES.md16,
     marginBottom: SIZES.sm8,
@@ -939,7 +962,7 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.r12,
     borderWidth: 1.5,
     borderColor: COLORS.border,
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FFFFFF',
     ...SHADOWS.card,
     shadowOpacity: 0.05,
     elevation: 1,
@@ -965,26 +988,25 @@ const styles = StyleSheet.create({
 
   saveBtn: { marginTop: SIZES.sm8 },
 
-  // Rescue linking section
   rescueSection: { marginBottom: SIZES.md16 },
   rescueEmpty: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: SIZES.sm8,
-    backgroundColor: COLORS.inputBg,
+    backgroundColor: '#FBF8F2',
     borderRadius: SIZES.r12,
     padding: SIZES.md16,
   },
   rescueEmptyText: { flex: 1, fontSize: SIZES.sm, color: COLORS.textMuted, lineHeight: 19 },
-  
+
   rescueLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: SIZES.r16,
     padding: SIZES.md16,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.borderLight || '#E8DFC8',
     ...SHADOWS.card,
   },
   rescueLinkLeft: {
@@ -1059,10 +1081,10 @@ const styles = StyleSheet.create({
   rescueUnlinkBtnText: { fontSize: SIZES.sm, fontWeight: '700', color: '#2D6B3F' },
 
   rescueSelector: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: SIZES.r16,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.borderLight || '#E8DFC8',
     ...SHADOWS.card,
   },
   rescueSelectorHeader: {
@@ -1075,7 +1097,7 @@ const styles = StyleSheet.create({
   },
   rescueSelectorTitle: { fontSize: SIZES.body, fontWeight: '700', color: COLORS.brown },
   rescueSelectorCancel: { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.primaryDeep },
-  
+
   rescueOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1099,7 +1121,6 @@ const styles = StyleSheet.create({
   rescueOptionSub: { fontSize: SIZES.xs, color: COLORS.textSecondary, marginBottom: 2, lineHeight: 16 },
   rescueOptionDate: { fontSize: SIZES.xs, color: COLORS.textMuted },
 
-  // Preview Modal
   previewModalOverlay: {
     flex: 1,
     backgroundColor: '#0A0A0A',
@@ -1185,14 +1206,13 @@ const styles = StyleSheet.create({
   },
 });
 
-// ── Link to Rescue Case Component ────────────────────────────────────────────
 function LinkToRescueSection({ rescuedCases, selectedRescueId, onSelectRescue, showSelector, onToggleSelector }) {
   const selectedCase = rescuedCases.find((r) => r.id === selectedRescueId);
-  
+
   const formatDate = (iso) => {
     if (!iso) return '';
-    return new Date(iso).toLocaleDateString('en-PH', { 
-      month: 'short', 
+    return new Date(iso).toLocaleDateString('en-PH', {
+      month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
@@ -1233,14 +1253,14 @@ function LinkToRescueSection({ rescuedCases, selectedRescueId, onSelectRescue, s
             </View>
           </View>
           <View style={styles.rescueActions}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.rescueChangeBtn}
               onPress={() => onToggleSelector(true)}
               activeOpacity={0.8}
             >
               <Text style={styles.rescueChangeBtnText}>Change</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.rescueUnlinkBtn}
               onPress={() => onSelectRescue(null)}
               activeOpacity={0.8}
@@ -1297,10 +1317,9 @@ function LinkToRescueSection({ rescuedCases, selectedRescueId, onSelectRescue, s
     );
   }
 
-  // Default state - show option to link
   return (
     <View style={styles.rescueSection}>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.rescueLink}
         onPress={() => onToggleSelector(true)}
         activeOpacity={0.8}

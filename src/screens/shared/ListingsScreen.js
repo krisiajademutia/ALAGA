@@ -1,28 +1,33 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList,
-  TouchableOpacity, ScrollView, Platform,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ScrollView,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../../context/AppContext';
-import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
+import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import AnimalCard from '../../components/AnimalCard';
 import EmptyState from '../../components/EmptyState';
 
 const SPECIES = ['All', 'Dog', 'Cat', 'Bird', 'Rabbit', 'Other'];
 const TYPE_FILTERS = [
-  { key: 'All',      label: 'All Pets' },
-  { key: 'Adoption', label: 'Adopt'    },
-  { key: 'Foster',   label: 'Foster'   },
+  { key: 'All', label: 'All Pets' },
+  { key: 'Adoption', label: 'Adopt' },
+  { key: 'Foster', label: 'Foster' },
 ];
 
 export default function ListingsScreen({ navigation }) {
   const { animals } = useApp();
-  const [species, setSpecies]       = useState('All');
+  const [species, setSpecies] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
 
-  const listed   = animals.filter((a) => a.status === 'Available');
+  const listed = animals.filter((a) => a.status === 'Available');
   const filtered = listed.filter((a) => {
     const matchSpecies = species === 'All' || a.species === species;
     const matchType =
@@ -32,32 +37,33 @@ export default function ListingsScreen({ navigation }) {
     return matchSpecies && matchType;
   });
 
-  // Pair items into rows of 2
   const rows = [];
   for (let i = 0; i < filtered.length; i += 2) {
     rows.push([filtered[i], filtered[i + 1] || null]);
   }
 
   const insets = useSafeAreaInsets();
-  const safeTop = Platform.OS === 'ios'
-    ? Math.max(insets.top, 16) + 4
-    : insets.top > 24 ? insets.top + 6 : 14;
+  const safeTop =
+    Platform.OS === 'ios'
+      ? Math.max(insets.top, 16) + 4
+      : insets.top > 24
+        ? insets.top + 6
+        : 14;
 
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
 
-      {/* ── Header ──────────────────────────────────────────── */}
+      {/* ── Clean White Header ──────────────────────────────── */}
       <View style={[styles.header, { paddingTop: safeTop }]}>
-        {/* Title Row */}
         <View style={styles.titleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.title}>Adopt &amp; Foster</Text>
-            <Text style={styles.subtitle}>Find pets available for adoption and care</Text>
+          <Text style={styles.title}>Adopt &amp; Foster</Text>
+          <View style={styles.countBadge}>
+            <Text style={styles.countNum}>{filtered.length} Available</Text>
           </View>
         </View>
 
-        {/* Segmented Type Filter */}
+        {/* Clean Segmented Type Filter */}
         <View style={styles.segmentedContainer}>
           {TYPE_FILTERS.map(({ key, label }) => {
             const isActive = typeFilter === key;
@@ -145,111 +151,98 @@ const styles = StyleSheet.create({
 
   header: {
     backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
     paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
+    borderBottomColor: '#F0ECE4',
   },
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SIZES.lg24,
-    marginBottom: SIZES.md16,
+    marginBottom: 12,
   },
   title: {
-    fontSize: 20,
+    ...FONTS.titleXl,
+    fontSize: 22,
     fontWeight: '800',
     color: COLORS.brown,
-    letterSpacing: -0.3,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-  },
-  subtitle: {
-    fontSize: SIZES.sm,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-    fontFamily: 'PlusJakartaSans_400Regular',
   },
   countBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 12,
     backgroundColor: '#EBF7FA',
     borderWidth: 1,
     borderColor: '#B8E4E5',
-    alignSelf: 'center',
-    marginLeft: 8,
   },
   countNum: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#2E7A99',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
   segmentedContainer: {
     flexDirection: 'row',
-    backgroundColor: COLORS.inputBg,
-    borderRadius: SIZES.r12,
-    marginHorizontal: SIZES.lg24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: SIZES.r20,
     padding: 3,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    marginBottom: 10,
+    borderWidth: 1.5,
+    borderColor: COLORS.secondary,
+    ...SHADOWS.sm,
   },
   segmentBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 9,
-    borderRadius: SIZES.radius,
+    paddingVertical: 8,
+    borderRadius: 16,
   },
   segmentBtnActive: {
-    backgroundColor: COLORS.surface,
-    ...SHADOWS.card,
+    backgroundColor: COLORS.primaryLight,
   },
   segmentText: {
-    fontSize: SIZES.small,
+    ...FONTS.subheading,
+    fontSize: 13,
     fontWeight: '600',
     color: COLORS.textMuted,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
   },
   segmentTextActive: {
     fontWeight: '800',
-    color: COLORS.brown,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: COLORS.primaryDeep,
   },
 
   speciesContent: {
-    paddingHorizontal: SIZES.lg24,
     gap: 8,
-    paddingBottom: 10,
+    paddingVertical: 2,
   },
   speciesChip: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 7,
-    borderRadius: SIZES.radiusFull,
-    backgroundColor: COLORS.inputBg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderRadius: SIZES.r20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: COLORS.borderLight || '#E8DFC8',
   },
   speciesChipActive: {
-    backgroundColor: COLORS.tagBg,
-    borderColor: COLORS.primaryLight,
+    backgroundColor: COLORS.primaryLight,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
   },
   speciesText: {
-    fontSize: SIZES.small,
+    ...FONTS.subheading,
+    fontSize: 12.5,
     fontWeight: '600',
-    color: COLORS.textSecondary,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: COLORS.textMuted,
   },
   speciesTextActive: {
     fontWeight: '800',
     color: COLORS.primaryDeep,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
 
-  grid:    { padding: 12, paddingBottom: 110 },
+  grid: { padding: 12, paddingBottom: 110 },
   gridRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
-  gridCard:{ flex: 1 },
-  empty:   { flex: 1 },
+  gridCard: { flex: 1 },
+  empty: { flex: 1 },
 });

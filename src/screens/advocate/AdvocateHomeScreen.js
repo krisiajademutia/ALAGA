@@ -14,7 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
-import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
+import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import Avatar from '../../components/Avatar';
 
 const CATEGORIES = [
@@ -79,7 +79,7 @@ export default function AdvocateHomeScreen({ navigation }) {
               onPress={() => navigation.navigate('Notifications')}
               activeOpacity={0.8}
             >
-              <Ionicons name="notifications-outline" size={22} color="#473018" />
+              <Ionicons name="notifications-outline" size={22} color={COLORS.brown} />
               {unreadNotifs > 0 && (
                 <View style={styles.notifBadge}>
                   <Text style={styles.notifBadgeText}>
@@ -100,16 +100,16 @@ export default function AdvocateHomeScreen({ navigation }) {
 
         {/* ── Search Bar ────────────────────────────────────── */}
         <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={20} color="#8C7D6A" style={styles.searchIcon} />
+          <Ionicons name="search-outline" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search breed, location, or shelter..."
-            placeholderTextColor="#8C7D6A"
+            placeholderTextColor={COLORS.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
           <TouchableOpacity style={styles.filterBtn}>
-            <Ionicons name="options-outline" size={20} color="#473018" />
+            <Ionicons name="options-outline" size={20} color={COLORS.brown} />
           </TouchableOpacity>
         </View>
 
@@ -137,7 +137,7 @@ export default function AdvocateHomeScreen({ navigation }) {
 
           <View style={styles.bannerRight}>
             <View style={styles.pawCircle}>
-              <Ionicons name="paw" size={32} color="#473018" />
+              <Ionicons name="paw" size={32} color={COLORS.brown} />
             </View>
           </View>
         </View>
@@ -178,24 +178,7 @@ export default function AdvocateHomeScreen({ navigation }) {
           })}
         </ScrollView>
 
-        {/* ── Segmented Tabs ────────────────────────────────── */}
-        <View style={styles.segmentContainer}>
-          {SEGMENTS.map((seg) => {
-            const active = activeSegment === seg;
-            return (
-              <TouchableOpacity
-                key={seg}
-                style={[styles.segBtn, active && styles.segBtnActive]}
-                onPress={() => setActiveSegment(seg)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.segText, active && styles.segTextActive]}>
-                  {seg}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+
 
         {/* ── Rescue Alerts Header ──────────────────────────── */}
         <View style={styles.sectionHeader}>
@@ -336,7 +319,7 @@ export default function AdvocateHomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
   },
   scroll: {
     paddingBottom: 90,
@@ -366,9 +349,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#E3EFF6',
+    borderColor: COLORS.divider,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -401,10 +384,10 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#CCE3EE',
-    borderRadius: 25,
+    borderColor: COLORS.border,
+    borderRadius: SIZES.r24 + 1,
     marginHorizontal: 20,
     paddingHorizontal: 16,
     height: 48,
@@ -415,23 +398,24 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    ...FONTS.bodyMedium,
     fontSize: 13,
-    color: '#473018',
-    fontFamily: 'PlusJakartaSans_500Medium',
+    color: COLORS.brown,
   },
   filterBtn: {
     padding: 4,
   },
 
   banner: {
-    backgroundColor: '#FBEEAC',
+    backgroundColor: COLORS.accent,
     marginHorizontal: 20,
-    borderRadius: 24,
+    borderRadius: SIZES.r24,
     padding: 20,
     flexDirection: 'row',
     overflow: 'hidden',
     position: 'relative',
     marginBottom: 18,
+    ...SHADOWS.card,
   },
   bannerDecor1: {
     position: 'absolute',
@@ -440,7 +424,7 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: '#B8D3C3',
+    backgroundColor: COLORS.secondary,
     opacity: 0.5,
   },
   bannerDecor2: {
@@ -450,7 +434,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#B8D3C3',
+    backgroundColor: COLORS.secondary,
     opacity: 0.4,
   },
   bannerLeft: {
@@ -459,47 +443,43 @@ const styles = StyleSheet.create({
   },
   tagWrap: {
     alignSelf: 'flex-start',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: SIZES.r12,
     marginBottom: 8,
   },
   tagText: {
+    ...FONTS.badge,
     fontSize: 9,
-    fontWeight: '800',
-    color: '#473018',
+    color: COLORS.brown,
     letterSpacing: 0.5,
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   bannerTitle: {
+    ...FONTS.titleXl,
     fontSize: 18,
-    fontWeight: '800',
-    color: '#473018',
+    color: COLORS.brown,
     marginBottom: 4,
-    letterSpacing: -0.3,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   bannerSub: {
+    ...FONTS.bodyRegular,
     fontSize: 12.5,
-    color: '#5C4E3A',
+    color: COLORS.textSecondary,
     lineHeight: 17,
     marginBottom: 14,
     paddingRight: 10,
-    fontFamily: 'PlusJakartaSans_400Regular',
   },
   helpBtn: {
     alignSelf: 'flex-start',
-    backgroundColor: '#473018',
+    backgroundColor: COLORS.brown,
     paddingHorizontal: 18,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: SIZES.r20,
   },
   helpBtnText: {
+    ...FONTS.button,
     fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    fontFamily: 'PlusJakartaSans_700Bold',
+    color: COLORS.surface,
   },
   bannerRight: {
     justifyContent: 'center',
@@ -511,7 +491,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
     ...SHADOWS.sm,
@@ -527,27 +507,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: SIZES.r20,
     borderWidth: 1,
   },
   catPillActive: {
-    backgroundColor: '#92CDE5',
-    borderColor: '#92CDE5',
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   catPillInactive: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#CCE3EE',
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
   },
   catPillText: {
+    ...FONTS.subheading,
     fontSize: 13,
-    fontWeight: '700',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
   },
   catPillTextActive: {
-    color: '#FFFFFF',
+    color: COLORS.surface,
   },
   catPillTextInactive: {
-    color: '#473018',
+    color: COLORS.brown,
   },
 
   segmentContainer: {
@@ -607,29 +586,25 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
+    ...FONTS.titleXl,
     fontSize: 20,
-    fontWeight: '800',
-    color: '#473018',
-    letterSpacing: -0.4,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: COLORS.brown,
   },
   countBadge: {
-    backgroundColor: '#E2F0F4',
+    backgroundColor: COLORS.primaryLight,
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 12,
+    borderRadius: SIZES.r12,
   },
   countBadgeText: {
+    ...FONTS.badge,
     fontSize: 12,
-    fontWeight: '800',
-    color: '#206B82',
-    fontFamily: 'PlusJakartaSans_700Bold',
+    color: COLORS.primaryDarkest,
   },
   seeAllText: {
+    ...FONTS.button,
     fontSize: 13,
-    color: '#206B82',
-    fontWeight: '700',
-    fontFamily: 'PlusJakartaSans_700Bold',
+    color: COLORS.primaryDarkest,
   },
 
   cardsFeed: {

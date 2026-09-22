@@ -11,6 +11,8 @@ import {
   loginWithGoogleProfile,
   cacheUserProfile,
   getAllUsersFirebase,
+  saveNotificationFirebase,
+  subscribeToNotificationsFirebase,
 } from '../services/authService';
 import {
   subscribeToRescueReports,
@@ -31,6 +33,7 @@ import {
 import {
   subscribeToConversations,
   saveConversationFirebase,
+  saveMessageFirebase,
   markConversationReadFirebase,
   deleteConversationFirebase,
 } from '../services/chatService';
@@ -248,6 +251,13 @@ export function AppProvider({ children }) {
         )
       ) {
         return prev;
+      }
+      // Persist to Firestore subcollection for cross-device sync (Gap 2 fix)
+      const targetUserId = newNotif.userId && newNotif.userId !== 'all'
+        ? newNotif.userId
+        : currentUserRef.current?.id;
+      if (targetUserId) {
+        saveNotificationFirebase(targetUserId, newNotif);
       }
       return [newNotif, ...prev];
     });
@@ -675,7 +685,7 @@ export function AppProvider({ children }) {
     }
   }, [currentUser?.id]);
 
-  // User-specific applications, conversations & donations listener (runs only when authenticated)
+  // User-specific applications, conversations, notifications & donations listener (runs only when authenticated)
   useEffect(() => {
     if (!isMockFirebase() && currentUser?.id) {
       const unsubApps = subscribeToApplications(currentUser, (liveApps) => {
@@ -689,10 +699,27 @@ export function AppProvider({ children }) {
           setDonations(liveDonations);
         }
       });
+      // Gap 2 fix: Subscribe to user's Firestore notifications subcollection for cross-device sync
+      const unsubNotifs = subscribeToNotificationsFirebase(
+        currentUser.id,
+        (firestoreNotifs) => {
+          if (!Array.isArray(firestoreNotifs) || firestoreNotifs.length === 0) return;
+          setNotifications((prev) => {
+            // Merge Firestore notifs with local ones, deduplicating by id
+            const existingIds = new Set(prev.map((n) => n.id));
+            const incoming = firestoreNotifs.filter((n) => !existingIds.has(n.id));
+            if (incoming.length === 0) return prev;
+            return [...incoming, ...prev].sort(
+              (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+            );
+          });
+        }
+      );
       return () => {
         unsubApps?.();
         unsubConvos?.();
         unsubDonations?.();
+        unsubNotifs?.();
       };
     } else {
       setRequests([]);
@@ -1087,10 +1114,8 @@ export function AppProvider({ children }) {
 
       // Only notify if there are unread messages and the last sender was someone else
       if (unreadForMe > 0 && convo.lastSenderId && convo.lastSenderId !== uId) {
-        const lastMsgObj = Array.isArray(convo.messages) && convo.messages.length > 0
-          ? convo.messages[convo.messages.length - 1]
-          : null;
-        const msgKey = lastMsgObj?.id || `${convo.id}_${convo.lastMessageTime}`;
+        // Messages are now in the subcollection; use lastMessageTime for dedup key
+        const msgKey = `${convo.id}_${convo.lastMessageTime || convo.lastSenderId}`;
 
         if (!notifiedMessageIdsRef.current.has(msgKey)) {
           notifiedMessageIdsRef.current.add(msgKey);
@@ -1193,7 +1218,13 @@ export function AppProvider({ children }) {
         ? '📍 Location'
         : newMsg.text;
 
-    let updatedConvo = null;
+    // Gap 1 fix: Write message to subcollection, NOT to the conversation doc array
+    saveMessageFirebase(conversationId, newMsg).catch((err) => {
+      console.warn('[AppContext] saveMessageFirebase warning:', err?.message);
+    });
+
+    // Update conversation metadata only (lastMessage, unreadCounts, etc.) — no messages array
+    let updatedConvoMeta = null;
 
     setConversations((prev) => {
       const existing = prev.find((c) => c.id === conversationId);
@@ -1209,9 +1240,8 @@ export function AppProvider({ children }) {
         }
       });
 
-      updatedConvo = {
+      updatedConvoMeta = {
         ...existing,
-        messages: [...(existing.messages || []), newMsg],
         lastMessage: lastSummary,
         lastMessageTime: newMsg.time,
         lastSenderId: newMsg.senderId,
@@ -1224,11 +1254,11 @@ export function AppProvider({ children }) {
         unread: false, // sender has already read their own message
       };
 
-      return prev.map((c) => (c.id === conversationId ? updatedConvo : c));
+      return prev.map((c) => (c.id === conversationId ? updatedConvoMeta : c));
     });
 
-    if (updatedConvo) {
-      saveConversationFirebase(updatedConvo);
+    if (updatedConvoMeta) {
+      saveConversationFirebase(updatedConvoMeta);
     }
   };
 
@@ -1269,7 +1299,6 @@ export function AppProvider({ children }) {
       lastMessage: '',
       lastMessageTime: new Date().toISOString(),
       lastSenderId: '',
-      messages: [],
       unreadCounts: {
         [currentUser.id]: 0,
         [otherUserId]: 0,
@@ -1308,7 +1337,6 @@ export function AppProvider({ children }) {
       lastMessage: '',
       lastMessageTime: new Date().toISOString(),
       lastSenderId: '',
-      messages: [],
       unreadCounts,
       unread: false,
     };
@@ -1323,7 +1351,8 @@ export function AppProvider({ children }) {
     setConversations((prev) =>
       prev.map((c) => {
         if (c.id === conversationId) {
-          updatedConvo = { ...c, messages: [], lastMessage: '', lastMessageTime: new Date().toISOString() };
+          // Messages live in the subcollection; only reset conversation metadata
+          updatedConvo = { ...c, lastMessage: '', lastMessageTime: new Date().toISOString() };
           return updatedConvo;
         }
         return c;

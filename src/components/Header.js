@@ -136,8 +136,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   title: {
-    ...FONTS.subheading,
-    fontSize: 17,
+    ...FONTS.heading,
+    fontSize: 18,
     fontWeight: '700',
     color: COLORS.brown,
     textAlign: 'center',

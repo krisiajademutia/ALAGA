@@ -22,7 +22,7 @@ export default function Avatar({ name, uri, avatar, photo, url, userId, size = 4
 
   // Initial display: prefer cache (id-keyed only), else prop
   const cached = getCachedUserAvatar(userId);
-  const [resolvedUri, setResolvedUri] = useState(cached || (userId ? null : propUri));
+  const [resolvedUri, setResolvedUri] = useState(cached || propUri || null);
   const [hasError, setHasError] = useState(false);
   const isMounted = useRef(true);
 
@@ -31,6 +31,7 @@ export default function Avatar({ name, uri, avatar, photo, url, userId, size = 4
     return () => { isMounted.current = false; };
   }, []);
 
+  // Re-run when either userId OR the prop avatar URL changes
   useEffect(() => {
     setHasError(false);
 
@@ -40,17 +41,18 @@ export default function Avatar({ name, uri, avatar, photo, url, userId, size = 4
       return;
     }
 
+    // If propUri is a valid fresh URL (e.g. just uploaded), use it immediately
+    if (propUri) {
+      setResolvedUri(propUri);
+      // Also update cache so other components benefit
+      cacheUserProfile({ id: userId, name, avatar: propUri });
+    }
+
     // Check cache first (synchronous, instant)
     const hit = getCachedUserAvatar(userId);
     if (hit) {
       setResolvedUri(hit);
       return;
-    }
-
-    // Show prop as placeholder while we fetch (avoids blank flash)
-    // but ONLY if we don't already have a resolved value
-    if (!resolvedUri && propUri) {
-      setResolvedUri(propUri);
     }
 
     // Fetch from Firestore — this is the authoritative source
@@ -61,12 +63,12 @@ export default function Avatar({ name, uri, avatar, photo, url, userId, size = 4
         cacheUserProfile({ id: userId, name, avatar: found });
         setResolvedUri(found);
       } else {
-        // User has no avatar set — show initials, not prop placeholder
-        setResolvedUri(null);
+        // If Firestore has no avatar, fallback to the prop placeholder if available
+        setResolvedUri(propUri || null);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, propUri]);
 
   const initials = name
     ? name.split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase()

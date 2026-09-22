@@ -16,7 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
-import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
+import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import Avatar from '../../components/Avatar';
 
 export default function MessagesScreen({ navigation }) {
@@ -50,8 +50,10 @@ export default function MessagesScreen({ navigation }) {
   const filteredConvos = sorted.filter((item) => {
     const q = searchQuery.toLowerCase();
     if (item.isGroup) {
-      return (item.groupName || '').toLowerCase().includes(q) ||
-        (item.lastMessage || '').toLowerCase().includes(q);
+      return (
+        (item.groupName || '').toLowerCase().includes(q) ||
+        (item.lastMessage || '').toLowerCase().includes(q)
+      );
     }
     const otherId = item.participants?.find((p) => p !== currentUser?.id);
     const otherName = (item.participantNames?.[otherId] || '').toLowerCase();
@@ -70,7 +72,12 @@ export default function MessagesScreen({ navigation }) {
     : [];
 
   const insets = useSafeAreaInsets();
-  const safeTopPadding = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
+  const safeTopPadding =
+    Platform.OS === 'ios'
+      ? Math.max(insets.top, 16) + 4
+      : insets.top > 24
+        ? insets.top + 6
+        : 14;
 
   // Active contacts for story row (only when not searching)
   const activeContacts = sorted.slice(0, 8).map((c) => {
@@ -91,7 +98,10 @@ export default function MessagesScreen({ navigation }) {
     if (roleFilter !== 'all' && u.role !== roleFilter) return false;
     if (!newChatSearch.trim()) return true;
     const q = newChatSearch.toLowerCase();
-    return (u.name || '').toLowerCase().includes(q) || (u.location || '').toLowerCase().includes(q);
+    return (
+      (u.name || '').toLowerCase().includes(q) ||
+      (u.location || '').toLowerCase().includes(q)
+    );
   });
 
   // Group chat modal users
@@ -112,10 +122,7 @@ export default function MessagesScreen({ navigation }) {
   const handleCreateGroup = () => {
     if (selectedMembers.length < 1) return;
     const memberIds = selectedMembers.map((m) => m.id);
-    const convId = startGroupConversation(
-      memberIds,
-      groupName.trim() || null
-    );
+    const convId = startGroupConversation(memberIds, groupName.trim() || null);
     setGroupChatVisible(false);
     setGroupName('');
     setSelectedMembers([]);
@@ -123,7 +130,9 @@ export default function MessagesScreen({ navigation }) {
     if (convId) {
       navigation.navigate('Chat', {
         conversationId: convId,
-        otherName: groupName.trim() || selectedMembers.map((m) => m.name.split(' ')[0]).join(', '),
+        otherName:
+          groupName.trim() ||
+          selectedMembers.map((m) => m.name.split(' ')[0]).join(', '),
         isGroup: true,
       });
     }
@@ -133,29 +142,32 @@ export default function MessagesScreen({ navigation }) {
     <View style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* ── Header Bar ─────────────────────────────────────── */}
+      {/* ── Matched Clean Header ─────────────────────────── */}
       <View style={[styles.headerWrap, { paddingTop: safeTopPadding }]}>
         <View style={styles.topRow}>
-          <Text style={styles.messengerTitle}>ALAGA Chat</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.actionCircleBtn}
-              onPress={() => setGroupChatVisible(true)}
-              activeOpacity={0.75}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="people-outline" size={20} color="#473018" />
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.messengerTitle}>Messages</Text>
+          <TouchableOpacity
+            style={styles.actionCircleBtn}
+            onPress={() => setGroupChatVisible(true)}
+            activeOpacity={0.75}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="people-outline" size={20} color={COLORS.brown} />
+          </TouchableOpacity>
         </View>
 
         {/* Unified Search Bar */}
         <View style={styles.searchBarWrap}>
-          <Ionicons name="search" size={17} color="#8C7D6A" style={styles.searchIcon} />
+          <Ionicons
+            name="search-outline"
+            size={20}
+            color={COLORS.textMuted}
+            style={styles.searchIcon}
+          />
           <TextInput
             style={styles.searchInput}
             placeholder="Search chats or people…"
-            placeholderTextColor="#8C7D6A"
+            placeholderTextColor={COLORS.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -199,14 +211,20 @@ export default function MessagesScreen({ navigation }) {
                 <Text style={styles.userResultName} numberOfLines={1}>
                   {user.name.split(' ')[0]}
                 </Text>
-                <View style={[
-                  styles.userResultRole,
-                  user.role === 'advocate' ? styles.roleAdvocate : styles.roleCommunity,
-                ]}>
-                  <Text style={[
-                    styles.userResultRoleText,
-                    user.role === 'advocate' ? styles.roleAdvocateText : styles.roleCommunityText,
-                  ]}>
+                <View
+                  style={[
+                    styles.userResultRole,
+                    user.role === 'advocate' ? styles.roleAdvocate : styles.roleCommunity,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.userResultRoleText,
+                      user.role === 'advocate'
+                        ? styles.roleAdvocateText
+                        : styles.roleCommunityText,
+                    ]}
+                  >
                     {user.role === 'advocate' ? 'Advocate' : 'Member'}
                   </Text>
                 </View>
@@ -253,7 +271,12 @@ export default function MessagesScreen({ navigation }) {
                           <Ionicons name="people" size={22} color="#2E7A99" />
                         </View>
                       ) : (
-                        <Avatar name={contact.name} userId={contact.otherId} uri={contact.otherAvatar} size={50} />
+                        <Avatar
+                          name={contact.name}
+                          userId={contact.otherId}
+                          uri={contact.otherAvatar}
+                          size={50}
+                        />
                       )}
                     </View>
                     <Text style={styles.storyName} numberOfLines={1}>
@@ -293,10 +316,10 @@ export default function MessagesScreen({ navigation }) {
           const isGroup = item.isGroup;
           const otherId = !isGroup ? item.participants?.find((p) => p !== currentUser?.id) : null;
           const displayName = isGroup
-            ? (item.groupName || 'Group Chat')
-            : (item.participantNames?.[otherId] || 'Community Member');
+            ? item.groupName || 'Group Chat'
+            : item.participantNames?.[otherId] || 'Community Member';
           const otherAvatar = (!isGroup && otherId && item.participantAvatars?.[otherId]) || null;
-          const groupPhoto = isGroup ? (item.groupPhoto || null) : null;
+          const groupPhoto = isGroup ? item.groupPhoto || null : null;
           const lastMsg = item.lastMessage || (isGroup ? 'Group created' : 'Sent a message');
           const time = formatTime(item.lastMessageTime);
           const uId = currentUser?.id;
@@ -304,7 +327,9 @@ export default function MessagesScreen({ navigation }) {
           const userUnreadCount =
             item.unreadCounts && typeof item.unreadCounts[uId] === 'number'
               ? item.unreadCounts[uId]
-              : (isFromOther && item.unread ? (item.unreadCount || 1) : 0);
+              : isFromOther && item.unread
+                ? item.unreadCount || 1
+                : 0;
           const isUnread = userUnreadCount > 0;
 
           return (
@@ -324,11 +349,13 @@ export default function MessagesScreen({ navigation }) {
             >
               <View style={styles.rowAvatarWrap}>
                 {isGroup ? (
-                  groupPhoto
-                    ? <Image source={{ uri: groupPhoto }} style={styles.groupAvatarPhoto} />
-                    : <View style={styles.groupAvatar}>
+                  groupPhoto ? (
+                    <Image source={{ uri: groupPhoto }} style={styles.groupAvatarPhoto} />
+                  ) : (
+                    <View style={styles.groupAvatar}>
                       <Ionicons name="people" size={26} color="#2E7A99" />
                     </View>
+                  )
                 ) : (
                   <Avatar name={displayName} userId={otherId} uri={otherAvatar} size={54} />
                 )}
@@ -336,7 +363,10 @@ export default function MessagesScreen({ navigation }) {
 
               <View style={styles.rowContentWrap}>
                 <View style={styles.rowTopBar}>
-                  <Text style={[styles.userNameText, isUnread && styles.userNameUnread]} numberOfLines={1}>
+                  <Text
+                    style={[styles.userNameText, isUnread && styles.userNameUnread]}
+                    numberOfLines={1}
+                  >
                     {displayName}
                   </Text>
                   {isGroup && (
@@ -386,10 +416,13 @@ export default function MessagesScreen({ navigation }) {
           <View style={styles.modalHeader}>
             <TouchableOpacity
               style={styles.modalCloseBtn}
-              onPress={() => { setNewChatVisible(false); setNewChatSearch(''); }}
+              onPress={() => {
+                setNewChatVisible(false);
+                setNewChatSearch('');
+              }}
               activeOpacity={0.8}
             >
-              <Ionicons name="close" size={22} color="#473018" />
+              <Ionicons name="close" size={22} color={COLORS.brown} />
             </TouchableOpacity>
             <View style={styles.modalHeaderCenter}>
               <Text style={styles.modalTitle}>New Message</Text>
@@ -400,11 +433,11 @@ export default function MessagesScreen({ navigation }) {
 
           {/* Search */}
           <View style={styles.modalSearchWrap}>
-            <Ionicons name="search" size={17} color="#8C7D6A" style={{ marginRight: 8 }} />
+            <Ionicons name="search-outline" size={17} color={COLORS.textMuted} style={{ marginRight: 8 }} />
             <TextInput
               style={styles.modalSearchInput}
               placeholder="Search people…"
-              placeholderTextColor="#8C7D6A"
+              placeholderTextColor={COLORS.textMuted}
               value={newChatSearch}
               onChangeText={setNewChatSearch}
             />
@@ -427,7 +460,12 @@ export default function MessagesScreen({ navigation }) {
                 style={[styles.filterChip, roleFilter === r && styles.filterChipActive]}
                 onPress={() => setRoleFilter(r)}
               >
-                <Text style={[styles.filterChipText, roleFilter === r && styles.filterChipTextActive]}>
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    roleFilter === r && styles.filterChipTextActive,
+                  ]}
+                >
                   {r === 'all' ? 'All' : r === 'advocate' ? 'Advocates' : 'Community'}
                 </Text>
               </TouchableOpacity>
@@ -467,13 +505,27 @@ export default function MessagesScreen({ navigation }) {
                 <View style={styles.contactInfo}>
                   <Text style={styles.contactName}>{item.name}</Text>
                   <View style={styles.contactRoleRow}>
-                    <View style={[styles.roleBadge, item.role === 'advocate' ? styles.roleAdvocate : styles.roleCommunity]}>
-                      <Text style={[styles.roleBadgeText, item.role === 'advocate' ? styles.roleAdvocateText : styles.roleCommunityText]}>
+                    <View
+                      style={[
+                        styles.roleBadge,
+                        item.role === 'advocate' ? styles.roleAdvocate : styles.roleCommunity,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.roleBadgeText,
+                          item.role === 'advocate'
+                            ? styles.roleAdvocateText
+                            : styles.roleCommunityText,
+                        ]}
+                      >
                         {item.role === 'advocate' ? 'Animal Advocate' : 'Community Member'}
                       </Text>
                     </View>
                     {Boolean(item.location) && (
-                      <Text style={styles.contactLocation} numberOfLines={1}>📍 {item.location}</Text>
+                      <Text style={styles.contactLocation} numberOfLines={1}>
+                        📍 {item.location}
+                      </Text>
                     )}
                   </View>
                 </View>
@@ -504,7 +556,7 @@ export default function MessagesScreen({ navigation }) {
               }}
               activeOpacity={0.8}
             >
-              <Ionicons name="close" size={22} color="#473018" />
+              <Ionicons name="close" size={22} color={COLORS.brown} />
             </TouchableOpacity>
             <View style={styles.modalHeaderCenter}>
               <Text style={styles.modalTitle}>New Group Chat</Text>
@@ -529,11 +581,16 @@ export default function MessagesScreen({ navigation }) {
 
           {/* Group Name Input */}
           <View style={styles.groupNameWrap}>
-            <Ionicons name="people-circle-outline" size={22} color="#2E7A99" style={{ marginRight: 10 }} />
+            <Ionicons
+              name="people-circle-outline"
+              size={22}
+              color="#2E7A99"
+              style={{ marginRight: 10 }}
+            />
             <TextInput
               style={styles.groupNameInput}
               placeholder="Group name (optional)"
-              placeholderTextColor="#8C7D6A"
+              placeholderTextColor={COLORS.textMuted}
               value={groupName}
               onChangeText={setGroupName}
               maxLength={40}
@@ -563,11 +620,11 @@ export default function MessagesScreen({ navigation }) {
 
           {/* Search Members */}
           <View style={styles.modalSearchWrap}>
-            <Ionicons name="search" size={17} color="#8C7D6A" style={{ marginRight: 8 }} />
+            <Ionicons name="search-outline" size={17} color={COLORS.textMuted} style={{ marginRight: 8 }} />
             <TextInput
               style={styles.modalSearchInput}
               placeholder="Search people to add…"
-              placeholderTextColor="#8C7D6A"
+              placeholderTextColor={COLORS.textMuted}
               value={groupSearch}
               onChangeText={setGroupSearch}
             />
@@ -600,8 +657,20 @@ export default function MessagesScreen({ navigation }) {
                   <Avatar name={item.name} userId={item.id} uri={item.avatar} size={48} />
                   <View style={styles.contactInfo}>
                     <Text style={styles.contactName}>{item.name}</Text>
-                    <View style={[styles.roleBadge, item.role === 'advocate' ? styles.roleAdvocate : styles.roleCommunity]}>
-                      <Text style={[styles.roleBadgeText, item.role === 'advocate' ? styles.roleAdvocateText : styles.roleCommunityText]}>
+                    <View
+                      style={[
+                        styles.roleBadge,
+                        item.role === 'advocate' ? styles.roleAdvocate : styles.roleCommunity,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.roleBadgeText,
+                          item.role === 'advocate'
+                            ? styles.roleAdvocateText
+                            : styles.roleCommunityText,
+                        ]}
+                      >
                         {item.role === 'advocate' ? 'Advocate' : 'Member'}
                       </Text>
                     </View>
@@ -638,9 +707,9 @@ function formatTime(isoString) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
 
-  // ── Header ───────────────────────────────────────────────
+  // ── Matched Clean Header ──────────────────────────────────
   headerWrap: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingBottom: 10,
     backgroundColor: '#FFFFFF',
   },
@@ -648,40 +717,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 4,
   },
   messengerTitle: {
-    fontSize: 20,
+    ...FONTS.titleXl,
+    fontSize: 22,
     fontWeight: '800',
-    color: '#473018',
-    letterSpacing: -0.3,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: COLORS.brown,
   },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   actionCircleBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#EFE8D6',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: COLORS.secondary,
     alignItems: 'center',
     justifyContent: 'center',
+    ...SHADOWS.sm,
   },
 
   // ── Search Bar ───────────────────────────────────────────
   searchBarWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFE8D6',
-    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: SIZES.r24,
+    borderWidth: 1.5,
+    borderColor: COLORS.secondary,
     paddingHorizontal: 14,
-    height: 40,
+    height: 48,
+    marginTop: 10,
+    marginBottom: 6,
+    ...SHADOWS.sm,
   },
   searchIcon: { marginRight: 8 },
   searchInput: {
     flex: 1,
+    ...FONTS.bodyMedium,
     fontSize: 14,
-    color: '#473018',
-    fontFamily: 'PlusJakartaSans_500Medium',
+    color: COLORS.brown,
     paddingVertical: 0,
   },
 
@@ -690,15 +765,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingTop: 6,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E8DFC8',
+    borderBottomColor: COLORS.borderLight || '#E8DFC8',
   },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
     color: '#8C7D6A',
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 6,
-    fontFamily: 'PlusJakartaSans_700Bold',
+    ...FONTS.subheading,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -717,7 +792,6 @@ const styles = StyleSheet.create({
     color: '#473018',
     marginTop: 4,
     textAlign: 'center',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
   },
   userResultRole: {
     marginTop: 3,
@@ -755,17 +829,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#473018',
     fontWeight: '600',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
     textAlign: 'center',
   },
 
   // ── Chat Rows ────────────────────────────────────────────
-  listContent: { paddingTop: 6, paddingBottom: 110 },
+  listContent: { paddingTop: 6, paddingBottom: 110, backgroundColor: '#FFFFFF' },
   chatRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 11,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
   },
   rowAvatarWrap: { marginRight: 14 },
   groupAvatar: {
@@ -795,11 +868,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
     letterSpacing: -0.1,
     flexShrink: 1,
   },
-  userNameUnread: { fontWeight: '800', fontFamily: 'PlusJakartaSans_700Bold' },
+  userNameUnread: { fontWeight: '800' },
   groupBadge: {
     backgroundColor: '#EBF7FA',
     paddingHorizontal: 7,
@@ -810,25 +882,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#2E7A99',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   rowBottomBar: { flexDirection: 'row', alignItems: 'center' },
   messageSnippet: {
     fontSize: 13,
     color: '#8C7D6A',
-    fontFamily: 'PlusJakartaSans_500Medium',
     flexShrink: 1,
   },
   messageSnippetUnread: {
     color: '#473018',
     fontWeight: '700',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   timeDot: { marginHorizontal: 4, color: '#8C7D6A', fontSize: 12 },
   timeText: {
     fontSize: 12,
     color: '#8C7D6A',
-    fontFamily: 'PlusJakartaSans_500Medium',
   },
   timeTextUnread: { color: '#2E7A99', fontWeight: '700' },
   rowEndWrap: { marginLeft: 8, alignItems: 'center', justifyContent: 'center' },
@@ -846,12 +914,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 10.5,
     fontWeight: '800',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   divider: {
     height: 1,
     backgroundColor: 'rgba(232,223,200,0.4)',
-    marginLeft: 86,
+    marginLeft: 84,
   },
 
   // ── Empty State ──────────────────────────────────────────
@@ -871,14 +938,12 @@ const styles = StyleSheet.create({
     color: '#473018',
     marginBottom: 8,
     textAlign: 'center',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   emptySubtitle: {
     fontSize: 13,
     color: '#8C7D6A',
     lineHeight: 19,
     textAlign: 'center',
-    fontFamily: 'PlusJakartaSans_500Medium',
     marginBottom: 24,
   },
   emptyBtn: {
@@ -891,7 +956,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
   // ── Modal ────────────────────────────────────────────────
@@ -920,7 +984,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   modalSubtitle: {
     fontSize: 11.5,
@@ -944,7 +1007,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13.5,
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_500Medium',
   },
   filterChipsRow: {
     paddingHorizontal: 16,
@@ -983,7 +1045,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   contactRoleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   roleBadge: { paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 10 },
@@ -1016,7 +1077,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   groupNameWrap: {
     flexDirection: 'row',
@@ -1034,7 +1094,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_500Medium',
   },
   selectedChipsRow: {
     paddingHorizontal: 16,
@@ -1056,7 +1115,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#2E7A99',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
   },
   checkbox: {
     width: 24,

@@ -14,7 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
-import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
+import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import EmptyState from '../../components/EmptyState';
 
 const FILTERS = ['Open', 'Responded', 'Rescued', 'All'];
@@ -44,30 +44,48 @@ export default function RescueAlertsScreen({ navigation }) {
   };
 
   const insets = useSafeAreaInsets();
-  const safeTopPadding = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
+  const safeTopPadding =
+    Platform.OS === 'ios'
+      ? Math.max(insets.top, 16) + 4
+      : insets.top > 24
+        ? insets.top + 6
+        : 14;
 
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* ── Header ─────────────────────────────────────────── */}
+      {/* ── Title-Only Clean Header ─────────────────────────── */}
       <View style={[styles.header, { paddingTop: safeTopPadding }]}>
         <Text style={styles.headerTitle}>Rescue Alerts</Text>
-        <Text style={styles.headerSub}>Track your reports, requests & contributions</Text>
 
         {/* Search Bar */}
         <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={20} color="#8C7D6A" style={styles.searchIcon} />
+          <Ionicons
+            name="search-outline"
+            size={20}
+            color={COLORS.textMuted}
+            style={styles.searchIcon}
+          />
           <TextInput
             style={styles.searchInput}
             placeholder="Search breed, location, or shelter..."
-            placeholderTextColor="#8C7D6A"
+            placeholderTextColor={COLORS.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          <TouchableOpacity style={styles.filterBtn} activeOpacity={0.7}>
-            <Ionicons name="options-outline" size={20} color="#473018" />
-          </TouchableOpacity>
+          {searchQuery ? (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close-circle" size={18} color="#8C7D6A" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.filterBtn} activeOpacity={0.7}>
+              <Ionicons name="options-outline" size={20} color={COLORS.brown} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Filter Pills */}
@@ -77,11 +95,19 @@ export default function RescueAlertsScreen({ navigation }) {
             return (
               <TouchableOpacity
                 key={f}
-                style={[styles.filterChip, isActive ? styles.filterChipActive : styles.filterChipInactive]}
+                style={[
+                  styles.filterChip,
+                  isActive ? styles.filterChipActive : styles.filterChipInactive,
+                ]}
                 onPress={() => setFilter(f)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.filterChipText, isActive ? styles.filterChipTextActive : styles.filterChipTextInactive]}>
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    isActive ? styles.filterChipTextActive : styles.filterChipTextInactive,
+                  ]}
+                >
                   {f}
                 </Text>
               </TouchableOpacity>
@@ -100,13 +126,20 @@ export default function RescueAlertsScreen({ navigation }) {
           <EmptyState
             icon="notifications-off-outline"
             title="No alerts found"
-            subtitle={filter === 'Open' ? 'No open rescue alerts matching your criteria.' : 'Nothing here yet.'}
+            subtitle={
+              filter === 'Open'
+                ? 'No open rescue alerts matching your criteria.'
+                : 'Nothing here yet.'
+            }
           />
         }
         renderItem={({ item }) => {
           const isHigh = item.urgency === 'High' || item.urgency === 'Critical';
-          const cardTitle = item.title || `${item.condition || 'Injured'} ${item.animalType.toLowerCase()}`;
-          const viaText = item.reporterName ? `Via: ${item.reporterName}` : 'Via: Community Member';
+          const cardTitle =
+            item.title || `${item.condition || 'Injured'} ${item.animalType.toLowerCase()}`;
+          const viaText = item.reporterName
+            ? `Via: ${item.reporterName}`
+            : 'Via: Community Member';
 
           return (
             <TouchableOpacity
@@ -117,14 +150,28 @@ export default function RescueAlertsScreen({ navigation }) {
               {/* Image & floating badge */}
               <View style={styles.imageWrap}>
                 {item.photo ? (
-                  <Image source={{ uri: item.photo }} style={styles.cardImage} resizeMode="cover" />
+                  <Image
+                    source={{ uri: item.photo }}
+                    style={styles.cardImage}
+                    resizeMode="cover"
+                  />
                 ) : (
                   <View style={[styles.cardImage, styles.placeholderImage]}>
                     <Ionicons name="paw" size={40} color="#85CCE5" />
                   </View>
                 )}
-                <View style={[styles.urgencyBadge, isHigh ? styles.badgeHigh : styles.badgeStandard]}>
-                  <Text style={[styles.badgeText, isHigh ? styles.badgeTextHigh : styles.badgeTextStandard]}>
+                <View
+                  style={[
+                    styles.urgencyBadge,
+                    isHigh ? styles.badgeHigh : styles.badgeStandard,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.badgeText,
+                      isHigh ? styles.badgeTextHigh : styles.badgeTextStandard,
+                    ]}
+                  >
                     {isHigh ? 'High' : 'Standard'}
                   </Text>
                 </View>
@@ -142,7 +189,12 @@ export default function RescueAlertsScreen({ navigation }) {
                   <Text style={styles.cardDate}>{formatDate(item.createdAt)}</Text>
                   <View style={styles.actionRow}>
                     <Text style={styles.viewDetailsText}>View Details</Text>
-                    <Ionicons name="arrow-forward" size={14} color="#473018" style={{ marginLeft: 4 }} />
+                    <Ionicons
+                      name="arrow-forward"
+                      size={14}
+                      color={COLORS.brown}
+                      style={{ marginLeft: 4 }}
+                    />
                   </View>
                 </View>
               </View>
@@ -159,34 +211,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+
+  /* ── Matched Clean Header ── */
   header: {
     paddingHorizontal: 16,
     paddingBottom: 10,
     backgroundColor: '#FFFFFF',
   },
   headerTitle: {
-    fontSize: 20,
+    ...FONTS.titleXl,
+    fontSize: 22,
     fontWeight: '800',
-    color: '#473018',
-    letterSpacing: -0.3,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-  },
-  headerSub: {
-    fontSize: 13,
-    color: '#8C7D6A',
-    marginTop: 3,
-    fontWeight: '500',
+    color: COLORS.brown,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
+    borderRadius: SIZES.r24,
     borderWidth: 1.5,
-    borderColor: '#B8D3C3',
+    borderColor: COLORS.secondary,
     paddingHorizontal: 14,
     height: 48,
-    marginTop: 14,
+    marginTop: 12,
     marginBottom: 12,
     ...SHADOWS.sm,
   },
@@ -195,9 +242,9 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    ...FONTS.bodyMedium,
     fontSize: 14,
-    color: '#473018',
-    fontWeight: '500',
+    color: COLORS.brown,
     paddingVertical: 0,
   },
   filterBtn: {
@@ -211,48 +258,51 @@ const styles = StyleSheet.create({
   filterChip: {
     paddingHorizontal: 18,
     paddingVertical: 7,
-    borderRadius: 20,
+    borderRadius: SIZES.r20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   filterChipActive: {
-    backgroundColor: '#E0F2F7',
+    backgroundColor: COLORS.primaryLight,
     borderWidth: 1.5,
-    borderColor: '#85CCE5',
+    borderColor: COLORS.primary,
   },
   filterChipInactive: {
-    backgroundColor: '#F3EFEA',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: 'transparent',
+    borderColor: COLORS.borderLight || '#E8DFC8',
   },
   filterChipText: {
+    ...FONTS.subheading,
     fontSize: 13,
-    fontWeight: '700',
   },
   filterChipTextActive: {
-    color: '#2E7A99',
+    color: COLORS.primaryDeep,
   },
   filterChipTextInactive: {
-    color: '#8C7D6A',
+    color: COLORS.textMuted,
   },
+
+  /* ── List & Cards ── */
   list: {
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 110,
+    backgroundColor: '#FFFFFF',
   },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
+    borderRadius: SIZES.r24,
     overflow: 'hidden',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#EFECE6',
+    borderColor: COLORS.borderLight || '#E8DFC8',
     ...SHADOWS.card,
   },
   imageWrap: {
     position: 'relative',
     height: 145,
-    backgroundColor: '#EBF4F0',
+    backgroundColor: COLORS.secondaryLight,
   },
   cardImage: {
     width: '100%',
@@ -290,20 +340,18 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   cardTitle: {
+    ...FONTS.titleMd,
     fontSize: 17,
-    fontWeight: '800',
-    color: '#473018',
   },
   cardVia: {
-    fontSize: 12,
-    color: '#7A6A55',
-    fontWeight: '600',
+    ...FONTS.meta,
     marginTop: 2,
   },
   cardDesc: {
+    ...FONTS.bodyRegular,
     fontSize: 13,
     fontStyle: 'italic',
-    color: '#5C4E3A',
+    color: COLORS.textSecondary,
     marginTop: 6,
     lineHeight: 18,
   },
@@ -314,18 +362,16 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   cardDate: {
+    ...FONTS.caption,
     fontSize: 12,
-    color: '#8C7D6A',
-    fontWeight: '500',
   },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   viewDetailsText: {
+    ...FONTS.button,
     fontSize: 13,
-    fontWeight: '800',
-    color: '#473018',
+    color: COLORS.brown,
   },
 });
-

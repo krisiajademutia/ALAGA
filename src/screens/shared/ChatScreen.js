@@ -22,6 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useApp } from '../../context/AppContext';
+import { subscribeToMessages } from '../../services/chatService';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import Avatar from '../../components/Avatar';
 import Header from '../../components/Header';
@@ -47,6 +48,7 @@ export default function ChatScreen({ route, navigation }) {
   const { conversations, currentUser, sendMessage, clearConversation, markConversationRead,
     setActiveConversationId, showAlert, updateGroupInfo, getAllKnownUsers } = useApp();
   const [text, setText] = useState(initialDraft || '');
+  const [messages, setMessages] = useState([]);
   const [attachModalVisible, setAttachModalVisible] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
@@ -65,6 +67,28 @@ export default function ChatScreen({ route, navigation }) {
 
   const flatRef = useRef(null);
   const inputRef = useRef(null);
+
+  // ── Subscribe to messages subcollection (Gap 1 fix) ───────────────────────
+  useEffect(() => {
+    if (!conversationId) return;
+    const unsub = subscribeToMessages(
+      conversationId,
+      (firestoreMsgs) => {
+        setMessages(firestoreMsgs);
+      },
+      (err) => {
+        console.warn('[ChatScreen] Messages listener error:', err?.message);
+      }
+    );
+    return () => unsub?.();
+  }, [conversationId]);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 80);
+    }
+  }, [messages.length]);
 
   const convo = conversations.find((c) => c.id === conversationId);
   const isGroup = convo?.isGroup || false;
@@ -85,7 +109,6 @@ export default function ChatScreen({ route, navigation }) {
         (detectedOtherId && convo?.participantNames?.[detectedOtherId]) ||
         (convo?.participant1 === currentUser?.id ? convo?.participant2Name : convo?.participant1Name) ||
         'Chat');
-  const messages = convo ? convo.messages : [];
 
   // Build member list for group chats
   const groupMembers = isGroup && convo?.participants
@@ -142,6 +165,11 @@ export default function ChatScreen({ route, navigation }) {
     if (!convo) return;
     sendMessage(convo.id, { text: msg, type: 'text' });
     setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
+  };
+
+  const handleSelectPrompt = (promptText) => {
+    setText(promptText);
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   // ── Media & Location Handlers ──────────────────────────────

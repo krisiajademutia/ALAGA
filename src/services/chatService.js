@@ -7,6 +7,8 @@ import {
   onSnapshot,
   query,
   where,
+  orderBy,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { isMockFirebase } from '../config/firebaseConfig';
@@ -58,7 +60,69 @@ export function subscribeToConversations(user, onUpdate, onError) {
 }
 
 /**
- * Save or update a conversation document in Firestore
+ * Real-time listener for messages in a conversation's subcollection.
+ * Matches Firestore rule: conversations/{convId}/messages/{msgId}
+ * allow read, create: if isAuthenticated();
+ */
+export function subscribeToMessages(conversationId, onUpdate, onError) {
+  if (isMockFirebase() || !db || !conversationId) return () => {};
+  if (!auth?.currentUser) {
+    if (onUpdate) onUpdate([]);
+    return () => {};
+  }
+
+  try {
+    const q = query(
+      collection(db, CONVERSATIONS_COLLECTION, conversationId, 'messages'),
+      orderBy('time', 'asc')
+    );
+
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const msgs = [];
+        snapshot.forEach((docSnap) => {
+          msgs.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        if (onUpdate) onUpdate(msgs);
+      },
+      (error) => {
+        console.warn('[chatService] Messages snapshot notice:', error?.message || error);
+        if (onError) onError(error);
+      }
+    );
+  } catch (err) {
+    console.warn('[chatService] Messages listener setup error:', err);
+    return () => {};
+  }
+}
+
+/**
+ * Save a single message to the conversations/{convId}/messages subcollection.
+ * Matches Firestore rule: allow create: if isAuthenticated();
+ */
+export async function saveMessageFirebase(conversationId, message) {
+  if (isMockFirebase() || !db || !conversationId || !message) return { isMock: true };
+  if (!auth?.currentUser) return { error: 'Not authenticated' };
+
+  try {
+    const msgId = message.id || `m${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const docRef = doc(db, CONVERSATIONS_COLLECTION, conversationId, 'messages', msgId);
+    await setDoc(docRef, {
+      ...message,
+      id: msgId,
+      timestamp: serverTimestamp(),
+    });
+    return { success: true, id: msgId };
+  } catch (err) {
+    console.warn('[chatService] Failed to save message:', err?.message || err);
+    return { error: err.message };
+  }
+}
+
+/**
+ * Save or update a conversation document in Firestore.
+ * Strips the `messages` array before saving — messages live in the subcollection.
  */
 export async function saveConversationFirebase(convoData) {
   if (isMockFirebase() || !db || !convoData?.id) {
@@ -71,9 +135,12 @@ export async function saveConversationFirebase(convoData) {
     participants.push(currentUid);
   }
 
+  // Strip messages array — individual messages belong in the subcollection
+  const { messages: _stripped, ...convoMeta } = convoData; // eslint-disable-line no-unused-vars
+
   try {
     const docRef = doc(db, CONVERSATIONS_COLLECTION, convoData.id);
-    await setDoc(docRef, { ...convoData, participants }, { merge: true });
+    await setDoc(docRef, { ...convoMeta, participants }, { merge: true });
     return { success: true };
   } catch (err) {
     console.warn('[chatService] Failed to save conversation:', err?.message || err);

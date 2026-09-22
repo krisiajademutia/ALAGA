@@ -121,7 +121,11 @@ export function subscribeToApplications(user, onUpdate, onError) {
   try {
     let q;
     if (user?.role === 'advocate') {
-      q = query(collection(db, APPLICATIONS_COLLECTION));
+      // Only load applications for this advocate's own animals
+      q = query(
+        collection(db, APPLICATIONS_COLLECTION),
+        where('advocateId', '==', currentUid)
+      );
     } else {
       q = query(
         collection(db, APPLICATIONS_COLLECTION),

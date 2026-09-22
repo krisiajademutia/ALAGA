@@ -6,7 +6,7 @@ import {
   GoogleAuthProvider,
   signInWithCredential,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection, getDocs, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { isMockFirebase } from '../config/firebaseConfig';
 
@@ -410,3 +410,51 @@ export async function getAllUsersFirebase() {
   }
 }
 
+/**
+ * Save a notification to the Firestore users/{userId}/notifications subcollection.
+ * Matches Firestore rule: allow read, write: if isOwner(userId);
+ */
+export async function saveNotificationFirebase(userId, notification) {
+  if (isMockFirebase() || !db || !userId || !notification?.id) return;
+  try {
+    const docRef = doc(db, 'users', userId, 'notifications', notification.id);
+    await setDoc(docRef, {
+      ...notification,
+      timestamp: serverTimestamp(),
+    }, { merge: true });
+  } catch (err) {
+    // Non-critical — local state is source of truth; Firestore is cross-device sync
+    console.warn('[authService] saveNotificationFirebase warning:', err?.message);
+  }
+}
+
+/**
+ * Real-time listener for a user's notifications subcollection.
+ * Matches Firestore rule: allow read, write: if isOwner(userId);
+ */
+export function subscribeToNotificationsFirebase(userId, onUpdate, onError) {
+  if (isMockFirebase() || !db || !userId) return () => {};
+  try {
+    const q = query(
+      collection(db, 'users', userId, 'notifications'),
+      orderBy('createdAt', 'desc')
+    );
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const notifs = [];
+        snapshot.forEach((docSnap) => {
+          notifs.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        if (onUpdate) onUpdate(notifs);
+      },
+      (error) => {
+        console.warn('[authService] Notifications snapshot notice:', error?.message || error);
+        if (onError) onError(error);
+      }
+    );
+  } catch (err) {
+    console.warn('[authService] Notifications listener setup error:', err);
+    return () => {};
+  }
+}

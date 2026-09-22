@@ -1,26 +1,33 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Dimensions, Platform, Modal, ScrollView, Image, StatusBar as RNStatusBar } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  Modal,
+  ScrollView,
+  Image,
+  Platform,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
-import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
+import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import StatusPill from '../../components/StatusPill';
 import EmptyState from '../../components/EmptyState';
 
-const W = Dimensions.get('window').width;
-
-// ── Tab config (Clean, Professional Text Labels) ──────────────────────────────
 const COMMUNITY_TABS = [
-  { key: 'reports',   label: 'My Reports' },
-  { key: 'requests',  label: 'My Requests' },
+  { key: 'reports', label: 'My Reports' },
+  { key: 'requests', label: 'My Requests' },
   { key: 'donations', label: 'Donations' },
 ];
 
 const ADVOCATE_TABS = [
   { key: 'responses', label: 'Responses' },
-  { key: 'requests',  label: 'Requests' },
-  { key: 'animals',   label: 'My Animals' },
+  { key: 'requests', label: 'Requests' },
+  { key: 'animals', label: 'My Animals' },
   { key: 'donations', label: 'Donations' },
 ];
 
@@ -52,13 +59,13 @@ export default function ActivityScreen({ route, navigation }) {
 
   const getRawData = () => {
     if (!isAdvocate) {
-      if (activeTab === 'reports')   return getUserReports();
-      if (activeTab === 'requests')  return getUserRequests();
+      if (activeTab === 'reports') return getUserReports();
+      if (activeTab === 'requests') return getUserRequests();
       if (activeTab === 'donations') return getUserDonations();
     } else {
       if (activeTab === 'responses') return getAdvocateResponses();
-      if (activeTab === 'requests')  return getAdvocateRequests();
-      if (activeTab === 'animals')   return getAdvocateAnimals();
+      if (activeTab === 'requests') return getAdvocateRequests();
+      if (activeTab === 'animals') return getAdvocateAnimals();
       if (activeTab === 'donations') return getAdvocateDonations ? getAdvocateDonations() : [];
     }
     return [];
@@ -69,7 +76,6 @@ export default function ActivityScreen({ route, navigation }) {
     ? rawData
     : rawData.filter((item) => item.status === statusFilter);
 
-  // Sub-status options based on active tab
   const getStatusOptions = () => {
     const statuses = new Set(['All']);
     rawData.forEach((item) => {
@@ -85,7 +91,14 @@ export default function ActivityScreen({ route, navigation }) {
       return <ReportCard item={item} isAdvocate={isAdvocate} navigation={navigation} />;
     }
     if (activeTab === 'requests') {
-      return <RequestCard item={item} isAdvocate={isAdvocate} onPress={() => setSelectedRequest(item)} animals={animals} />;
+      return (
+        <RequestCard
+          item={item}
+          isAdvocate={isAdvocate}
+          onPress={() => setSelectedRequest(item)}
+          animals={animals}
+        />
+      );
     }
     if (activeTab === 'donations') {
       return (
@@ -122,21 +135,23 @@ export default function ActivityScreen({ route, navigation }) {
   };
 
   const insets = useSafeAreaInsets();
-  const safeTopPadding = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
+  const safeTopPadding =
+    Platform.OS === 'ios'
+      ? Math.max(insets.top, 16) + 4
+      : insets.top > 24
+        ? insets.top + 6
+        : 14;
 
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
 
-      {/* ── Header Bar ────────────────────────────────────────── */}
+      {/* ── Matched Title-Only Clean Header ─────────────────── */}
       <View style={[styles.header, { paddingTop: safeTopPadding }]}>
         <View style={styles.headerTop}>
-          <View style={styles.headerTitleWrap}>
-            <Text style={styles.headerTitle} numberOfLines={1}>Activity Dashboard</Text>
-            <Text style={styles.headerSub} numberOfLines={1}>
-              {isAdvocate ? 'Manage your rescue operations' : 'Track your reports, requests & contributions'}
-            </Text>
-          </View>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            Activity
+          </Text>
           <View style={styles.headerBadge}>
             <Text style={styles.headerBadgeText}>{rawData.length} Total</Text>
           </View>
@@ -153,13 +168,13 @@ export default function ActivityScreen({ route, navigation }) {
             const isActive = activeTab === t.key;
             const count = (() => {
               if (!isAdvocate) {
-                if (t.key === 'reports')   return getUserReports().length;
-                if (t.key === 'requests')  return getUserRequests().length;
+                if (t.key === 'reports') return getUserReports().length;
+                if (t.key === 'requests') return getUserRequests().length;
                 if (t.key === 'donations') return getUserDonations().length;
               } else {
                 if (t.key === 'responses') return getAdvocateResponses().length;
-                if (t.key === 'requests')  return getAdvocateRequests().length;
-                if (t.key === 'animals')   return getAdvocateAnimals().length;
+                if (t.key === 'requests') return getAdvocateRequests().length;
+                if (t.key === 'animals') return getAdvocateAnimals().length;
                 if (t.key === 'donations') return getAdvocateDonations ? getAdvocateDonations().length : 0;
               }
               return 0;
@@ -173,7 +188,7 @@ export default function ActivityScreen({ route, navigation }) {
                   setActiveTab(t.key);
                   setStatusFilter('All');
                 }}
-                activeOpacity={0.78}
+                activeOpacity={0.8}
               >
                 <Text style={[styles.tabPillText, isActive && styles.tabPillTextActive]}>
                   {t.label} {count > 0 ? count : ''}
@@ -185,7 +200,11 @@ export default function ActivityScreen({ route, navigation }) {
 
         {/* Sub-status Filter Carousel */}
         {statusOptions.length > 1 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subFilterContent}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.subFilterContent}
+          >
             {statusOptions.map((st) => (
               <TouchableOpacity
                 key={st}
@@ -242,7 +261,6 @@ export default function ActivityScreen({ route, navigation }) {
                   </TouchableOpacity>
                 </View>
 
-                {/* Animal photo in modal */}
                 {modalPhotoUri ? (
                   <Image
                     source={{ uri: modalPhotoUri }}
@@ -327,7 +345,6 @@ export default function ActivityScreen({ route, navigation }) {
   );
 }
 
-// ── Report / Response card ─────────────────────────────────────────────────────
 function ReportCard({ item, isAdvocate, navigation }) {
   const photoUri = item.photoUri || (Array.isArray(item.photos) && item.photos[0]) || item.image || item.photo || null;
 
@@ -370,9 +387,7 @@ function ReportCard({ item, isAdvocate, navigation }) {
   );
 }
 
-// ── Request card ──────────────────────────────────────────────────────────────
 function RequestCard({ item, isAdvocate, onPress, animals }) {
-  // Look up animal photo: check item fields first, then find in animals array by animalId
   const linkedAnimal = animals && item.animalId
     ? animals.find((a) => a.id === item.animalId)
     : null;
@@ -414,7 +429,6 @@ function RequestCard({ item, isAdvocate, onPress, animals }) {
   );
 }
 
-// ── Donation card ─────────────────────────────────────────────────────────────
 function DonationCard({ item, isAdvocate, onVerify, onPreviewReceipt }) {
   const isPending = item.status === 'Pending';
   const hasProof = Boolean(item.proofPhoto);
@@ -478,7 +492,6 @@ function DonationCard({ item, isAdvocate, onVerify, onPreviewReceipt }) {
   );
 }
 
-// ── Animal card (advocate) ────────────────────────────────────────────────────
 function AnimalCard({ item, navigation }) {
   const photoUri = item.photo || (Array.isArray(item.photos) && item.photos[0]) || null;
 
@@ -529,17 +542,15 @@ function fmtDate(val) {
   return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#FFFFFF' },
 
-  // Header
   header: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingBottom: 10,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E8DEC5',
+    borderBottomColor: '#F0ECE4',
   },
   headerTop: {
     flexDirection: 'row',
@@ -547,29 +558,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  headerBackBtn: {
-    marginRight: 8,
-    padding: 2,
-    flexShrink: 0,
-  },
-  headerTitleWrap: {
-    flex: 1,
-    marginRight: 8,
-  },
   headerTitle: {
-    fontSize: 20,
+    ...FONTS.titleXl,
+    fontSize: 22,
     fontWeight: '800',
-    color: '#473018',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-  },
-  headerSub: {
-    fontSize: 12,
-    color: '#8C7D6A',
-    fontFamily: 'PlusJakartaSans_500Medium',
-    marginTop: 2,
+    color: COLORS.brown,
   },
   headerBadge: {
-    flexShrink: 0,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -582,10 +577,8 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '700',
     color: '#2E7A99',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
-  // Scrollable Tab bar
   tabScrollView: {
     marginBottom: 6,
   },
@@ -594,31 +587,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingVertical: 2,
-    paddingRight: 16,
   },
   tabPill: {
     paddingVertical: 7,
     paddingHorizontal: 16,
-    borderRadius: 20,
+    borderRadius: SIZES.r20,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E8DEC5',
+    borderWidth: 1.5,
+    borderColor: COLORS.borderLight || '#E8DFC8',
   },
   tabPillActive: {
-    backgroundColor: '#2E7A99',
-    borderColor: '#2E7A99',
+    backgroundColor: COLORS.primaryLight,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
   },
   tabPillText: {
-    fontSize: 12.5,
+    ...FONTS.subheading,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#8C7D6A',
-    fontFamily: 'PlusJakartaSans_700Bold',
+    color: COLORS.textMuted,
   },
   tabPillTextActive: {
-    color: '#FFFFFF',
+    color: COLORS.primaryDeep,
   },
 
-  // Sub-filter carousel
   subFilterContent: {
     gap: 6,
     paddingVertical: 4,
@@ -627,9 +619,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 14,
-    backgroundColor: '#FCF8E8',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E8DEC5',
+    borderColor: COLORS.borderLight || '#E8DFC8',
   },
   subFilterChipActive: {
     backgroundColor: '#EBF7FA',
@@ -637,21 +629,17 @@ const styles = StyleSheet.create({
   },
   subFilterText: {
     fontSize: 11,
-    color: '#8C7D6A',
+    color: COLORS.textMuted,
     fontWeight: '600',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
   },
   subFilterTextActive: {
     color: '#2E7A99',
     fontWeight: '700',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
-  // List
   list: { paddingTop: 0, paddingBottom: 100 },
   empty: { marginTop: 24 },
 
-  // Shared card shell — flat, divider-based
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -679,17 +667,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardThumbInitials: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#2E7A99',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-  },
   cardBody: {
     flex: 1,
     minWidth: 0,
   },
-
   cardTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -702,41 +683,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   cardSubTitle: {
     fontSize: 13,
     fontWeight: '700',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_700Bold',
     marginBottom: 4,
   },
   amountText: {
     fontSize: 15,
     fontWeight: '800',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-  },
-  cardPillWrap: {
-    flexShrink: 0,
-  },
-  cardMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 2,
   },
   cardMeta: {
     fontSize: 12,
     color: '#8C7D6A',
-    fontFamily: 'PlusJakartaSans_400Regular',
     marginBottom: 2,
   },
   typeTagText: {
     fontSize: 11,
     fontWeight: '700',
     color: '#2E7A99',
-    fontFamily: 'PlusJakartaSans_700Bold',
     marginBottom: 2,
   },
   cardQuote: {
@@ -755,18 +722,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#B45309',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   cardDate: {
     fontSize: 11,
     color: '#AAAAAA',
-    fontFamily: 'PlusJakartaSans_400Regular',
   },
   viewReceiptText: {
     fontSize: 11,
     fontWeight: '700',
     color: '#2E7A99',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   donationThumbBg: {
     backgroundColor: '#EDF6F1',
@@ -792,7 +756,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#FFFFFF',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   rejectDonationBtn: {
     backgroundColor: '#FFFFFF',
@@ -806,10 +769,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#D94F4F',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
-  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -839,7 +800,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   modalBody: {
     gap: 10,
@@ -893,10 +853,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
-  // Receipt Modal
   receiptModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
