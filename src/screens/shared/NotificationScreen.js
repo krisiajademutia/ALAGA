@@ -6,11 +6,13 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
-import Header from '../../components/Header';
+import { COLORS, SIZES, FONTS } from '../../constants/theme';
 
 function formatTimeAgo(timestamp) {
   if (!timestamp) return 'Recently';
@@ -149,14 +151,22 @@ export default function NotificationScreen({ navigation }) {
     );
   };
 
+  const insets = useSafeAreaInsets();
+  const safeTopPadding =
+    Platform.OS === 'ios'
+      ? Math.max(insets.top, 16) + 4
+      : insets.top > 24
+        ? insets.top + 6
+        : 14;
+
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
 
-      {/* Header */}
-      <Header
-        centerComponent={
-          <View style={styles.headerCenter}>
+      {/* ── Matched Clean Header (Title Only, No Back Button) ── */}
+      <View style={[styles.header, { paddingTop: safeTopPadding }]}>
+        <View style={styles.headerTop}>
+          <View style={styles.titleWrap}>
             <Text style={styles.headerTitle}>Notifications</Text>
             {unreadCount > 0 && (
               <View style={styles.unreadBadge}>
@@ -164,65 +174,63 @@ export default function NotificationScreen({ navigation }) {
               </View>
             )}
           </View>
-        }
-        rightComponent={
-          <View style={styles.headerRight}>
-            {unreadCount > 0 && (
-              <TouchableOpacity
-                onPress={markAllNotificationsRead}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.markReadText}>Mark all read</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        }
-      />
 
-      {/* Filter Tabs */}
-      <View style={styles.filterRow}>
-        {FILTER_TABS.map((tab) => {
-          const isActive = activeFilter === tab.key;
-          const showCount = tab.key === 'unread' && unreadCount > 0;
-
-          return (
+          {unreadCount > 0 && (
             <TouchableOpacity
-              key={tab.key}
-              style={[styles.filterChip, isActive && styles.filterChipActive]}
-              onPress={() => setActiveFilter(tab.key)}
+              onPress={markAllNotificationsRead}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               activeOpacity={0.7}
             >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  isActive && styles.filterChipTextActive,
-                ]}
+              <Text style={styles.markReadText}>Mark all read</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Filter Tabs */}
+        <View style={styles.filterRow}>
+          {FILTER_TABS.map((tab) => {
+            const isActive = activeFilter === tab.key;
+            const showCount = tab.key === 'unread' && unreadCount > 0;
+
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={[styles.filterChip, isActive && styles.filterChipActive]}
+                onPress={() => setActiveFilter(tab.key)}
+                activeOpacity={0.8}
               >
-                {tab.label}
-              </Text>
-              {showCount && (
-                <View
+                <Text
                   style={[
-                    styles.chipBadge,
-                    isActive ? styles.chipBadgeActive : styles.chipBadgeInactive,
+                    styles.filterChipText,
+                    isActive && styles.filterChipTextActive,
                   ]}
                 >
-                  <Text
+                  {tab.label}
+                </Text>
+                {showCount && (
+                  <View
                     style={[
-                      styles.chipBadgeText,
-                      isActive ? styles.chipBadgeTextActive : styles.chipBadgeTextInactive,
+                      styles.chipBadge,
+                      isActive ? styles.chipBadgeActive : styles.chipBadgeInactive,
                     ]}
                   >
-                    {unreadCount}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
+                    <Text
+                      style={[
+                        styles.chipBadgeText,
+                        isActive ? styles.chipBadgeTextActive : styles.chipBadgeTextInactive,
+                      ]}
+                    >
+                      {unreadCount}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
 
-      {/* Notification Stream (Unified Continuous Surface) */}
+      {/* Notification Stream */}
       <FlatList
         data={listData}
         keyExtractor={(item, index) => item.id || `h-${index}`}
@@ -258,15 +266,12 @@ export default function NotificationScreen({ navigation }) {
               onPress={() => handleTap(item)}
               activeOpacity={0.75}
             >
-              {/* Refined Status Indicator Dot */}
               <View style={styles.dotSlot}>
                 {isUnread && <View style={styles.unreadDot} />}
               </View>
 
-              {/* Minimal Icon Badge */}
               {renderIcon(item.type, item.icon, item.iconColor, item.iconBg)}
 
-              {/* Textual Details */}
               <View style={styles.contentWrap}>
                 <View style={styles.titleRow}>
                   <Text
@@ -317,17 +322,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  headerCenter: {
+
+  // ── Header ───────────────────────────────────────────────
+  header: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0ECE4',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  titleWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
   headerTitle: {
-    fontSize: 20,
+    ...FONTS.titleXl,
+    fontSize: 22,
     fontWeight: '800',
-    color: '#473018',
-    letterSpacing: -0.3,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: COLORS.brown,
   },
   unreadBadge: {
     backgroundColor: '#C23E3E',
@@ -343,49 +362,44 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   markReadText: {
+    ...FONTS.button,
     fontSize: 13,
-    fontWeight: '600',
-    color: '#2E7A99',
+    fontWeight: '700',
+    color: COLORS.primaryDeep,
   },
 
   // Filter Row
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E8DFC8',
     gap: 8,
+    paddingTop: 2,
   },
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#FAF5E8',
-    borderWidth: 1,
-    borderColor: '#E8DFC8',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: SIZES.r20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: COLORS.borderLight || '#E8DFC8',
   },
   filterChipActive: {
-    backgroundColor: '#2E7A99',
-    borderColor: '#2E7A99',
+    backgroundColor: COLORS.primaryLight,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
   },
   filterChipText: {
+    ...FONTS.subheading,
     fontSize: 12.5,
     fontWeight: '600',
-    color: '#685038',
+    color: COLORS.textMuted,
   },
   filterChipTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
+    fontWeight: '800',
+    color: COLORS.primaryDeep,
   },
   chipBadge: {
     marginLeft: 6,
@@ -394,7 +408,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   chipBadgeActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: COLORS.primaryDeep,
   },
   chipBadgeInactive: {
     backgroundColor: '#E8DFC8',
@@ -414,6 +428,7 @@ const styles = StyleSheet.create({
   listContent: {
     flexGrow: 1,
     paddingBottom: 32,
+    backgroundColor: '#FFFFFF',
   },
   sectionHeader: {
     paddingHorizontal: 16,
@@ -428,7 +443,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
 
-  // Continuous Row Items (Clean & Professional, No Heavy Box Cards)
   rowItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -454,7 +468,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#2E7A99',
   },
 
-  // Icon Badge
   iconContainer: {
     width: 36,
     height: 36,
@@ -465,7 +478,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Content Details
   contentWrap: {
     flex: 1,
   },
@@ -514,7 +526,6 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
 
-  // Empty State (Professional & Subtle)
   emptyState: {
     flex: 1,
     alignItems: 'center',
