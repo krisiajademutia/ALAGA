@@ -255,7 +255,7 @@ export async function notifyPhoneSystem({ title, body, data = {}, channelId = 'r
 }
 
 /**
- * Trigger high-priority phone notification when a rescue alert is within 5km
+ * Trigger high-priority phone notification when a rescue alert is within 50km
  */
 export async function notifyNearbyRescueAlert({ report, distanceKm }) {
   const distStr =

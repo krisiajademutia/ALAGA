@@ -112,6 +112,7 @@ const defaultContext = {
   pushNotification: () => {},
   getAdvocateRescuedCases: () => [],
   getOpenAlertsCount: () => 0,
+  markAlertsAsViewed: () => {},
   showInAppNotification: () => {},
   hideInAppNotification: () => {},
   showAlert: () => {},
@@ -130,6 +131,7 @@ export function AppProvider({ children }) {
   const [donations, setDonations] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [inAppBanner, setInAppBanner] = useState(null);
+  const [lastViewedAlertsTime, setLastViewedAlertsTime] = useState(null);
 
   const isInitialRescuesLoad = useRef(true);
   const currentUserRef = useRef(currentUser);
@@ -223,7 +225,18 @@ export function AppProvider({ children }) {
   };
 
   const getOpenAlertsCount = () =>
-    rescueReports.filter((r) => r.status === 'Open').length;
+    rescueReports.filter((r) => {
+      if (r.status !== 'Open') return false;
+      if (lastViewedAlertsTime) {
+        const rTime = r.createdAt ? new Date(r.createdAt).getTime() : 0;
+        if (rTime <= lastViewedAlertsTime) return false;
+      }
+      return true;
+    }).length;
+
+  const markAlertsAsViewed = () => {
+    setLastViewedAlertsTime(Date.now());
+  };
 
   const pushNotification = (notifData) => {
     const notifId = notifData.id || `n${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
@@ -297,6 +310,12 @@ export function AppProvider({ children }) {
         distance = getDistanceInKm(uLat, uLng, rLat, rLng);
         if (distance !== null) {
           distStr = distance < 1 ? ` (${Math.round(distance * 1000)}m away)` : ` (${distance.toFixed(1)} km away)`;
+          
+          // DO NOT NOTIFY if the rescue report is further than 50km away
+          if (distance > 50) {
+            console.log(`[AppContext] Suppressing notification: rescue alert is ${distance.toFixed(1)}km away (limit is 50km)`);
+            return;
+          }
         }
       }
     }
@@ -1773,6 +1792,7 @@ export function AppProvider({ children }) {
         getAdvocateRescuedCases,
         // alerts badge and top notifications
         getOpenAlertsCount,
+        markAlertsAsViewed,
         showInAppNotification,
         hideInAppNotification,
         // global themed alert

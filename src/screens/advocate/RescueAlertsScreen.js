@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
@@ -20,9 +21,17 @@ import EmptyState from '../../components/EmptyState';
 const FILTERS = ['Open', 'Responded', 'Rescued', 'All'];
 
 export default function RescueAlertsScreen({ navigation }) {
-  const { rescueReports } = useApp();
+  const { rescueReports, markAlertsAsViewed } = useApp();
   const [filter, setFilter] = useState('Open');
   const [searchQuery, setSearchQuery] = useState('');
+
+  useFocusEffect(
+    useCallback(() => {
+      if (markAlertsAsViewed) {
+        markAlertsAsViewed();
+      }
+    }, [markAlertsAsViewed])
+  );
 
   const filtered = rescueReports.filter((r) => {
     if (filter !== 'All' && r.status !== filter) return false;
