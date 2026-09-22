@@ -212,7 +212,7 @@ export default function ProfileScreen({ route, navigation }) {
         {
           label: 'Requests',
           value: getAdvocateRequests().length,
-          onPress: () => navigation.navigate('AdvocateRequests'),
+          onPress: () => navigation.navigate('Activity', { tab: 'requests' }),
         },
       ]
     : [
@@ -281,7 +281,8 @@ export default function ProfileScreen({ route, navigation }) {
             icon: 'heart-outline',
             label: 'Adoption & Foster Requests',
             desc: 'Review, approve & coordinate pet requests',
-            screen: 'AdvocateRequests',
+            screen: 'Activity',
+            params: { tab: 'requests' },
             color: '#B45309',
             bg: '#FEF3DC',
           },

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -105,6 +106,10 @@ export default function NotificationScreen({ navigation }) {
 
     if (item.navTarget?.screen) {
       navigation.navigate(item.navTarget.screen, item.navTarget.params || {});
+    } else if (item.type === 'donation' || item.donationId) {
+      navigation.navigate('Activity', { tab: 'donations' });
+    } else if (item.type === 'adoption' || item.requestId) {
+      navigation.navigate('Activity', { tab: 'requests' });
     } else if (item.reportId) {
       navigation.navigate(
         currentUser?.role === 'advocate' ? 'RescueAlertDetail' : 'ReportDetail',
@@ -278,6 +283,26 @@ export default function NotificationScreen({ navigation }) {
                 <Text style={styles.bodyText} numberOfLines={2}>
                   {item.body || item.message || ''}
                 </Text>
+
+                {item.type === 'donation' && item.animalPhoto ? (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      if (item.animalId) {
+                        markNotificationRead(item.id);
+                        navigation.navigate('AnimalDetail', { animalId: item.animalId });
+                      }
+                    }}
+                    style={styles.animalThumbRow}
+                  >
+                    <Image
+                      source={{ uri: item.animalPhoto }}
+                      style={styles.animalThumb}
+                      resizeMode="cover"
+                    />
+                    <Text style={styles.animalThumbLabel}>View animal profile →</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </TouchableOpacity>
           );
@@ -469,6 +494,24 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     color: '#685038',
     lineHeight: 17,
+  },
+  animalThumbRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 8,
+  },
+  animalThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#E8DEC5',
+  },
+  animalThumbLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2E7A99',
+    textDecorationLine: 'underline',
   },
 
   // Empty State (Professional & Subtle)

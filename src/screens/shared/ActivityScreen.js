@@ -38,6 +38,7 @@ export default function ActivityScreen({ route, navigation }) {
     getUserRequests, getAdvocateRequests,
     getAdvocateAnimals, getUserDonations,
     getAdvocateDonations, verifyDonation,
+    updateRequestStatus,
     showAlert,
     animals,
   } = useApp();
@@ -330,8 +331,31 @@ export default function ActivityScreen({ route, navigation }) {
                   ) : null}
                 </View>
 
+                {isAdvocate && selectedRequest.status === 'Pending' ? (
+                  <View style={styles.modalActionRow}>
+                    <TouchableOpacity
+                      style={styles.modalRejectBtn}
+                      onPress={() => {
+                        updateRequestStatus(selectedRequest.id, 'Rejected');
+                        setSelectedRequest(null);
+                      }}
+                    >
+                      <Text style={styles.modalRejectBtnText}>Reject</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.modalApproveBtn}
+                      onPress={() => {
+                        updateRequestStatus(selectedRequest.id, 'Approved');
+                        setSelectedRequest(null);
+                      }}
+                    >
+                      <Text style={styles.modalApproveBtnText}>Approve</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+
                 <TouchableOpacity
-                  style={styles.doneBtn}
+                  style={[styles.doneBtn, isAdvocate && selectedRequest.status === 'Pending' && { marginTop: 12 }]}
                   onPress={() => setSelectedRequest(null)}
                 >
                   <Text style={styles.doneBtnText}>Close</Text>
@@ -885,6 +909,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  modalApproveBtn: {
+    flex: 1,
+    backgroundColor: '#306B4D',
+    paddingVertical: 12,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  modalApproveBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  modalRejectBtn: {
+    flex: 1,
+    backgroundColor: '#FCE8E8',
+    paddingVertical: 12,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  modalRejectBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#D94F4F',
   },
 
   receiptModalOverlay: {
