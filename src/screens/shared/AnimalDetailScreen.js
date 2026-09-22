@@ -404,7 +404,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
           {isOwner && animal.status !== 'Adopted' && (
             <TouchableOpacity
               style={[styles.donateBanner, { backgroundColor: '#EBF4FF', borderColor: '#90CDF4' }]}
-              onPress={() => navigation.navigate('Profile', { openPayoutModal: true })}
+              onPress={() => navigation.navigate('MainTabs', { screen: 'Profile', params: { openPayoutModal: true } })}
             >
               <Ionicons name="card-outline" size={18} color="#007DFE" />
               <Text style={[styles.donateBannerText, { color: '#0D3B66' }]}>

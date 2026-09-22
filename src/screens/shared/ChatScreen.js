@@ -17,15 +17,15 @@ import {
   Linking,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useApp } from '../../context/AppContext';
 import { subscribeToMessages } from '../../services/chatService';
-import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
+import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import Avatar from '../../components/Avatar';
-import Header from '../../components/Header';
 
 const QUICK_PROMPTS = [
   { icon: 'paw-outline', text: 'How is the animal doing right now?' },
@@ -69,7 +69,14 @@ export default function ChatScreen({ route, navigation }) {
   const flatRef = useRef(null);
   const inputRef = useRef(null);
 
-  // ── Subscribe to messages subcollection (Gap 1 fix) ───────────────────────
+  const insets = useSafeAreaInsets();
+  const safeTopPadding =
+    Platform.OS === 'ios'
+      ? Math.max(insets.top, 16) + 4
+      : insets.top > 24
+        ? insets.top + 6
+        : 14;
+
   useEffect(() => {
     if (!conversationId) return;
     const unsub = subscribeToMessages(
@@ -84,7 +91,6 @@ export default function ChatScreen({ route, navigation }) {
     return () => unsub?.();
   }, [conversationId]);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 80);
@@ -101,37 +107,32 @@ export default function ChatScreen({ route, navigation }) {
     (detectedOtherId && convo?.participantAvatars?.[detectedOtherId]) ||
     (otherId && convo?.participantAvatars?.[otherId]) ||
     null;
-  // For groups, use the stored groupName; for 1-on-1 use other person's name
   const groupName = convo?.groupName || resolvedOtherName || 'Group Chat';
   const groupPhoto = editGroupPhoto || convo?.groupPhoto || null;
   const name = isGroup
     ? groupName
     : (resolvedOtherName ||
-        (detectedOtherId && convo?.participantNames?.[detectedOtherId]) ||
-        (convo?.participant1 === currentUser?.id ? convo?.participant2Name : convo?.participant1Name) ||
-        'Chat');
+      (detectedOtherId && convo?.participantNames?.[detectedOtherId]) ||
+      (convo?.participant1 === currentUser?.id ? convo?.participant2Name : convo?.participant1Name) ||
+      'Chat');
 
-  // Build member list for group chats
   const groupMembers = isGroup && convo?.participants
     ? convo.participants.map((pid) => ({
-        id: pid,
-        name: convo.participantNames?.[pid] || 'Member',
-        avatar: convo.participantAvatars?.[pid] || null,
-        isMe: pid === currentUser?.id,
-      }))
+      id: pid,
+      name: convo.participantNames?.[pid] || 'Member',
+      avatar: convo.participantAvatars?.[pid] || null,
+      isMe: pid === currentUser?.id,
+    }))
     : [];
 
-  // All images/videos sent in this conversation (for media gallery)
   const mediaMessages = messages.filter((m) => m.type === 'image' || m.type === 'video');
 
-  // All known users NOT already in this group (for Add Members picker)
   const nonMembers = isGroup
     ? (getAllKnownUsers?.() || []).filter(
-        (u) => u.id !== currentUser?.id && !(convo?.participants || []).includes(u.id)
-      )
+      (u) => u.id !== currentUser?.id && !(convo?.participants || []).includes(u.id)
+    )
     : [];
 
-  // Register active conversation for auto-read and heads-up notification suppression while actively in chat
   useEffect(() => {
     if (setActiveConversationId && conversationId) {
       setActiveConversationId(conversationId);
@@ -141,21 +142,18 @@ export default function ChatScreen({ route, navigation }) {
     }
   }, [conversationId, setActiveConversationId]);
 
-  // Mark conversation read on mount / view
   useEffect(() => {
     if (convo?.id && markConversationRead) {
       markConversationRead(convo.id);
     }
   }, [convo?.id, messages?.length]);
 
-  // If initial draft is provided, focus the input
   useEffect(() => {
     if (initialDraft) {
       setTimeout(() => inputRef.current?.focus(), 300);
     }
   }, [initialDraft]);
 
-  // Auto-send a report_link card as the first message so BOTH users see which report this chat is about
   const reportLinkAutoSentRef = useRef(false);
   useEffect(() => {
     if (
@@ -163,8 +161,6 @@ export default function ChatScreen({ route, navigation }) {
       !convo?.id ||
       reportLinkAutoSentRef.current
     ) return;
-    // Only send once, and only when there are no existing messages AND
-    // no existing report_link card for this report already exists in the thread
     const alreadySent = messages.some(
       (m) => m.type === 'report_link' && m.reportId === linkedReport.id
     );
@@ -192,18 +188,11 @@ export default function ChatScreen({ route, navigation }) {
     setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
-  const handleQuickReply = (msg) => {
-    if (!convo) return;
-    sendMessage(convo.id, { text: msg, type: 'text' });
-    setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
-  };
-
   const handleSelectPrompt = (promptText) => {
     setText(promptText);
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 
-  // ── Media & Location Handlers ──────────────────────────────
   const handlePickImage = async () => {
     setAttachModalVisible(false);
     try {
@@ -339,9 +328,7 @@ export default function ChatScreen({ route, navigation }) {
           ].filter(Boolean);
           if (parts.length > 0) address = parts.join(', ');
         }
-      } catch (e) {
-        // use coordinate string fallback
-      }
+      } catch (e) { }
 
       if (convo?.id) {
         sendMessage(convo.id, {
@@ -431,7 +418,7 @@ export default function ChatScreen({ route, navigation }) {
       if (!result.canceled && result.assets?.[0]?.uri) {
         setEditGroupPhoto(result.assets[0].uri);
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) { }
   };
 
   const handleSaveGroupInfo = () => {
@@ -465,12 +452,10 @@ export default function ChatScreen({ route, navigation }) {
     });
   };
 
-  // Render empty state with friendly intro and quick chips
   const renderEmptyState = () => {
     if (isGroup) {
       return (
         <View style={styles.emptyContainer}>
-          {/* Group Photo */}
           <TouchableOpacity
             style={styles.groupEmptyAvatarWrap}
             onPress={() => { setEditGroupName(groupName); setEditGroupPhoto(convo?.groupPhoto || null); setGroupInfoVisible(true); }}
@@ -479,8 +464,8 @@ export default function ChatScreen({ route, navigation }) {
             {groupPhoto
               ? <Image source={{ uri: groupPhoto }} style={styles.groupEmptyAvatar} />
               : <View style={styles.groupEmptyAvatarPlaceholder}>
-                  <Ionicons name="people" size={36} color="#2E7A99" />
-                </View>
+                <Ionicons name="people" size={36} color="#2E7A99" />
+              </View>
             }
             <View style={styles.groupEmptyCameraBtn}>
               <Ionicons name="camera" size={14} color="#FFFFFF" />
@@ -494,7 +479,6 @@ export default function ChatScreen({ route, navigation }) {
           </View>
           <Text style={styles.emptyNote}>This is the beginning of your group chat. Say hi!</Text>
 
-          {/* Members */}
           <View style={styles.membersSection}>
             <Text style={styles.membersSectionTitle}>Members</Text>
             {groupMembers.map((m) => (
@@ -520,7 +504,6 @@ export default function ChatScreen({ route, navigation }) {
         <Text style={styles.emptyNote}>
           This is the start of your private 1-on-1 chat with {name}. Send a message, animal photo, video, or location pin to coordinate!
         </Text>
-        {/* Suggested Quick Prompts */}
         <View style={styles.promptsSection}>
           <Text style={styles.promptsHeader}>Suggested quick messages:</Text>
           <View style={styles.promptsWrap}>
@@ -548,61 +531,55 @@ export default function ChatScreen({ route, navigation }) {
     >
       <StatusBar style="dark" />
 
-      {/* ── Top Header ────────────────────────────────────────── */}
-      <Header
-        onBack={() => navigation.goBack()}
-        centerComponent={
-          <TouchableOpacity
-            style={styles.navCenter}
-            onPress={() => {
-              if (isGroup) {
-                setEditGroupName(groupName);
-                setEditGroupPhoto(convo?.groupPhoto || null);
-                setGroupInfoVisible(true);
-              } else if (otherId) {
-                navigation.navigate('PublicProfile', { userId: otherId, userName: name, userAvatar: otherAvatar });
-              }
-            }}
-            activeOpacity={0.75}
-          >
-            <View style={styles.navAvatarWrap}>
+      {/* ── Standardized Clean Header (No Back Button) ──────── */}
+      <View style={[styles.headerWrap, { paddingTop: safeTopPadding }]}>
+        <TouchableOpacity
+          style={styles.navCenter}
+          onPress={() => {
+            if (isGroup) {
+              setEditGroupName(groupName);
+              setEditGroupPhoto(convo?.groupPhoto || null);
+              setGroupInfoVisible(true);
+            } else if (otherId) {
+              navigation.navigate('PublicProfile', { userId: otherId, userName: name, userAvatar: otherAvatar });
+            }
+          }}
+          activeOpacity={0.75}
+        >
+          <View style={styles.navAvatarWrap}>
+            {isGroup
+              ? (groupPhoto
+                ? <Image source={{ uri: groupPhoto }} style={styles.navGroupAvatar} />
+                : <View style={styles.navGroupAvatarPlaceholder}>
+                  <Ionicons name="people" size={20} color="#2E7A99" />
+                </View>
+              )
+              : <Avatar name={name} userId={otherId} uri={otherAvatar} size={42} />
+            }
+          </View>
+          <View style={styles.navTextWrap}>
+            <Text style={styles.navName} numberOfLines={1}>{name}</Text>
+            <View style={styles.navSubRow}>
               {isGroup
-                ? (groupPhoto
-                    ? <Image source={{ uri: groupPhoto }} style={styles.navGroupAvatar} />
-                    : <View style={styles.navGroupAvatarPlaceholder}>
-                        <Ionicons name="people" size={20} color="#2E7A99" />
-                      </View>
-                  )
-                : <Avatar name={name} userId={otherId} uri={otherAvatar} size={38} />
+                ? <><Ionicons name="people" size={11} color="#2E7A99" style={{ marginRight: 3 }} />
+                  <Text style={styles.navSub}>{groupMembers.length} members</Text></>
+                : <><Ionicons name="paw" size={11} color="#2E7A99" style={{ marginRight: 3 }} />
+                  <Text style={styles.navSub}>ALAGA Direct Chat</Text></>
               }
             </View>
-            <View style={styles.navTextWrap}>
-              <Text style={styles.navName} numberOfLines={1}>{name}</Text>
-              <View style={styles.navSubRow}>
-                {isGroup
-                  ? <><Ionicons name="people" size={11} color="#2E7A99" style={{ marginRight: 3 }} />
-                      <Text style={styles.navSub}>{groupMembers.length} members</Text></>
-                  : <><Ionicons name="paw" size={11} color="#2E7A99" style={{ marginRight: 3 }} />
-                      <Text style={styles.navSub}>ALAGA Direct Chat</Text></>
-                }
-              </View>
-            </View>
-          </TouchableOpacity>
-        }
-        rightComponent={
-          <TouchableOpacity
-            style={styles.menuBtn}
-            onPress={handleOpenMenu}
-            activeOpacity={0.8}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="ellipsis-vertical" size={18} color="#473018" />
-          </TouchableOpacity>
-        }
-      />
-      {/* Linked report banner removed — the report link is now sent as a message card visible to both users */}
+          </View>
+        </TouchableOpacity>
 
-      {/* ── Locating Status Banner ────────────────────────────── */}
+        <TouchableOpacity
+          style={styles.menuBtn}
+          onPress={handleOpenMenu}
+          activeOpacity={0.8}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="ellipsis-vertical" size={18} color={COLORS.brown} />
+        </TouchableOpacity>
+      </View>
+
       {isLocating && (
         <View style={styles.locatingBanner}>
           <ActivityIndicator size="small" color="#2E7A99" />
@@ -675,155 +652,150 @@ export default function ChatScreen({ route, navigation }) {
                     item.type === 'report_link' && { backgroundColor: 'transparent', padding: 0, shadowOpacity: 0, elevation: 0 },
                   ]}
                 >
-                {/* ── Image Message ────────────────────────── */}
-                {item.type === 'image' && (
-                  <TouchableOpacity
-                    onPress={() => setPreviewImage(item.mediaUri)}
-                    activeOpacity={0.9}
-                  >
-                    <Image
-                      source={{ uri: item.mediaUri }}
-                      style={styles.msgImage}
-                      resizeMode="cover"
-                    />
-                    {Boolean(item.text) && (
-                      <Text
-                        style={[
-                          styles.bubbleText,
-                          isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
-                          { marginTop: 6, marginHorizontal: 4 },
-                        ]}
-                      >
-                        {item.text}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                )}
-
-                {/* ── Video Message ────────────────────────── */}
-                {item.type === 'video' && (
-                  <TouchableOpacity
-                    style={styles.msgVideoCard}
-                    onPress={() => setActiveVideo(item.mediaUri)}
-                    activeOpacity={0.88}
-                  >
-                    <View style={styles.videoThumbnailPlaceholder}>
-                      <View style={styles.playButtonCircle}>
-                        <Ionicons name="play" size={26} color="#FFFFFF" style={{ marginLeft: 3 }} />
-                      </View>
-                      <View style={styles.videoBadge}>
-                        <Ionicons name="videocam" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
-                        <Text style={styles.videoBadgeText}>
-                          {item.duration ? `${Math.round(item.duration)}s` : 'Video Clip'}
-                        </Text>
-                      </View>
-                    </View>
-                    {Boolean(item.text) && (
-                      <Text
-                        style={[
-                          styles.bubbleText,
-                          isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
-                          { marginTop: 6, marginHorizontal: 4 },
-                        ]}
-                      >
-                        {item.text}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                )}
-
-                {/* ── Location Message ──────────────────────── */}
-                {item.type === 'location' && (
-                  <View style={styles.msgLocationCard}>
-                    <View style={styles.locationHeaderRow}>
-                      <View style={styles.locationIconBadge}>
-                        <Ionicons name="location" size={20} color="#2E7A99" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.locationTitle}>Rescue Location</Text>
-                        <Text style={styles.locationAddr} numberOfLines={2}>
-                          {item.location?.address || 'Pinned GPS Position'}
-                        </Text>
-                        {item.location?.latitude && (
-                          <Text style={styles.locationCoords}>
-                            {item.location.latitude.toFixed(5)}, {item.location.longitude.toFixed(5)}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
+                  {item.type === 'image' && (
                     <TouchableOpacity
-                      style={styles.openMapBtn}
-                      onPress={() => openExternalLocation(item.location)}
-                      activeOpacity={0.85}
+                      onPress={() => setPreviewImage(item.mediaUri)}
+                      activeOpacity={0.9}
                     >
-                      <Ionicons name="navigate" size={14} color="#FFFFFF" />
-                      <Text style={styles.openMapBtnText}>Open in Maps</Text>
+                      <Image
+                        source={{ uri: item.mediaUri }}
+                        style={styles.msgImage}
+                        resizeMode="cover"
+                      />
+                      {Boolean(item.text) && (
+                        <Text
+                          style={[
+                            styles.bubbleText,
+                            isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
+                            { marginTop: 6, marginHorizontal: 4 },
+                          ]}
+                        >
+                          {item.text}
+                        </Text>
+                      )}
                     </TouchableOpacity>
-                  </View>
-                )}
+                  )}
 
-                {/* ── Report Link Card ──────────────────────── */}
-                {item.type === 'report_link' && (
-                  <TouchableOpacity
-                    style={styles.reportLinkCard}
-                    onPress={() =>
-                      navigation.navigate(
-                        currentUser?.role === 'advocate' ? 'RescueAlertDetail' : 'ReportDetail',
-                        { reportId: item.reportId || item.reportId }
-                      )
-                    }
-                    activeOpacity={0.82}
-                  >
-                    <View style={styles.reportLinkHeader}>
-                      <Ionicons name="alert-circle" size={18} color="#2E7A99" style={{ marginRight: 6 }} />
-                      <Text style={styles.reportLinkTitle} numberOfLines={1}>
-                        Rescue Report Linked
-                      </Text>
+                  {item.type === 'video' && (
+                    <TouchableOpacity
+                      style={styles.msgVideoCard}
+                      onPress={() => setActiveVideo(item.mediaUri)}
+                      activeOpacity={0.88}
+                    >
+                      <View style={styles.videoThumbnailPlaceholder}>
+                        <View style={styles.playButtonCircle}>
+                          <Ionicons name="play" size={26} color="#FFFFFF" style={{ marginLeft: 3 }} />
+                        </View>
+                        <View style={styles.videoBadge}>
+                          <Ionicons name="videocam" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+                          <Text style={styles.videoBadgeText}>
+                            {item.duration ? `${Math.round(item.duration)}s` : 'Video Clip'}
+                          </Text>
+                        </View>
+                      </View>
+                      {Boolean(item.text) && (
+                        <Text
+                          style={[
+                            styles.bubbleText,
+                            isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
+                            { marginTop: 6, marginHorizontal: 4 },
+                          ]}
+                        >
+                          {item.text}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+
+                  {item.type === 'location' && (
+                    <View style={styles.msgLocationCard}>
+                      <View style={styles.locationHeaderRow}>
+                        <View style={styles.locationIconBadge}>
+                          <Ionicons name="location" size={20} color="#2E7A99" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.locationTitle}>Rescue Location</Text>
+                          <Text style={styles.locationAddr} numberOfLines={2}>
+                            {item.location?.address || 'Pinned GPS Position'}
+                          </Text>
+                          {item.location?.latitude && (
+                            <Text style={styles.locationCoords}>
+                              {item.location.latitude.toFixed(5)}, {item.location.longitude.toFixed(5)}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.openMapBtn}
+                        onPress={() => openExternalLocation(item.location)}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="navigate" size={14} color="#FFFFFF" />
+                        <Text style={styles.openMapBtnText}>Open in Maps</Text>
+                      </TouchableOpacity>
                     </View>
-                    <Text style={styles.reportLinkAnimal}>
-                      {item.animalType || 'Animal'} · {item.condition || 'Rescue'}
-                    </Text>
-                    {Boolean(item.address) && (
-                      <Text style={styles.reportLinkAddr} numberOfLines={2}>
-                        📍 {item.address}
-                      </Text>
-                    )}
-                    <View style={styles.reportLinkFooter}>
-                      <View style={[styles.reportLinkStatusBadge, item.status === 'Rescued' && { backgroundColor: '#D1FAE5' }, item.status === 'Responded' && { backgroundColor: '#FEF3E2' }]}>
-                        <Text style={[styles.reportLinkStatusText, item.status === 'Rescued' && { color: '#065F46' }, item.status === 'Responded' && { color: '#92400E' }]}>
-                          {item.status || 'Open'}
+                  )}
+
+                  {item.type === 'report_link' && (
+                    <TouchableOpacity
+                      style={styles.reportLinkCard}
+                      onPress={() =>
+                        navigation.navigate(
+                          currentUser?.role === 'advocate' ? 'RescueAlertDetail' : 'ReportDetail',
+                          { reportId: item.reportId || item.reportId }
+                        )
+                      }
+                      activeOpacity={0.82}
+                    >
+                      <View style={styles.reportLinkHeader}>
+                        <Ionicons name="alert-circle" size={18} color="#2E7A99" style={{ marginRight: 6 }} />
+                        <Text style={styles.reportLinkTitle} numberOfLines={1}>
+                          Rescue Report Linked
                         </Text>
                       </View>
-                      <Text style={styles.reportLinkTap}>Tap to view →</Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
-
-                {/* ── Standard Text Message ─────────────────── */}
-                {(!item.type || item.type === 'text') && (
-                  <Text
-                    style={[
-                      styles.bubbleText,
-                      isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
-                    ]}
-                  >
-                    {item.text}
-                  </Text>
-                )}
-
-                <View style={styles.timeRow}>
-                  <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>
-                    {formatMessageTime(item.time)}
-                  </Text>
-                  {isMine && (
-                    <Ionicons
-                      name="checkmark-done"
-                      size={13}
-                      color="#A4E6FA"
-                      style={{ marginLeft: 4 }}
-                    />
+                      <Text style={styles.reportLinkAnimal}>
+                        {item.animalType || 'Animal'} · {item.condition || 'Rescue'}
+                      </Text>
+                      {Boolean(item.address) && (
+                        <Text style={styles.reportLinkAddr} numberOfLines={2}>
+                          📍 {item.address}
+                        </Text>
+                      )}
+                      <View style={styles.reportLinkFooter}>
+                        <View style={[styles.reportLinkStatusBadge, item.status === 'Rescued' && { backgroundColor: '#D1FAE5' }, item.status === 'Responded' && { backgroundColor: '#FEF3E2' }]}>
+                          <Text style={[styles.reportLinkStatusText, item.status === 'Rescued' && { color: '#065F46' }, item.status === 'Responded' && { color: '#92400E' }]}>
+                            {item.status || 'Open'}
+                          </Text>
+                        </View>
+                        <Text style={styles.reportLinkTap}>Tap to view →</Text>
+                      </View>
+                    </TouchableOpacity>
                   )}
-                </View>
+
+                  {(!item.type || item.type === 'text') && (
+                    <Text
+                      style={[
+                        styles.bubbleText,
+                        isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
+                      ]}
+                    >
+                      {item.text}
+                    </Text>
+                  )}
+
+                  <View style={styles.timeRow}>
+                    <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>
+                      {formatMessageTime(item.time)}
+                    </Text>
+                    {isMine && (
+                      <Ionicons
+                        name="checkmark-done"
+                        size={13}
+                        color="#A4E6FA"
+                        style={{ marginLeft: 4 }}
+                      />
+                    )}
+                  </View>
                 </View>
               </View>
             </View>
@@ -833,7 +805,6 @@ export default function ChatScreen({ route, navigation }) {
 
       {/* ── Input Bar ─────────────────────────────────────────── */}
       <View style={styles.inputBar}>
-        {/* Attachment Plus Button */}
         <TouchableOpacity
           style={styles.attachBtn}
           onPress={() => setAttachModalVisible(true)}
@@ -842,7 +813,6 @@ export default function ChatScreen({ route, navigation }) {
           <Ionicons name="add" size={22} color="#2E7A99" />
         </TouchableOpacity>
 
-        {/* Quick Paw Prompt */}
         <TouchableOpacity
           style={styles.quickActionBtn}
           onPress={() => handleSelectPrompt('🐾 Hi! Can you provide an update on the animal?')}
@@ -991,7 +961,6 @@ export default function ChatScreen({ route, navigation }) {
         onRequestClose={() => setGroupInfoVisible(false)}
       >
         <SafeAreaView style={styles.groupInfoContainer}>
-          {/* Header */}
           <View style={styles.groupInfoHeader}>
             <TouchableOpacity
               style={styles.groupInfoCloseBtn}
@@ -1009,7 +978,6 @@ export default function ChatScreen({ route, navigation }) {
           </View>
 
           <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-            {/* Group Photo */}
             <View style={styles.groupInfoPhotoSection}>
               <TouchableOpacity
                 style={styles.groupInfoAvatarWrap}
@@ -1019,8 +987,8 @@ export default function ChatScreen({ route, navigation }) {
                 {editGroupPhoto
                   ? <Image source={{ uri: editGroupPhoto }} style={styles.groupInfoAvatar} />
                   : <View style={styles.groupInfoAvatarPlaceholder}>
-                      <Ionicons name="people" size={42} color="#2E7A99" />
-                    </View>
+                    <Ionicons name="people" size={42} color="#2E7A99" />
+                  </View>
                 }
                 <View style={styles.groupInfoCameraBtn}>
                   <Ionicons name="camera" size={16} color="#FFFFFF" />
@@ -1029,7 +997,6 @@ export default function ChatScreen({ route, navigation }) {
               <Text style={styles.groupInfoPhotoHint}>Tap to change group photo</Text>
             </View>
 
-            {/* Group Name */}
             <View style={styles.groupInfoFieldSection}>
               <Text style={styles.groupInfoFieldLabel}>GROUP NAME</Text>
               <View style={styles.groupInfoNameWrap}>
@@ -1045,7 +1012,6 @@ export default function ChatScreen({ route, navigation }) {
               </View>
             </View>
 
-            {/* Members */}
             <View style={styles.groupInfoFieldSection}>
               <View style={styles.groupInfoSectionHeader}>
                 <Text style={styles.groupInfoFieldLabel}>
@@ -1073,7 +1039,6 @@ export default function ChatScreen({ route, navigation }) {
               ))}
             </View>
 
-            {/* Media Gallery */}
             {mediaMessages.length > 0 && (
               <View style={styles.groupInfoFieldSection}>
                 <View style={styles.groupInfoSectionHeader}>
@@ -1087,7 +1052,6 @@ export default function ChatScreen({ route, navigation }) {
                     <Text style={styles.seeAllTxt}>See all</Text>
                   </TouchableOpacity>
                 </View>
-                {/* Preview grid — first 6 */}
                 <View style={styles.mediaPreviewGrid}>
                   {mediaMessages.slice(0, 6).map((m, i) => (
                     <TouchableOpacity
@@ -1111,7 +1075,6 @@ export default function ChatScreen({ route, navigation }) {
               </View>
             )}
 
-            {/* Danger Zone */}
             <TouchableOpacity
               style={styles.groupInfoDangerBtn}
               activeOpacity={0.8}
@@ -1166,7 +1129,6 @@ export default function ChatScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
 
-          {/* Search bar */}
           <View style={styles.memberSearchWrap}>
             <Ionicons name="search" size={16} color="#8C7D6A" style={{ marginRight: 8 }} />
             <TextInput
@@ -1255,7 +1217,6 @@ export default function ChatScreen({ route, navigation }) {
             <View style={{ width: 36 }} />
           </View>
 
-          {/* Full image preview */}
           {galleryPreview ? (
             <View style={styles.galleryFullPreview}>
               <Image
@@ -1381,29 +1342,39 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
 
-  // Header Center & Right
+  // ── Standardized Clean Header ─────────────────────────────
+  headerWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0ECE4',
+  },
   navCenter: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     flex: 1,
     paddingRight: 8,
   },
   navAvatarWrap: {
     borderWidth: 1.5,
     borderColor: '#E8DFC8',
-    borderRadius: 22,
+    borderRadius: 24,
     padding: 1,
   },
   navGroupAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
   },
   navGroupAvatarPlaceholder: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#EBF7FA',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1414,10 +1385,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   navName: {
-    fontSize: 15,
+    ...FONTS.titleMd,
+    fontSize: 17,
     fontWeight: '800',
-    color: '#473018',
-    fontFamily: 'PlusJakartaSans_700Bold',
+    color: COLORS.brown,
   },
   navSubRow: {
     flexDirection: 'row',
@@ -1425,18 +1396,17 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   navSub: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#685038',
     fontWeight: '600',
-    fontFamily: 'PlusJakartaSans_500Medium',
   },
   menuBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E8DFC8',
+    borderWidth: 1.5,
+    borderColor: COLORS.secondary,
     alignItems: 'center',
     justifyContent: 'center',
     ...SHADOWS.sm,
@@ -1545,6 +1515,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     paddingBottom: 20,
+    backgroundColor: '#FFFFFF',
   },
   datePillWrap: {
     alignItems: 'center',
@@ -1596,10 +1567,8 @@ const styles = StyleSheet.create({
     color: '#2E7A99',
     marginBottom: 3,
     marginLeft: 4,
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
-  // \u2500\u2500 Group Empty State \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   groupEmptyAvatarWrap: {
     width: 88,
     height: 88,
@@ -1661,7 +1630,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 8,
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   memberRow: {
     flexDirection: 'row',
@@ -1673,10 +1641,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
   },
 
-  // \u2500\u2500 Group Info Modal \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   groupInfoContainer: {
     flex: 1,
     backgroundColor: '#FFFFFF',
@@ -1703,7 +1669,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   groupInfoSaveBtn: {
     paddingHorizontal: 16,
@@ -1715,7 +1680,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   groupInfoPhotoSection: {
     alignItems: 'center',
@@ -1758,7 +1722,6 @@ const styles = StyleSheet.create({
   groupInfoPhotoHint: {
     fontSize: 12,
     color: '#8C7D6A',
-    fontFamily: 'PlusJakartaSans_500Medium',
   },
   groupInfoFieldSection: {
     marginHorizontal: 16,
@@ -1771,7 +1734,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     marginBottom: 8,
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   groupInfoNameWrap: {
     flexDirection: 'row',
@@ -1787,7 +1749,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_500Medium',
   },
   groupInfoMemberRow: {
     flexDirection: 'row',
@@ -1804,7 +1765,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
   },
   groupInfoMemberYou: {
     fontSize: 11,
@@ -1829,10 +1789,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#C0392B',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
-  // ── Group Info section header (label + action button row) ──────────────
   groupInfoSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1852,16 +1810,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#2E7A99',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   seeAllTxt: {
     fontSize: 12,
     fontWeight: '700',
     color: '#2E7A99',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
-  // ── Media preview grid (inside Group Info modal) ──────────────────────
   mediaPreviewGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1887,7 +1842,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // ── Add Members picker styles ─────────────────────────────────────────
   memberSearchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1905,7 +1859,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_400Regular',
     paddingVertical: 0,
   },
   noMembersWrap: {
@@ -1916,7 +1869,6 @@ const styles = StyleSheet.create({
   noMembersTxt: {
     fontSize: 15,
     color: '#8C7D6A',
-    fontFamily: 'PlusJakartaSans_500Medium',
   },
   addMemberRow: {
     flexDirection: 'row',
@@ -1937,14 +1889,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
   },
   addMemberRole: {
     fontSize: 11,
     color: '#8C7D6A',
     marginTop: 1,
     textTransform: 'capitalize',
-    fontFamily: 'PlusJakartaSans_400Regular',
   },
   checkCircle: {
     width: 26,
@@ -1960,7 +1910,6 @@ const styles = StyleSheet.create({
     borderColor: '#2E7A99',
   },
 
-  // ── Full Media Gallery styles ─────────────────────────────────────────
   galleryContainer: {
     flex: 1,
     backgroundColor: '#FFFFFF',
@@ -2013,7 +1962,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Bubbles
   bubble: {
     paddingHorizontal: 15,
     paddingVertical: 10,
@@ -2070,7 +2018,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
   },
 
-  // Media bubble contents
   msgImage: {
     width: 230,
     height: 180,
@@ -2117,7 +2064,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Location card inside bubble
   msgLocationCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -2169,7 +2115,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // Input Bar
   inputBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2231,7 +2176,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ECE6D8',
   },
 
-  // Attach Sheet Modal
   attachOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
@@ -2288,7 +2232,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Fullscreen Media Modals
   mediaModalContainer: {
     flex: 1,
     backgroundColor: '#000000',
@@ -2327,7 +2270,6 @@ const styles = StyleSheet.create({
     height: '100%',
   },
 
-  // Report Link Card (auto-sent to both users)
   reportLinkCard: {
     backgroundColor: '#EBF7FA',
     borderRadius: 12,

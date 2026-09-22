@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,15 +13,14 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { useApp } from '../../context/AppContext';
-import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
-import Header from '../../components/Header';
+import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import AlertModal from '../../components/AlertModal';
 import PhotoPickerModal from '../../components/PhotoPickerModal';
-import Avatar from '../../components/Avatar';
 import StatusPill from '../../components/StatusPill';
 
 const PRESET_AMOUNTS = ['100', '250', '500', '1,000', '2,500'];
@@ -43,7 +42,6 @@ export default function DonateScreen({ route, navigation }) {
     showAlert,
   } = useApp();
 
-  // Find targeted animal from context or route — every donation is strictly for an animal patient
   const [selectedAnimalId, setSelectedAnimalId] = useState(
     initialAnimalId || (animals.length > 0 ? animals[0].id : null)
   );
@@ -64,7 +62,6 @@ export default function DonateScreen({ route, navigation }) {
   const targetAdvocateId = selectedAnimal?.advocateId || initialAdvocateId || null;
   const isOwner = Boolean(currentUser?.id && targetAdvocateId === currentUser.id);
 
-  // Real Advocate Profile fetched dynamically from Firestore without re-render loop
   const [advocateProfile, setAdvocateProfile] = useState(null);
   const [loadingAdvocate, setLoadingAdvocate] = useState(false);
 
@@ -90,7 +87,6 @@ export default function DonateScreen({ route, navigation }) {
     };
   }, [targetAdvocateId]);
 
-  // Form State
   const [amount, setAmount] = useState('500');
   const [method, setMethod] = useState('');
   const [reference, setReference] = useState('');
@@ -98,7 +94,6 @@ export default function DonateScreen({ route, navigation }) {
   const [proof, setProof] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Modals & Feedback
   const [photoPickerVisible, setPhotoPickerVisible] = useState(false);
   const [recipientModalVisible, setRecipientModalVisible] = useState(false);
   const [qrModalVisible, setQrModalVisible] = useState(false);
@@ -113,7 +108,6 @@ export default function DonateScreen({ route, navigation }) {
     onPrimaryPress: null,
   });
 
-  // Calculate real-time contributions for this specific animal
   const targetDonations = useMemo(() => {
     if (!Array.isArray(donations) || !selectedAnimal) return [];
     return donations.filter(
@@ -127,7 +121,6 @@ export default function DonateScreen({ route, navigation }) {
     return targetDonations.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
   }, [targetDonations]);
 
-  // Stable calculation of real payment methods based on the animal's advocate profile
   const payoutMethodsKey = JSON.stringify(advocateProfile?.payoutMethods);
   const paymentMethods = useMemo(() => {
     const list = [];
@@ -178,7 +171,6 @@ export default function DonateScreen({ route, navigation }) {
       }
     }
 
-    // Always include direct in-person coordination
     list.push({
       id: 'Cash',
       label: 'In-Person / Cash',
@@ -193,7 +185,6 @@ export default function DonateScreen({ route, navigation }) {
     return list;
   }, [advocateProfile?.id, advocateProfile?.name, payoutMethodsKey]);
 
-  // Set default method without causing flicker or infinite loops
   useEffect(() => {
     if (paymentMethods.length > 0) {
       setMethod((currentMethod) => {
@@ -211,13 +202,11 @@ export default function DonateScreen({ route, navigation }) {
     return paymentMethods.some((m) => m.id !== 'Cash');
   }, [paymentMethods]);
 
-  // Clean numeric amount
   const numericAmount = useMemo(() => {
     const clean = String(amount || '').replace(/[^0-9.]/g, '');
     return parseFloat(clean) || 0;
   }, [amount]);
 
-  // Tangible Care Impact description based on amount
   const impactDescription = useMemo(() => {
     if (numericAmount <= 0) return 'Enter an amount to see how your gift directly saves lives.';
     if (numericAmount < 250) {
@@ -235,7 +224,6 @@ export default function DonateScreen({ route, navigation }) {
     return 'Directly finances lifesaving surgery, foster medical boarding, and ongoing physical therapy.';
   }, [numericAmount]);
 
-  // Copy account details to clipboard with haptic feedback
   const handleCopyAccount = async (textToCopy, label) => {
     try {
       await Clipboard.setStringAsync(textToCopy);
@@ -247,7 +235,6 @@ export default function DonateScreen({ route, navigation }) {
     }
   };
 
-  // Proof pickers
   const pickProofCamera = async () => {
     setPhotoPickerVisible(false);
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -282,7 +269,6 @@ export default function DonateScreen({ route, navigation }) {
     }
   };
 
-  // Submit Donation
   const handleSubmit = async () => {
     if (numericAmount <= 0) {
       showAlert({
@@ -340,6 +326,14 @@ export default function DonateScreen({ route, navigation }) {
     }
   };
 
+  const insets = useSafeAreaInsets();
+  const safeTopPadding =
+    Platform.OS === 'ios'
+      ? Math.max(insets.top, 16) + 4
+      : insets.top > 24
+        ? insets.top + 6
+        : 14;
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -347,17 +341,19 @@ export default function DonateScreen({ route, navigation }) {
     >
       <StatusBar style="dark" />
 
-      <Header
-        title="Support Patient Care"
-        onBack={() => navigation.goBack()}
-      />
+      {/* ── Matched Clean Header (Matches Messages Screen Layout) ── */}
+      <View style={[styles.headerWrap, { paddingTop: safeTopPadding }]}>
+        <View style={styles.topRow}>
+          <Text style={styles.headerTitle}>Support Animal Care</Text>
+        </View>
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* ── 1. DE-CONTAINERIZED HERO PATIENT HEADER ─────────────────── */}
+        {/* ── 1. Patient Profile Header ────────────────────────── */}
         <View style={styles.heroSection}>
           <View style={styles.heroRow}>
             {selectedAnimal?.photo || selectedAnimal?.photos?.[0] ? (
@@ -389,8 +385,8 @@ export default function DonateScreen({ route, navigation }) {
                 {advocateProfile?.name
                   ? `Cared for by ${advocateProfile.name}`
                   : selectedAnimal?.advocateName
-                  ? `Cared for by ${selectedAnimal.advocateName}`
-                  : 'Rescue Patient Under Care'}
+                    ? `Cared for by ${selectedAnimal.advocateName}`
+                    : 'Rescue Patient Under Care'}
               </Text>
             </View>
 
@@ -406,7 +402,6 @@ export default function DonateScreen({ route, navigation }) {
             )}
           </View>
 
-          {/* Minimalist Stat Line (No nested box) */}
           {targetDonations.length > 0 && (
             <View style={styles.inlineStatsRow}>
               <Ionicons name="heart" size={13} color="#E8622A" style={{ marginRight: 4 }} />
@@ -417,11 +412,10 @@ export default function DonateScreen({ route, navigation }) {
           )}
         </View>
 
-        {/* ── 2. DE-CONTAINERIZED AMOUNT SELECTOR ───────────────────── */}
+        {/* ── 2. Amount Selector ───────────────────────────────── */}
         <View style={styles.amountSection}>
           <Text style={styles.minimalSectionLabel}>SPONSORSHIP AMOUNT (₱)</Text>
 
-          {/* Big, clean amount display */}
           <View style={styles.heroAmountRow}>
             <Text style={styles.heroCurrencySymbol}>₱</Text>
             <TextInput
@@ -446,7 +440,6 @@ export default function DonateScreen({ route, navigation }) {
             )}
           </View>
 
-          {/* Preset Pills */}
           <View style={styles.presetChipsRow}>
             {PRESET_AMOUNTS.map((a) => {
               const cleanStr = a.replace(/,/g, '');
@@ -471,14 +464,13 @@ export default function DonateScreen({ route, navigation }) {
             })}
           </View>
 
-          {/* Direct Care Impact Line (Unboxed, airy quote) */}
           <View style={styles.impactInlineRow}>
             <Ionicons name="medkit-outline" size={15} color="#2E7A99" style={{ marginRight: 6, marginTop: 1 }} />
             <Text style={styles.impactInlineText}>{impactDescription}</Text>
           </View>
         </View>
 
-        {/* ── 3. NOTICE IF ADVOCATE HAS NOT CONFIGURED DIGITAL PAYOUTS ─ */}
+        {/* ── 3. Notice if Digital Payouts Unconfigured ───────── */}
         {!loadingAdvocate && !hasDigitalMethods && (
           <View style={styles.unconfiguredNoticeRow}>
             <Ionicons
@@ -499,7 +491,7 @@ export default function DonateScreen({ route, navigation }) {
               {isOwner ? (
                 <TouchableOpacity
                   style={styles.setupPayoutBtn}
-                  onPress={() => navigation.navigate('Profile', { openPayoutModal: true })}
+                  onPress={() => navigation.navigate('MainTabs', { screen: 'Profile', params: { openPayoutModal: true } })}
                   activeOpacity={0.8}
                 >
                   <Ionicons name="card-outline" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
@@ -529,7 +521,7 @@ export default function DonateScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* ── 4. MODERN PAYMENT METHOD SEGMENTS (ZERO FLICKER) ─────── */}
+        {/* ── 4. Payment Method Options ────────────────────────── */}
         <View style={styles.methodSection}>
           <Text style={styles.minimalSectionLabel}>SELECT PAYMENT METHOD</Text>
 
@@ -564,7 +556,7 @@ export default function DonateScreen({ route, navigation }) {
           </ScrollView>
         </View>
 
-        {/* ── 5. ADVOCATE ACCOUNT CREDENTIALS (DE-CONTAINERIZED) ──────── */}
+        {/* ── 5. Advocate Credentials Surface ─────────────────── */}
         {activeMethod && (
           <View style={styles.accountCredentialsSurface}>
             <View style={styles.accountCredentialsHeader}>
@@ -637,7 +629,7 @@ export default function DonateScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* ── 6. TRANSACTION REFERENCE & PROOF ───────────────────────── */}
+        {/* ── 6. Transaction Reference & Proof ─────────────────── */}
         {activeMethod?.id !== 'Cash' && (
           <View style={styles.fieldsSection}>
             <Text style={styles.minimalSectionLabel}>TRANSACTION REFERENCE NUMBER *</Text>
@@ -655,7 +647,6 @@ export default function DonateScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* Optional encouraging note */}
         <View style={styles.fieldsSection}>
           <Text style={styles.minimalSectionLabel}>ENCOURAGING NOTE FOR RESCUERS (OPTIONAL)</Text>
           <View style={[styles.minimalInputRow, { height: 68, alignItems: 'flex-start', paddingTop: 8 }]}>
@@ -671,7 +662,6 @@ export default function DonateScreen({ route, navigation }) {
           </View>
         </View>
 
-        {/* Proof of Payment Upload */}
         <View style={styles.fieldsSection}>
           <Text style={styles.minimalSectionLabel}>TRANSFER RECEIPT (RECOMMENDED)</Text>
 
@@ -706,7 +696,7 @@ export default function DonateScreen({ route, navigation }) {
           )}
         </View>
 
-        {/* ── 7. PRIMARY ACTION BUTTON ──────────────────────────────── */}
+        {/* ── 7. Primary Action Button ─────────────────────────── */}
         <TouchableOpacity
           style={[styles.primaryDonateBtn, loading && { opacity: 0.75 }]}
           onPress={handleSubmit}
@@ -730,7 +720,7 @@ export default function DonateScreen({ route, navigation }) {
         </Text>
       </ScrollView>
 
-      {/* ── ANIMAL PATIENT SELECTOR MODAL (NO GENERAL FUND) ──────────── */}
+      {/* ── Patient Selector Modal ───────────────────────────── */}
       <Modal
         visible={recipientModalVisible}
         animationType="slide"
@@ -803,7 +793,7 @@ export default function DonateScreen({ route, navigation }) {
         </TouchableOpacity>
       </Modal>
 
-      {/* ── REAL QR CODE MODAL ─────────────────────────────────────── */}
+      {/* ── QR Modal ─────────────────────────────────────────── */}
       <Modal
         visible={qrModalVisible}
         animationType="fade"
@@ -864,7 +854,7 @@ export default function DonateScreen({ route, navigation }) {
         </TouchableOpacity>
       </Modal>
 
-      {/* ── Branded Photo Picker Modal ─────────────────────────────── */}
+      {/* ── Photo Picker Modal ───────────────────────────────── */}
       <PhotoPickerModal
         visible={photoPickerVisible}
         onClose={() => setPhotoPickerVisible(false)}
@@ -874,7 +864,7 @@ export default function DonateScreen({ route, navigation }) {
         subtitle="Attach screenshot of your online payment transfer"
       />
 
-      {/* ── Branded Alert Modal ────────────────────────────────────── */}
+      {/* ── Alert Modal ──────────────────────────────────────── */}
       <AlertModal
         visible={alertConfig.visible}
         type={alertConfig.type}
@@ -893,13 +883,32 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+
+  // ── Header (Matched to MessagesScreen_2.js) ─────────────
+  headerWrap: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  headerTitle: {
+    ...FONTS.titleXl,
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.brown,
+    letterSpacing: -0.3,
+  },
+
   scroll: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 48,
   },
 
-  // ── 1. De-containerized Hero Patient Section ──────────────────
   heroSection: {
     paddingVertical: 10,
     marginBottom: 16,
@@ -950,7 +959,6 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     fontWeight: '800',
     color: '#B45309',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   heroSpeciesText: {
     fontSize: 11,
@@ -961,7 +969,6 @@ const styles = StyleSheet.create({
     fontSize: 21,
     fontWeight: '800',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
     lineHeight: 25,
   },
   heroCaretakerText: {
@@ -1002,7 +1009,6 @@ const styles = StyleSheet.create({
     color: '#2E7A99',
   },
 
-  // ── 2. De-containerized Amount Section ────────────────────────
   amountSection: {
     marginBottom: 20,
   },
@@ -1012,7 +1018,6 @@ const styles = StyleSheet.create({
     color: '#8C7D6A',
     letterSpacing: 0.6,
     marginBottom: 8,
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   heroAmountRow: {
     flexDirection: 'row',
@@ -1026,13 +1031,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#8C7D6A',
     marginRight: 6,
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   heroAmountInput: {
     fontSize: 36,
     fontWeight: '800',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
     minWidth: 80,
     textAlign: 'center',
   },
@@ -1064,7 +1067,6 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '700',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   presetChipTextActive: {
     color: '#FFFFFF',
@@ -1081,10 +1083,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#705E49',
     lineHeight: 16.5,
-    fontFamily: 'PlusJakartaSans_500Medium',
   },
 
-  // ── 3. Unconfigured Notice ───────────────────────────────────
   unconfiguredNoticeRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1097,7 +1097,6 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '800',
     color: '#92400E',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   unconfiguredSub: {
     fontSize: 11.5,
@@ -1123,7 +1122,6 @@ const styles = StyleSheet.create({
     color: '#2E7A99',
   },
 
-  // ── 4. Method Pills ──────────────────────────────────────────
   methodSection: {
     marginBottom: 14,
   },
@@ -1162,7 +1160,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
-  // ── 5. Clean Account Credentials Surface ─────────────────────
   accountCredentialsSurface: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -1191,7 +1188,6 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '800',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   viewQrPill: {
     flexDirection: 'row',
@@ -1243,7 +1239,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: '#2E7A99',
-    fontFamily: 'PlusJakartaSans_700Bold',
     letterSpacing: 0.5,
     flex: 1,
     marginRight: 8,
@@ -1297,10 +1292,8 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '800',
     color: '#FFFFFF',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
-  // ── 6. Minimalist Inputs ─────────────────────────────────────
   fieldsSection: {
     marginBottom: 14,
   },
@@ -1382,7 +1375,6 @@ const styles = StyleSheet.create({
     color: '#D94F4F',
   },
 
-  // ── 7. Primary Action Button ─────────────────────────────────
   primaryDonateBtn: {
     backgroundColor: '#2E7A99',
     borderRadius: 22,
@@ -1404,7 +1396,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#FFFFFF',
-    fontFamily: 'PlusJakartaSans_700Bold',
     flexShrink: 1,
     textAlign: 'center',
   },
@@ -1415,7 +1406,6 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
 
-  // ── Recipient Picker Modal ───────────────────────────────────
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1446,7 +1436,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   modalSheetSub: {
     fontSize: 12,
@@ -1492,7 +1481,6 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontWeight: '800',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   animalOptionMeta: {
     fontSize: 11,
@@ -1509,7 +1497,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 
-  // ── QR Modal ─────────────────────────────────────────────────
   qrCardModal: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 28,
@@ -1530,7 +1517,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: '#473018',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   qrSub: {
     fontSize: 11.5,
@@ -1580,7 +1566,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#2E7A99',
     marginTop: 2,
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
   qrActionCopyBtn: {
     flexDirection: 'row',
@@ -1596,6 +1581,5 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '800',
     color: '#FFFFFF',
-    fontFamily: 'PlusJakartaSans_700Bold',
   },
 });

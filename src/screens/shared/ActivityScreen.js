@@ -147,19 +147,12 @@ export default function ActivityScreen({ route, navigation }) {
     <View style={styles.root}>
       <StatusBar style="dark" />
 
-      {/* ── Matched Title-Only Clean Header ─────────────────── */}
+      {/* ── Matched Title-Only Clean Header (No Back Button) ── */}
       <View style={[styles.header, { paddingTop: safeTopPadding }]}>
         <View style={styles.headerTop}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            {navigation.canGoBack() && (
-              <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} style={{ marginLeft: -4 }}>
-                <Ionicons name="arrow-back" size={26} color={COLORS.brown} />
-              </TouchableOpacity>
-            )}
-            <Text style={styles.headerTitle} numberOfLines={1}>
-              Activity
-            </Text>
-          </View>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            Activity
+          </Text>
           <View style={styles.headerBadge}>
             <Text style={styles.headerBadgeText}>{rawData.length} Total</Text>
           </View>
