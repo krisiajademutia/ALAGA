@@ -201,6 +201,7 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
       otherName: report.reporterName,
       otherId: report.reporterId,
       initialDraft: `Hi ${report.reporterName || ''}! I am responding to your rescue alert for the ${report.animalType || 'animal'}. I am on my way to help!`,
+      linkedReport: report,
     });
   };
 

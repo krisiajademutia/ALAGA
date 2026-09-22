@@ -1225,6 +1225,13 @@ export function AppProvider({ children }) {
         location: messageData.location || null,
         duration: messageData.duration || null,
         time: new Date().toISOString(),
+        // Extra fields for special message types (e.g. report_link)
+        ...(messageData.reportId ? { reportId: messageData.reportId } : {}),
+        ...(messageData.animalType ? { animalType: messageData.animalType } : {}),
+        ...(messageData.condition ? { condition: messageData.condition } : {}),
+        ...(messageData.address !== undefined ? { address: messageData.address } : {}),
+        ...(messageData.status ? { status: messageData.status } : {}),
+        ...(messageData.reporterName !== undefined ? { reporterName: messageData.reporterName } : {}),
       };
     }
 

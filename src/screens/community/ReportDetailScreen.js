@@ -206,6 +206,7 @@ export default function ReportDetailScreen({ route, navigation }) {
                     otherName: report.responderName || 'Advocate',
                     otherId: report.responderId,
                     initialDraft: `Hi ${report.responderName || ''}! Thank you for responding to my rescue report. Here is the latest update:`,
+                    linkedReport: report,
                   });
                 }}
               >

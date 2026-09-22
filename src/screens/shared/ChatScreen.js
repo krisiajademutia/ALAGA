@@ -43,6 +43,7 @@ export default function ChatScreen({ route, navigation }) {
     otherAvatar: routeOtherAvatar,
     userAvatar: routeUserAvatar,
     initialDraft,
+    linkedReport,
   } = route.params || {};
   const resolvedOtherName = otherName || routeUserName;
   const { conversations, currentUser, sendMessage, clearConversation, markConversationRead,
@@ -153,6 +154,36 @@ export default function ChatScreen({ route, navigation }) {
       setTimeout(() => inputRef.current?.focus(), 300);
     }
   }, [initialDraft]);
+
+  // Auto-send a report_link card as the first message so BOTH users see which report this chat is about
+  const reportLinkAutoSentRef = useRef(false);
+  useEffect(() => {
+    if (
+      !linkedReport ||
+      !convo?.id ||
+      reportLinkAutoSentRef.current
+    ) return;
+    // Only send once, and only when there are no existing messages AND
+    // no existing report_link card for this report already exists in the thread
+    const alreadySent = messages.some(
+      (m) => m.type === 'report_link' && m.reportId === linkedReport.id
+    );
+    if (messages.length === 0 || (!alreadySent && messages.length > 0 && messages.every((m) => m.type !== 'report_link'))) {
+      if (messages.length === 0) {
+        reportLinkAutoSentRef.current = true;
+        sendMessage(convo.id, {
+          type: 'report_link',
+          reportId: linkedReport.id,
+          animalType: linkedReport.animalType || 'Animal',
+          condition: linkedReport.condition || 'Rescue',
+          address: linkedReport.location?.address || '',
+          status: linkedReport.status || 'Open',
+          reporterName: linkedReport.reporterName || '',
+          text: `📋 Rescue Report: ${linkedReport.animalType || 'Animal'} (${linkedReport.condition || 'Rescue'}) at ${linkedReport.location?.address || 'reported location'}`,
+        });
+      }
+    }
+  }, [convo?.id, messages.length, linkedReport]);
 
   const handleSend = () => {
     if (!text.trim() || !convo) return;
@@ -569,6 +600,7 @@ export default function ChatScreen({ route, navigation }) {
           </TouchableOpacity>
         }
       />
+      {/* Linked report banner removed — the report link is now sent as a message card visible to both users */}
 
       {/* ── Locating Status Banner ────────────────────────────── */}
       {isLocating && (
@@ -640,6 +672,7 @@ export default function ChatScreen({ route, navigation }) {
                     isMine ? styles.bubbleMine : styles.bubbleTheirs,
                     item.type === 'image' && styles.bubbleImageContainer,
                     item.type === 'location' && styles.bubbleLocationContainer,
+                    item.type === 'report_link' && { backgroundColor: 'transparent', padding: 0, shadowOpacity: 0, elevation: 0 },
                   ]}
                 >
                 {/* ── Image Message ────────────────────────── */}
@@ -727,6 +760,43 @@ export default function ChatScreen({ route, navigation }) {
                       <Text style={styles.openMapBtnText}>Open in Maps</Text>
                     </TouchableOpacity>
                   </View>
+                )}
+
+                {/* ── Report Link Card ──────────────────────── */}
+                {item.type === 'report_link' && (
+                  <TouchableOpacity
+                    style={styles.reportLinkCard}
+                    onPress={() =>
+                      navigation.navigate(
+                        currentUser?.role === 'advocate' ? 'RescueAlertDetail' : 'ReportDetail',
+                        { reportId: item.reportId || item.reportId }
+                      )
+                    }
+                    activeOpacity={0.82}
+                  >
+                    <View style={styles.reportLinkHeader}>
+                      <Ionicons name="alert-circle" size={18} color="#2E7A99" style={{ marginRight: 6 }} />
+                      <Text style={styles.reportLinkTitle} numberOfLines={1}>
+                        Rescue Report Linked
+                      </Text>
+                    </View>
+                    <Text style={styles.reportLinkAnimal}>
+                      {item.animalType || 'Animal'} · {item.condition || 'Rescue'}
+                    </Text>
+                    {Boolean(item.address) && (
+                      <Text style={styles.reportLinkAddr} numberOfLines={2}>
+                        📍 {item.address}
+                      </Text>
+                    )}
+                    <View style={styles.reportLinkFooter}>
+                      <View style={[styles.reportLinkStatusBadge, item.status === 'Rescued' && { backgroundColor: '#D1FAE5' }, item.status === 'Responded' && { backgroundColor: '#FEF3E2' }]}>
+                        <Text style={[styles.reportLinkStatusText, item.status === 'Rescued' && { color: '#065F46' }, item.status === 'Responded' && { color: '#92400E' }]}>
+                          {item.status || 'Open'}
+                        </Text>
+                      </View>
+                      <Text style={styles.reportLinkTap}>Tap to view →</Text>
+                    </View>
+                  </TouchableOpacity>
                 )}
 
                 {/* ── Standard Text Message ─────────────────── */}
@@ -2255,5 +2325,60 @@ const styles = StyleSheet.create({
   fullscreenVideo: {
     width: '100%',
     height: '100%',
+  },
+
+  // Report Link Card (auto-sent to both users)
+  reportLinkCard: {
+    backgroundColor: '#EBF7FA',
+    borderRadius: 12,
+    padding: 12,
+    minWidth: 200,
+    maxWidth: 260,
+    borderWidth: 1,
+    borderColor: '#B8E4E5',
+  },
+  reportLinkHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  reportLinkTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1A535C',
+    flex: 1,
+  },
+  reportLinkAnimal: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F3D40',
+    marginBottom: 4,
+  },
+  reportLinkAddr: {
+    fontSize: 11,
+    color: '#2E7A99',
+    marginBottom: 8,
+    lineHeight: 15,
+  },
+  reportLinkFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  reportLinkStatusBadge: {
+    backgroundColor: '#FDECEA',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  reportLinkStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#C0392B',
+  },
+  reportLinkTap: {
+    fontSize: 10,
+    color: '#2E7A99',
+    fontWeight: '600',
   },
 });
