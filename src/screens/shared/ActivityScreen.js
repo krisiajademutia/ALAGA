@@ -269,11 +269,21 @@ export default function ActivityScreen({ route, navigation }) {
                 </View>
 
                 {modalPhotoUri ? (
-                  <Image
-                    source={{ uri: modalPhotoUri }}
-                    style={styles.modalAnimalImage}
-                    resizeMode="cover"
-                  />
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      if (selectedRequest.animalId) {
+                        setSelectedRequest(null);
+                        navigation.navigate('AnimalDetail', { animalId: selectedRequest.animalId });
+                      }
+                    }}
+                  >
+                    <Image
+                      source={{ uri: modalPhotoUri }}
+                      style={styles.modalAnimalImage}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
                 ) : null}
 
                 <View style={styles.modalBody}>
@@ -289,7 +299,22 @@ export default function ActivityScreen({ route, navigation }) {
 
                   <View style={styles.modalRow}>
                     <Text style={styles.modalLabel}>Animal:</Text>
-                    <Text style={styles.modalVal}>{selectedRequest.animalName || 'Animal'}</Text>
+                    {selectedRequest.animalId ? (
+                      <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center' }}
+                        onPress={() => {
+                          setSelectedRequest(null);
+                          navigation.navigate('AnimalDetail', { animalId: selectedRequest.animalId });
+                        }}
+                      >
+                        <Text style={[styles.modalVal, { color: '#2E7A99', textDecorationLine: 'underline' }]}>
+                          {selectedRequest.animalName || 'Animal'}
+                        </Text>
+                        <Ionicons name="open-outline" size={14} color="#2E7A99" style={{ marginLeft: 4 }} />
+                      </TouchableOpacity>
+                    ) : (
+                      <Text style={styles.modalVal}>{selectedRequest.animalName || 'Animal'}</Text>
+                    )}
                   </View>
 
                   <View style={styles.modalRow}>
