@@ -184,6 +184,10 @@ function RootStack() {
       <Stack.Screen name="Donate"         component={DonateScreen} />
       <Stack.Screen name="PublicProfile"  component={PublicProfileScreen} />
       <Stack.Screen name="Notifications"  component={NotificationScreen} />
+
+      {isAdvocate && (
+        <Stack.Screen name="Activity" component={ActivityScreen} />
+      )}
     </Stack.Navigator>
   );
 }
