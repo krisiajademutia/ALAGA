@@ -4,6 +4,7 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  getDocs,
   onSnapshot,
   query,
   where,
@@ -166,15 +167,47 @@ export async function markConversationReadFirebase(conversationId, userId) {
 }
 
 /**
- * Delete a conversation in Firestore
+ * Clear all messages in a conversation's messages subcollection in Firestore (best-effort)
  */
-export async function deleteConversationFirebase(conversationId) {
-  if (isMockFirebase() || !db || !conversationId) return;
+export async function clearConversationMessagesFirebase(conversationId) {
+  if (isMockFirebase() || !db || !conversationId) return { isMock: true };
 
   try {
+    const msgsColl = collection(db, CONVERSATIONS_COLLECTION, conversationId, 'messages');
+    const snapshot = await getDocs(msgsColl);
+    if (!snapshot.empty) {
+      const deletePromises = snapshot.docs.map((d) => deleteDoc(d.ref).catch(() => {}));
+      await Promise.all(deletePromises);
+    }
+    return { success: true };
+  } catch (_err) {
+    // If client rules don't permit subcollection bulk deletes, ignore quietly
+    return { success: false };
+  }
+}
+
+/**
+ * Delete a conversation in Firestore and clean up all its subcollection messages
+ */
+export async function deleteConversationFirebase(conversationId) {
+  if (isMockFirebase() || !db || !conversationId) return { isMock: true };
+
+  try {
+    // 1. Delete all messages inside the subcollection first (best effort)
+    await clearConversationMessagesFirebase(conversationId);
+    // 2. Delete the conversation document itself
     const docRef = doc(db, CONVERSATIONS_COLLECTION, conversationId);
     await deleteDoc(docRef);
+    return { success: true };
   } catch (err) {
-    console.warn('[chatService] Failed to delete conversation:', err);
+    // If deleteDoc fails, fallback to clearing metadata
+    try {
+      const docRef = doc(db, CONVERSATIONS_COLLECTION, conversationId);
+      await updateDoc(docRef, {
+        lastMessage: '',
+        lastMessageTime: new Date().toISOString(),
+      });
+    } catch (_fallbackErr) {}
+    return { error: err?.message };
   }
 }

@@ -404,13 +404,16 @@ export default function ChatScreen({ route, navigation }) {
         setTimeout(() => {
           showAlert({
             title: 'Clear Conversation',
-            message: 'Are you sure you want to clear all messages in this conversation?',
+            message: 'Are you sure you want to clear all messages and remove this conversation?',
             type: 'warning',
-            customIcon: 'alert-circle',
+            customIcon: 'trash-outline',
             secondaryText: 'Cancel',
             primaryText: 'Clear All',
             onPrimaryPress: () => {
-              if (convo?.id) clearConversation(convo.id);
+              const targetId = convo?.id || conversationId;
+              setMessages([]);
+              if (targetId) clearConversation(targetId);
+              navigation.goBack();
             },
           });
         }, 200);
@@ -1154,12 +1157,17 @@ export default function ChatScreen({ route, navigation }) {
                 setTimeout(() => {
                   showAlert({
                     title: 'Clear Group Messages',
-                    message: 'Remove all messages from this group chat?',
+                    message: 'Remove all messages and delete this group chat?',
                     type: 'warning',
-                    customIcon: 'alert-circle',
+                    customIcon: 'trash-outline',
                     secondaryText: 'Cancel',
                     primaryText: 'Clear All',
-                    onPrimaryPress: () => { if (convo?.id) clearConversation(convo.id); },
+                    onPrimaryPress: () => {
+                      const targetId = convo?.id || conversationId;
+                      setMessages([]);
+                      if (targetId) clearConversation(targetId);
+                      navigation.goBack();
+                    },
                   });
                 }, 200);
               }}

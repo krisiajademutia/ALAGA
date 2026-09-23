@@ -26,6 +26,8 @@ export default function MessagesScreen({ navigation }) {
     startConversation,
     startGroupConversation,
     markConversationRead,
+    clearConversation,
+    showAlert,
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -342,6 +344,19 @@ export default function MessagesScreen({ navigation }) {
                   otherId,
                   otherAvatar,
                   isGroup,
+                });
+              }}
+              onLongPress={() => {
+                showAlert({
+                  title: displayName,
+                  message: 'Do you want to delete this conversation and clear all its messages?',
+                  type: 'warning',
+                  customIcon: 'trash-outline',
+                  secondaryText: 'Cancel',
+                  primaryText: 'Delete Chat',
+                  onPrimaryPress: () => {
+                    clearConversation(item.id);
+                  },
                 });
               }}
               activeOpacity={0.72}

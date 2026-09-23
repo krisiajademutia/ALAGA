@@ -42,6 +42,7 @@ import {
   saveMessageFirebase,
   markConversationReadFirebase,
   deleteConversationFirebase,
+  clearConversationMessagesFirebase,
 } from '../services/chatService';
 import {
   subscribeToDonations,
@@ -1871,28 +1872,26 @@ export function AppProvider({ children }) {
     return newConv.id;
   };
 
-  const clearConversation = (conversationId) => {
+  const clearConversation = async (conversationId) => {
     if (!conversationId) return;
-    let updatedConvo = null;
-    setConversations((prev) =>
-      prev.map((c) => {
-        if (c.id === conversationId) {
-          // Messages live in the subcollection; only reset conversation metadata
-          updatedConvo = { ...c, lastMessage: '', lastMessageTime: new Date().toISOString() };
-          return updatedConvo;
-        }
-        return c;
-      })
-    );
-    if (updatedConvo) {
-      saveConversationFirebase(updatedConvo);
+    // 1. Remove conversation from local list so it immediately disappears from Messages inbox
+    setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+    // 2. Clear all subcollection messages and delete the conversation document in Firestore
+    try {
+      await deleteConversationFirebase(conversationId);
+    } catch (err) {
+      console.warn('[AppContext] clearConversation warning:', err?.message || err);
     }
   };
 
-  const deleteConversation = (conversationId) => {
+  const deleteConversation = async (conversationId) => {
     if (!conversationId) return;
     setConversations((prev) => prev.filter((c) => c.id !== conversationId));
-    deleteConversationFirebase(conversationId);
+    try {
+      await deleteConversationFirebase(conversationId);
+    } catch (err) {
+      console.warn('[AppContext] deleteConversation warning:', err?.message || err);
+    }
   };
 
   const updateGroupInfo = (conversationId, { groupName, groupPhoto, addParticipants } = {}) => {
