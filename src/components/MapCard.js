@@ -5,13 +5,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   Modal,
-  SafeAreaView,
   StatusBar as RNStatusBar,
   Platform,
   Linking,
   ActivityIndicator,
   Share,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS } from '../constants/theme';
 
