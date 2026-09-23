@@ -156,9 +156,9 @@ export function AppProvider({ children }) {
   const activeConversationIdRef = useRef(null); // ID of chat screen currently active/focused
   const userProfilesCacheRef = useRef(new Map()); // In-memory cache of fetched user profiles to prevent re-render loops
 
-  const setActiveConversationId = (id) => {
+  const setActiveConversationId = useCallback((id) => {
     activeConversationIdRef.current = id;
-  };
+  }, []);
 
   useEffect(() => {
     currentUserRef.current = currentUser;
@@ -2053,14 +2053,20 @@ export function AppProvider({ children }) {
     }, 0);
   };
 
-  const markConversationRead = (conversationId) => {
+  const markConversationRead = useCallback((conversationId) => {
     if (!conversationId) return;
     const activeUser = currentUserRef.current || currentUser;
     if (!activeUser?.id) return;
     const uId = activeUser.id;
 
-    setConversations((prev) =>
-      prev.map((c) => {
+    setConversations((prev) => {
+      const target = prev.find((c) => c.id === conversationId);
+      if (!target) return prev;
+      const unreadCountForMe = target.unreadCounts?.[uId] || 0;
+      if (unreadCountForMe === 0 && !target.unread && (!target.unreadCount || target.unreadCount === 0)) {
+        return prev;
+      }
+      return prev.map((c) => {
         if (c.id === conversationId) {
           const nextCounts = { ...(c.unreadCounts || {}) };
           nextCounts[uId] = 0;
@@ -2072,11 +2078,11 @@ export function AppProvider({ children }) {
           };
         }
         return c;
-      })
-    );
+      });
+    });
 
     markConversationReadFirebase(conversationId, uId);
-  };
+  }, []);
 
   const getAllKnownUsers = () => {
     const map = new Map();
