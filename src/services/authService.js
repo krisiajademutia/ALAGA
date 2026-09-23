@@ -461,11 +461,25 @@ export async function getAllUsersFirebase() {
 /**
  * Save a notification to the Firestore users/{userId}/notifications subcollection.
  * Sanitizes all undefined values so Firestore setDoc never throws an unsupported field value error.
+ * Preserves existing `read: true` status if the user already reviewed/read this notification.
  */
 export async function saveNotificationFirebase(userId, notification) {
   if (isMockFirebase() || !db || !userId || !notification?.id) return;
   try {
     const docRef = doc(db, 'users', userId, 'notifications', notification.id);
+    
+    // Check if document already exists and was already marked read
+    let finalRead = notification.read ?? false;
+    try {
+      const existingSnap = await getDoc(docRef);
+      if (existingSnap.exists()) {
+        const data = existingSnap.data();
+        if (data.read === true) {
+          finalRead = true; // Never revert a read notification back to unread
+        }
+      }
+    } catch (e) {}
+
     // Strip undefined properties to ensure Firestore compatibility
     const sanitized = {};
     Object.keys(notification).forEach((key) => {
@@ -477,10 +491,54 @@ export async function saveNotificationFirebase(userId, notification) {
 
     await setDoc(docRef, {
       ...sanitized,
+      read: finalRead,
       timestamp: serverTimestamp(),
     }, { merge: true });
   } catch (err) {
     console.warn('[authService] saveNotificationFirebase warning:', err?.message || err);
+  }
+}
+
+/**
+ * Mark a specific notification as read in Firestore
+ */
+export async function markNotificationReadFirebase(userId, notificationId) {
+  if (isMockFirebase() || !db || !userId || !notificationId) return;
+  try {
+    const docRef = doc(db, 'users', userId, 'notifications', String(notificationId));
+    await updateDoc(docRef, {
+      read: true,
+      readAt: serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn('[authService] markNotificationReadFirebase warning:', err?.message || err);
+  }
+}
+
+/**
+ * Mark ALL notifications as read for a user in Firestore
+ */
+export async function markAllNotificationsReadFirebase(userId) {
+  if (isMockFirebase() || !db || !userId) return;
+  try {
+    const notifsRef = collection(db, 'users', userId, 'notifications');
+    const snapshot = await getDocs(notifsRef);
+    if (snapshot.empty) return;
+
+    const batch = writeBatch(db);
+    let count = 0;
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (!data.read) {
+        batch.update(docSnap.ref, { read: true, readAt: serverTimestamp() });
+        count++;
+      }
+    });
+    if (count > 0) {
+      await batch.commit();
+    }
+  } catch (err) {
+    console.warn('[authService] markAllNotificationsReadFirebase warning:', err?.message || err);
   }
 }
 

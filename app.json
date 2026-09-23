@@ -38,12 +38,24 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "notification": {
+        "icon": "./assets/icon.png",
+        "color": "#2E7A99"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#2E7A99",
+          "defaultChannel": "rescue-alerts"
+        }
+      ],
       [
         "expo-image-picker",
         {

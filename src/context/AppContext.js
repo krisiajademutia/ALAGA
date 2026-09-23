@@ -12,6 +12,8 @@ import {
   cacheUserProfile,
   getAllUsersFirebase,
   saveNotificationFirebase,
+  markNotificationReadFirebase,
+  markAllNotificationsReadFirebase,
   subscribeToNotificationsFirebase,
   deleteNotificationFirebase,
   clearAllNotificationsFirebase,
@@ -293,13 +295,12 @@ export function AppProvider({ children }) {
 
     if (isForActiveUser) {
       setNotifications((prev) => {
-        if (
-          prev.some(
-            (n) =>
-              n.id === cleanNotif.id ||
-              (cleanNotif.type === 'rescue' && n.type === 'rescue' && cleanNotif.reportId && n.reportId === cleanNotif.reportId)
-          )
-        ) {
+        const existing = prev.find(
+          (n) =>
+            n.id === cleanNotif.id ||
+            (cleanNotif.type === 'rescue' && n.type === 'rescue' && cleanNotif.reportId && n.reportId === cleanNotif.reportId)
+        );
+        if (existing) {
           isDuplicate = true;
           return prev;
         }
@@ -460,6 +461,16 @@ export function AppProvider({ children }) {
       const descText = `${rep.title || rep.condition || 'Animal in need'} reported at ${locationText}. Tap to review details.`;
       const notifId = `rescue_notif_${rep.id}`;
 
+      // Check if this rescue alert has already been notified to this user
+      const alreadyNotified =
+        notifiedReportIdsRef.current.has(rep.id) ||
+        notifications.some((n) => n.id === notifId || (n.type === 'rescue' && n.reportId === rep.id));
+
+      if (alreadyNotified) {
+        notifiedReportIdsRef.current.add(rep.id);
+        continue; // Already processed! Never re-notify and never overwrite read status
+      }
+
       // 1. Ensure the in-app notification feed card exists
       pushNotification({
         id: notifId,
@@ -475,14 +486,10 @@ export function AppProvider({ children }) {
         createdAt: rep.createdAt || new Date().toISOString(),
       });
 
-      // 2. If this user has not yet received a system/popup alert for this report on this device:
-      if (!notifiedReportIdsRef.current.has(rep.id)) {
-        notifiedReportIdsRef.current.add(rep.id);
-        hasNewToPersist = true;
-
-        // Trigger phone system notification (pull-down shade) + animated in-app toast banner
-        triggerRescueAlertNotification(rep);
-      }
+      // 2. Trigger phone system notification (pull-down shade) + animated in-app toast banner
+      notifiedReportIdsRef.current.add(rep.id);
+      hasNewToPersist = true;
+      triggerRescueAlertNotification(rep);
     }
 
     if (hasNewToPersist) {
@@ -1022,7 +1029,12 @@ export function AppProvider({ children }) {
     const uId = currentUser?.id || currentUser?.uid;
     if (uId) {
       cacheUserProfile(currentUser);
-      notifiedReportIdsRef.current.clear();
+      // Pre-populate with existing notifications to avoid race conditions during login
+      notifications.forEach((n) => {
+        if (n.type === 'rescue' && n.reportId) {
+          notifiedReportIdsRef.current.add(n.reportId);
+        }
+      });
       notifiedMessageIdsRef.current.clear();
       notifiedCommentIdsRef.current.clear();
 
@@ -1111,6 +1123,14 @@ export function AppProvider({ children }) {
         (firestoreNotifs) => {
           if (!Array.isArray(firestoreNotifs)) return;
           const remoteList = firestoreNotifs || [];
+
+          // Pre-seed notifiedReportIdsRef so existing reports in Firestore are never re-alerted
+          remoteList.forEach((n) => {
+            if (n.type === 'rescue' && n.reportId) {
+              notifiedReportIdsRef.current.add(n.reportId);
+            }
+          });
+
           setNotifications((prev) => {
             // Keep notifications that belong to 'all' or other users
             const otherUserNotifs = prev.filter(
@@ -2237,21 +2257,38 @@ export function AppProvider({ children }) {
   };
 
   const markNotificationRead = (notifId) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
-    );
+    if (!notifId) return;
+    const activeUser = currentUserRef.current || currentUser;
+    const uId = activeUser?.id || activeUser?.uid;
+
+    setNotifications((prev) => {
+      const updated = prev.map((n) => (n.id === notifId ? { ...n, read: true } : n));
+      AsyncStorage.setItem('@alaga_realtime_notifications_v2', JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+
+    if (uId) {
+      markNotificationReadFirebase(uId, notifId);
+    }
   };
 
   const markAllNotificationsRead = () => {
     const activeUser = currentUserRef.current || currentUser;
     const uId = activeUser?.id || activeUser?.uid;
-    setNotifications((prev) =>
-      prev.map((n) =>
+
+    setNotifications((prev) => {
+      const updated = prev.map((n) =>
         !n.userId || n.userId === 'all' || (uId && (n.userId === uId || n.userId === activeUser?.id || n.userId === activeUser?.uid))
           ? { ...n, read: true }
           : n
-      )
-    );
+      );
+      AsyncStorage.setItem('@alaga_realtime_notifications_v2', JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+
+    if (uId) {
+      markAllNotificationsReadFirebase(uId);
+    }
   };
 
   const deleteNotification = (notifId) => {

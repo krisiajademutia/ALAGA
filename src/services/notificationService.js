@@ -83,7 +83,7 @@ export async function initNotifications() {
 
         // General channel
         await N.setNotificationChannelAsync('default', {
-          name: 'General Notifications',
+          name: 'ALAGA - General Notifications',
           importance: maxImportance,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#2E7A99',
@@ -93,7 +93,7 @@ export async function initNotifications() {
 
         // Emergency rescue alerts channel (High priority)
         await N.setNotificationChannelAsync('rescue-alerts', {
-          name: 'Emergency Rescue Alerts',
+          name: 'ALAGA - Rescue Alerts',
           importance: maxImportance,
           sound: 'default',
           vibrationPattern: [0, 500, 250, 500],
@@ -105,7 +105,7 @@ export async function initNotifications() {
 
         // Direct messaging channel
         await N.setNotificationChannelAsync('messages', {
-          name: 'Direct Messages',
+          name: 'ALAGA - Direct Messages',
           importance: highImportance,
           sound: 'default',
           vibrationPattern: [0, 200, 200, 200],
@@ -116,7 +116,7 @@ export async function initNotifications() {
 
         // System fallback channel
         await N.setNotificationChannelAsync('expo_notifications_fallback_notification_channel', {
-          name: 'Rescue Notifications',
+          name: 'ALAGA - Notifications',
           importance: maxImportance,
           sound: 'default',
           vibrationPattern: [0, 500, 250, 500],
@@ -206,7 +206,7 @@ export async function notifyPhoneSystem({ title, body, data = {}, channelId = 'r
         const publicVis = N.AndroidNotificationVisibility?.PUBLIC ?? 1;
 
         await N.setNotificationChannelAsync(channelId, {
-          name: channelId === 'messages' ? 'Direct Messages' : 'Emergency Rescue Alerts',
+          name: channelId === 'messages' ? 'ALAGA - Direct Messages' : 'ALAGA - Rescue Alerts',
           importance: maxImportance,
           sound: 'default',
           vibrationPattern: [0, 400, 200, 400],
@@ -217,7 +217,7 @@ export async function notifyPhoneSystem({ title, body, data = {}, channelId = 'r
         });
 
         await N.setNotificationChannelAsync('expo_notifications_fallback_notification_channel', {
-          name: 'Rescue Notifications',
+          name: 'ALAGA - Notifications',
           importance: maxImportance,
           sound: 'default',
           vibrationPattern: [0, 400, 200, 400],
@@ -231,12 +231,13 @@ export async function notifyPhoneSystem({ title, body, data = {}, channelId = 'r
       }
     }
 
-    // 3. Schedule the notification — this sends it to the phone's system notification drawer
+    // 3. Schedule the notification — clearly branded as ALAGA on system shade and lock screen
+    const displayTitle = title?.startsWith('ALAGA') ? title : `ALAGA • ${title}`;
     const notifId = 'alaga_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
     await N.scheduleNotificationAsync({
       identifier: notifId,
       content: {
-        title,
+        title: displayTitle,
         body,
         data,
         sound: 'default',
@@ -248,7 +249,7 @@ export async function notifyPhoneSystem({ title, body, data = {}, channelId = 'r
       trigger: null,
     });
 
-    console.log('[notificationService] ✅ Notification posted to system panel:', notifId, title);
+    console.log('[notificationService] ✅ Notification posted to system panel:', notifId, displayTitle);
   } catch (err) {
     console.warn('[notificationService] Failed to post notification to phone panel:', err);
   }
