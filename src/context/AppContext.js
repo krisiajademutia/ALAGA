@@ -146,6 +146,7 @@ export function AppProvider({ children }) {
   const mySubmittedReportIds = useRef(new Map()); // Map<reportId, authorUserId>
   const notifiedReportIdsRef = useRef(new Set()); // Set of report IDs that have triggered phone alerts for active user
   const notifiedMessageIdsRef = useRef(new Set()); // Set of message IDs that have triggered alerts
+  const notifiedCommentIdsRef = useRef(new Set()); // Set of comment/reply IDs that have triggered alerts for active user
   const activeConversationIdRef = useRef(null); // ID of chat screen currently active/focused
   const userProfilesCacheRef = useRef(new Map()); // In-memory cache of fetched user profiles to prevent re-render loops
 
@@ -273,24 +274,35 @@ export function AppProvider({ children }) {
     });
 
     let isDuplicate = false;
-    setNotifications((prev) => {
-      if (
-        prev.some(
-          (n) =>
-            n.id === cleanNotif.id ||
-            (cleanNotif.reportId && n.reportId === cleanNotif.reportId && n.userId === cleanNotif.userId)
-        )
-      ) {
-        isDuplicate = true;
-        return prev;
-      }
-      return [cleanNotif, ...prev];
-    });
+    const activeUser = currentUserRef.current || currentUser;
+    const activeUserId = activeUser?.id || activeUser?.uid;
+    const isForActiveUser =
+      !cleanNotif.userId ||
+      cleanNotif.userId === 'all' ||
+      cleanNotif.userId === activeUserId ||
+      cleanNotif.userId === activeUser?.id ||
+      cleanNotif.userId === activeUser?.uid;
+
+    if (isForActiveUser) {
+      setNotifications((prev) => {
+        if (
+          prev.some(
+            (n) =>
+              n.id === cleanNotif.id ||
+              (cleanNotif.type === 'rescue' && n.type === 'rescue' && cleanNotif.reportId && n.reportId === cleanNotif.reportId)
+          )
+        ) {
+          isDuplicate = true;
+          return prev;
+        }
+        return [cleanNotif, ...prev];
+      });
+    }
 
     // Persist to Firestore subcollection for cross-device sync
     const targetUserId = cleanNotif.userId && cleanNotif.userId !== 'all'
       ? cleanNotif.userId
-      : currentUserRef.current?.id;
+      : activeUserId;
     if (targetUserId && !isDuplicate) {
       saveNotificationFirebase(targetUserId, cleanNotif);
     }
@@ -471,6 +483,188 @@ export function AppProvider({ children }) {
     }
   };
 
+  const syncCommentNotifications = async (user, reports) => {
+    if (!user || (!user.id && !user.uid) || !Array.isArray(reports) || reports.length === 0) return;
+    const uId = user.id || user.uid;
+
+    const storageKey = `@alaga_notified_comments_${uId}`;
+    try {
+      const stored = await AsyncStorage.getItem(storageKey);
+      if (stored) {
+        const arr = JSON.parse(stored);
+        if (Array.isArray(arr)) {
+          arr.forEach((id) => notifiedCommentIdsRef.current.add(id));
+        }
+      }
+    } catch (e) {}
+
+    let hasNewToPersist = false;
+    const newNotificationsToAdd = [];
+
+    // Helper to recursively collect all replies and check for notifications
+    const checkReplies = (repliesList, parentAuthorId, rep) => {
+      if (!Array.isArray(repliesList)) return;
+      for (const r of repliesList) {
+        if (!r || !r.id) continue;
+
+        // If the reply author is not the current user, AND the parent comment was authored by the current user:
+        const isFromOther = r.userId && r.userId !== uId && r.userId !== user.id && r.userId !== user.uid;
+        const isReplyingToMe = parentAuthorId && (parentAuthorId === uId || parentAuthorId === user.id || parentAuthorId === user.uid);
+
+        if (isFromOther && isReplyingToMe) {
+          const snippet = (r.text || '').length > 55 ? (r.text || '').slice(0, 52) + '...' : (r.text || '');
+          const notifId = `reply_notif_${rep.id}_${r.id}`;
+          const replyTitle = 'New reply to your comment';
+          const replyBody = `${r.userName || 'Community member'} replied: "${snippet}"`;
+
+          newNotificationsToAdd.push({
+            id: notifId,
+            userId: uId,
+            title: replyTitle,
+            body: replyBody,
+            message: replyBody,
+            type: 'comment',
+            reportId: rep.id,
+            replyId: r.id,
+            icon: 'chatbox-ellipses-outline',
+            iconBg: '#EBF4F8',
+            iconColor: '#2E7A99',
+            createdAt: r.createdAt || new Date().toISOString(),
+          });
+
+          if (!notifiedCommentIdsRef.current.has(r.id)) {
+            notifiedCommentIdsRef.current.add(r.id);
+            hasNewToPersist = true;
+
+            const rTime = r.createdAt ? new Date(r.createdAt).getTime() : 0;
+            const isRecent = rTime > 0 && (Date.now() - rTime) < 24 * 60 * 60 * 1000;
+            if (isRecent) {
+              if (Platform.OS !== 'web') {
+                notifyPhoneSystem({
+                  title: replyTitle,
+                  body: replyBody,
+                  data: { type: 'comment', reportId: rep.id },
+                  channelId: 'default',
+                }).catch(() => {});
+              } else {
+                setInAppBanner({
+                  id: `banner_reply_${r.id}`,
+                  title: replyTitle,
+                  message: replyBody,
+                  type: 'comment',
+                  onPress: () => {
+                    if (user?.role === 'advocate') {
+                      navigate('RescueAlertDetail', { reportId: rep.id });
+                    } else {
+                      navigate('ReportDetail', { reportId: rep.id });
+                    }
+                  },
+                });
+              }
+            }
+          }
+        }
+
+        if (Array.isArray(r.replies) && r.replies.length > 0) {
+          checkReplies(r.replies, r.userId, rep);
+        }
+      }
+    };
+
+    for (const rep of reports) {
+      if (!rep || !Array.isArray(rep.comments) || rep.comments.length === 0) continue;
+
+      const isMyReport = isOwnReport(rep, user);
+
+      for (const c of rep.comments) {
+        if (!c || !c.id) continue;
+
+        // 1. Direct comments on current user's report
+        const isFromOther = c.userId && c.userId !== uId && c.userId !== user.id && c.userId !== user.uid;
+        if (isMyReport && isFromOther) {
+          const snippet = (c.text || '').length > 55 ? (c.text || '').slice(0, 52) + '...' : (c.text || '');
+          const notifId = `comment_notif_${rep.id}_${c.id}`;
+          const commentTitle = 'New comment on your report';
+          const commentBody = `${c.userName || 'Community member'}: "${snippet}"`;
+
+          newNotificationsToAdd.push({
+            id: notifId,
+            userId: uId,
+            title: commentTitle,
+            body: commentBody,
+            message: commentBody,
+            type: 'comment',
+            reportId: rep.id,
+            commentId: c.id,
+            icon: 'chatbox-ellipses-outline',
+            iconBg: '#EBF4F8',
+            iconColor: '#2E7A99',
+            createdAt: c.createdAt || new Date().toISOString(),
+          });
+
+          if (!notifiedCommentIdsRef.current.has(c.id)) {
+            notifiedCommentIdsRef.current.add(c.id);
+            hasNewToPersist = true;
+
+            const cTime = c.createdAt ? new Date(c.createdAt).getTime() : 0;
+            const isRecent = cTime > 0 && (Date.now() - cTime) < 24 * 60 * 60 * 1000;
+            if (isRecent) {
+              if (Platform.OS !== 'web') {
+                notifyPhoneSystem({
+                  title: commentTitle,
+                  body: commentBody,
+                  data: { type: 'comment', reportId: rep.id },
+                  channelId: 'default',
+                }).catch(() => {});
+              } else {
+                setInAppBanner({
+                  id: `banner_comment_${c.id}`,
+                  title: commentTitle,
+                  message: commentBody,
+                  type: 'comment',
+                  onPress: () => {
+                    if (user?.role === 'advocate') {
+                      navigate('RescueAlertDetail', { reportId: rep.id });
+                    } else {
+                      navigate('ReportDetail', { reportId: rep.id });
+                    }
+                  },
+                });
+              }
+            }
+          }
+        }
+
+        // 2. Check replies to comments
+        if (Array.isArray(c.replies) && c.replies.length > 0) {
+          checkReplies(c.replies, c.userId, rep);
+        }
+      }
+    }
+
+    if (newNotificationsToAdd.length > 0) {
+      setNotifications((prev) => {
+        const existingIds = new Set(prev.map((n) => n.id));
+        const toAdd = newNotificationsToAdd.filter((n) => !existingIds.has(n.id));
+        if (toAdd.length === 0) return prev;
+
+        // Persist newly created notifications to Firestore under this user's subcollection
+        toAdd.forEach((notif) => {
+          saveNotificationFirebase(uId, notif);
+        });
+
+        return [...toAdd, ...prev].sort(
+          (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+        );
+      });
+    }
+
+    if (hasNewToPersist) {
+      const arr = Array.from(notifiedCommentIdsRef.current);
+      AsyncStorage.setItem(storageKey, JSON.stringify(arr)).catch(() => {});
+    }
+  };
+
   // ── Global Themed Alert Modal State ─────────────────────────────────────────
   const [globalAlert, setGlobalAlert] = useState({
     visible: false,
@@ -569,7 +763,7 @@ export function AppProvider({ children }) {
     initNotifications();
 
     const unsubListener = registerNotificationResponseListener((data) => {
-      if (data?.type === 'rescue' && data.reportId) {
+      if ((data?.type === 'rescue' || data?.type === 'comment') && data.reportId) {
         if (currentUser?.role === 'advocate') {
           navigate('RescueAlertDetail', { reportId: data.reportId });
         } else {
@@ -679,6 +873,7 @@ export function AppProvider({ children }) {
         const activeUser = currentUserRef.current;
         if (activeUser) {
           syncRescueAlertNotifications(activeUser, reportsList);
+          syncCommentNotifications(activeUser, reportsList);
         }
       });
 
@@ -731,14 +926,16 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  // Sync rescue alert & message notifications whenever the logged-in user changes
+  // Sync rescue alert, comment & message notifications whenever the logged-in user changes
   useEffect(() => {
-    if (currentUser?.id) {
+    const uId = currentUser?.id || currentUser?.uid;
+    if (uId) {
       cacheUserProfile(currentUser);
       notifiedReportIdsRef.current.clear();
       notifiedMessageIdsRef.current.clear();
+      notifiedCommentIdsRef.current.clear();
 
-      const storageKey = `@alaga_notified_reports_${currentUser.id}`;
+      const storageKey = `@alaga_notified_reports_${uId}`;
       AsyncStorage.getItem(storageKey)
         .then((stored) => {
           if (stored) {
@@ -759,7 +956,28 @@ export function AppProvider({ children }) {
           }
         });
 
-      const msgKey = `@alaga_notified_messages_${currentUser.id}`;
+      const commentKey = `@alaga_notified_comments_${uId}`;
+      AsyncStorage.getItem(commentKey)
+        .then((stored) => {
+          if (stored) {
+            try {
+              const arr = JSON.parse(stored);
+              if (Array.isArray(arr)) {
+                arr.forEach((id) => notifiedCommentIdsRef.current.add(id));
+              }
+            } catch (e) {}
+          }
+          if (Array.isArray(rescueReports) && rescueReports.length > 0) {
+            syncCommentNotifications(currentUser, rescueReports);
+          }
+        })
+        .catch(() => {
+          if (Array.isArray(rescueReports) && rescueReports.length > 0) {
+            syncCommentNotifications(currentUser, rescueReports);
+          }
+        });
+
+      const msgKey = `@alaga_notified_messages_${uId}`;
       AsyncStorage.getItem(msgKey)
         .then((stored) => {
           if (stored) {
@@ -780,7 +998,7 @@ export function AppProvider({ children }) {
           }
         });
     }
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUser?.uid]);
 
   // User-specific applications, conversations, notifications & donations listener (runs only when authenticated)
   useEffect(() => {
@@ -805,7 +1023,7 @@ export function AppProvider({ children }) {
           setNotifications((prev) => {
             // Keep notifications that belong to 'all' or other users
             const otherUserNotifs = prev.filter(
-              (n) => n.userId && n.userId !== 'all' && n.userId !== currentUser.id
+              (n) => n.userId && n.userId !== 'all' && n.userId !== currentUser.id && n.userId !== currentUser.uid
             );
             // Deduplicate remoteList
             const seenIds = new Set();
@@ -878,6 +1096,7 @@ export function AppProvider({ children }) {
     mySubmittedReportIds.current.clear();
     notifiedReportIdsRef.current.clear();
     notifiedMessageIdsRef.current.clear();
+    notifiedCommentIdsRef.current.clear();
     activeConversationIdRef.current = null;
   };
 
@@ -1013,19 +1232,27 @@ export function AppProvider({ children }) {
   };
 
   const addComment = (reportId, text, parentCommentId = null) => {
+    const activeUser = currentUserRef.current || currentUser;
+    const authorId = activeUser?.id || activeUser?.uid || 'u_anon';
+    const authorName = activeUser?.name || 'Community Member';
+    const authorAvatar = activeUser?.avatar || null;
+
     const newComment = {
       id: `c${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-      userId: currentUser?.id || 'u_anon',
-      userName: currentUser?.name || 'Community Member',
-      userAvatar: currentUser?.avatar || null,
+      userId: authorId,
+      userName: authorName,
+      userAvatar: authorAvatar,
       text,
       createdAt: new Date().toISOString(),
       replies: [],
     };
     let updatedCommentsForReport = null;
+    let targetReport = rescueReports.find((r) => r.id === reportId) || null;
+
     setRescueReports((prev) =>
       prev.map((r) => {
         if (r.id !== reportId) return r;
+        targetReport = r;
         let newComments;
         if (!parentCommentId) {
           newComments = [...(r.comments || []), newComment];
@@ -1046,7 +1273,19 @@ export function AppProvider({ children }) {
         return { ...r, comments: newComments };
       })
     );
+
     addRescueCommentFirebase(reportId, newComment, updatedCommentsForReport);
+
+    // Comments are synced in real-time across devices via subscribeToRescueReports -> syncCommentNotifications.
+    // In mock / offline mode, trigger sync for local state.
+    if (isMockFirebase()) {
+      const active = currentUserRef.current;
+      if (active) {
+        setTimeout(() => {
+          syncCommentNotifications(active, rescueReports);
+        }, 100);
+      }
+    }
   };
 
   // ── Animal Profiles ───────────────────────────────────────────────────────
@@ -1315,7 +1554,7 @@ export function AppProvider({ children }) {
           } else {
             // In-app dropdown toast banner on web
             showInAppNotification({
-              title: `💬 Message from ${senderName}`,
+              title: `Message from ${senderName}`,
               message: msgText,
               type: 'message',
               onPress: () => {
@@ -1328,7 +1567,7 @@ export function AppProvider({ children }) {
           pushNotification({
             id: `msg_notif_${msgKey}`,
             userId: uId,
-            title: `💬 Message from ${senderName}`,
+            title: `Message from ${senderName}`,
             message: msgText,
             body: msgText,
             type: 'chat',
@@ -1623,7 +1862,7 @@ export function AppProvider({ children }) {
     const advocateId = donationData.advocateId;
     const recipientTitle = donationData.animalName || 'Rescue Patient Care';
     if (advocateId && advocateId !== donorId) {
-      const notifTitle = '🎁 New Donation Received!';
+      const notifTitle = 'New Donation Received';
       const notifBody = `${newDonation.donorName} donated ₱${rawAmount.toLocaleString()} for ${recipientTitle}.`;
       pushNotification({
         userId: advocateId,
@@ -1649,8 +1888,8 @@ export function AppProvider({ children }) {
     // Donor confirmation notification
     pushNotification({
       userId: donorId,
-      title: 'Donation Submitted 🐾',
-      body: `Thank you! Your donation of ₱${rawAmount.toLocaleString()} for ${recipientTitle} has been recorded (Ref: ${donationData.referenceNumber || 'Cash'}).`,
+      title: 'Donation Submitted',
+      body: `Thank you. Your donation of ₱${rawAmount.toLocaleString()} for ${recipientTitle} has been recorded (Ref: ${donationData.referenceNumber || 'Cash'}).`,
       message: `Your donation of ₱${rawAmount.toLocaleString()} for ${recipientTitle} has been recorded.`,
       type: 'donation',
       donationId: newDonation.id,
@@ -1673,9 +1912,9 @@ export function AppProvider({ children }) {
     const donation = donations.find((d) => d.id === donationId);
     if (donation && donation.donorId) {
       const isApproved = status === 'Verified';
-      const title = isApproved ? '✅ Donation Verified!' : 'Donation Update';
+      const title = isApproved ? 'Donation Verified' : 'Donation Update';
       const body = isApproved
-        ? `Your donation of ₱${donation.amount?.toLocaleString()} for ${donation.animalName || 'ALAGA'} has been verified. Thank you for your generosity! 🐾`
+        ? `Your donation of ₱${donation.amount?.toLocaleString()} for ${donation.animalName || 'ALAGA'} has been verified. Thank you for your generosity.`
         : `Your donation for ${donation.animalName || 'ALAGA'} has been updated: ${status}.`;
 
       pushNotification({
@@ -1852,15 +2091,23 @@ export function AppProvider({ children }) {
     donations.filter((d) => d.animalId === animalId);
 
   // ── Notifications ─────────────────────────────────────────────────────────
-  const getUserNotifications = () =>
-    notifications
-      .filter((n) => !n.userId || n.userId === 'all' || n.userId === currentUser?.id)
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const getUserNotifications = () => {
+    const activeUser = currentUserRef.current || currentUser;
+    const uId = activeUser?.id || activeUser?.uid;
+    return notifications
+      .filter((n) => !n.userId || n.userId === 'all' || (uId && (n.userId === uId || n.userId === activeUser?.id || n.userId === activeUser?.uid)))
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  };
 
-  const getUnreadCount = () =>
-    notifications.filter(
-      (n) => (!n.userId || n.userId === 'all' || n.userId === currentUser?.id) && !n.read
+  const getUnreadCount = () => {
+    const activeUser = currentUserRef.current || currentUser;
+    const uId = activeUser?.id || activeUser?.uid;
+    return notifications.filter(
+      (n) =>
+        (!n.userId || n.userId === 'all' || (uId && (n.userId === uId || n.userId === activeUser?.id || n.userId === activeUser?.uid))) &&
+        !n.read
     ).length;
+  };
 
   const markNotificationRead = (notifId) => {
     setNotifications((prev) =>
@@ -1869,9 +2116,11 @@ export function AppProvider({ children }) {
   };
 
   const markAllNotificationsRead = () => {
+    const activeUser = currentUserRef.current || currentUser;
+    const uId = activeUser?.id || activeUser?.uid;
     setNotifications((prev) =>
       prev.map((n) =>
-        !n.userId || n.userId === 'all' || n.userId === currentUser?.id
+        !n.userId || n.userId === 'all' || (uId && (n.userId === uId || n.userId === activeUser?.id || n.userId === activeUser?.uid))
           ? { ...n, read: true }
           : n
       )
@@ -1881,21 +2130,25 @@ export function AppProvider({ children }) {
   const deleteNotification = (notifId) => {
     if (!notifId) return;
     const activeUser = currentUserRef.current || currentUser;
+    const uId = activeUser?.id || activeUser?.uid;
     setNotifications((prev) => prev.filter((n) => n.id !== notifId));
-    if (activeUser?.id) {
-      deleteNotificationFirebase(activeUser.id, notifId);
+    if (uId) {
+      deleteNotificationFirebase(uId, notifId);
     }
   };
 
   const clearAllNotifications = () => {
     const activeUser = currentUserRef.current || currentUser;
+    const uId = activeUser?.id || activeUser?.uid;
     setNotifications((prev) =>
-      prev.filter((n) => n.userId && n.userId !== 'all' && n.userId !== activeUser?.id)
+      prev.filter((n) => n.userId && n.userId !== 'all' && (uId ? (n.userId !== uId && n.userId !== activeUser?.id && n.userId !== activeUser?.uid) : true))
     );
-    if (activeUser?.id) {
-      clearAllNotificationsFirebase(activeUser.id);
-      AsyncStorage.removeItem(`@alaga_notified_reports_${activeUser.id}`).catch(() => {});
+    if (uId) {
+      clearAllNotificationsFirebase(uId);
+      AsyncStorage.removeItem(`@alaga_notified_reports_${uId}`).catch(() => {});
+      AsyncStorage.removeItem(`@alaga_notified_comments_${uId}`).catch(() => {});
       notifiedReportIdsRef.current.clear();
+      notifiedCommentIdsRef.current.clear();
     }
     AsyncStorage.removeItem('@alaga_realtime_notifications_v2').catch(() => {});
   };

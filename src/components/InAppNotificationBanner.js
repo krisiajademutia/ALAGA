@@ -17,6 +17,13 @@ import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
+function cleanNotificationText(text) {
+  if (!text || typeof text !== 'string') return '';
+  return text
+    .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+    .trim();
+}
+
 /**
  * Standard Phone Heads-Up Dropdown Notification Banner
  * - Default smartphone black-transparent UI with frosted glass
@@ -192,10 +199,10 @@ export default function InAppNotificationBanner({
           {/* Title & Body */}
           <View style={styles.bodyWrap}>
             <Text style={styles.titleText} numberOfLines={1}>
-              {notification.title}
+              {cleanNotificationText(notification.title)}
             </Text>
             <Text style={styles.messageText} numberOfLines={2}>
-              {notification.message}
+              {cleanNotificationText(notification.message)}
             </Text>
           </View>
 

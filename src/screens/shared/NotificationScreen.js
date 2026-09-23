@@ -41,6 +41,13 @@ function formatTimeAgo(timestamp) {
   return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
 }
 
+function cleanNotificationText(text) {
+  if (!text || typeof text !== 'string') return '';
+  return text
+    .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+    .trim();
+}
+
 function SwipeableNotificationItem({
   item,
   onTap,
@@ -149,7 +156,7 @@ function SwipeableNotificationItem({
                 style={[styles.titleText, isUnread && styles.titleTextUnread]}
                 numberOfLines={1}
               >
-                {item.title}
+                {cleanNotificationText(item.title)}
               </Text>
               <Text style={styles.timeText}>
                 {formatTimeAgo(item.createdAt)}
@@ -157,7 +164,7 @@ function SwipeableNotificationItem({
             </View>
 
             <Text style={styles.bodyText} numberOfLines={2}>
-              {item.body || item.message || ''}
+              {cleanNotificationText(item.body || item.message || '')}
             </Text>
 
             {item.type === 'donation' && item.animalPhoto ? (
@@ -328,10 +335,18 @@ export default function NotificationScreen({ navigation }) {
       name = 'chatbubble-outline';
       color = '#2A728F';
       bg = '#EBF4F8';
+    } else if (type === 'comment') {
+      name = 'chatbox-ellipses-outline';
+      color = '#2E7A99';
+      bg = '#EBF4F8';
     } else if (type === 'adoption') {
       name = 'paw-outline';
       color = '#2B8259';
       bg = '#EDF6F1';
+    } else if (type === 'donation') {
+      name = 'heart-outline';
+      color = '#2D9E5F';
+      bg = '#E8F5EE';
     }
 
     return (
