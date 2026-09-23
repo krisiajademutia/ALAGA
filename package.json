@@ -7,7 +7,10 @@
     "start": "node --max-old-space-size=4096 node_modules/@expo/cli/build/bin/cli start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:apk": "eas build -p android --profile preview",
+    "build:android": "eas build -p android --profile production",
+    "build:web": "expo export -p web"
   },
   "keywords": [],
   "author": "",

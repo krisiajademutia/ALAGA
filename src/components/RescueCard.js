@@ -66,6 +66,26 @@ export default function RescueCard({ report, onPress, style }) {
           </Text>
         </View>
 
+        {/* Ongoing Responder or Rescuer Tag */}
+        {report.status === 'Responded' && Boolean(report.responderName) && (
+          <View style={styles.responderRow}>
+            <View style={styles.ongoingDot} />
+            <Text style={styles.responderLabel}>Ongoing Responder: </Text>
+            <Text style={styles.responderName} numberOfLines={1}>
+              {report.responderName}
+            </Text>
+          </View>
+        )}
+        {report.status === 'Rescued' && Boolean(report.responderName) && (
+          <View style={[styles.responderRow, styles.rescuedRow]}>
+            <Ionicons name="checkmark-circle" size={13} color={COLORS.success} style={{ marginRight: 4 }} />
+            <Text style={[styles.responderLabel, { color: COLORS.success }]}>Rescued by: </Text>
+            <Text style={[styles.responderName, { color: COLORS.textDark }]} numberOfLines={1}>
+              {report.responderName}
+            </Text>
+          </View>
+        )}
+
         {/* Footer */}
         <View style={styles.footer}>
           {report.comments?.length > 0 ? (
@@ -168,4 +188,37 @@ const styles = StyleSheet.create({
   },
   commentText: { fontSize: SIZES.xs, color: COLORS.textMuted, fontFamily: 'PlusJakartaSans_500Medium' },
   viewLabel:   { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.primaryDeep, fontFamily: 'PlusJakartaSans_700Bold' },
+
+  responderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginBottom: SIZES.xs4,
+  },
+  rescuedRow: {
+    backgroundColor: '#F0FDF4',
+  },
+  ongoingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#0284C7',
+    marginRight: 6,
+  },
+  responderLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0284C7',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  responderName: {
+    fontSize: 11,
+    color: '#1E293B',
+    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    flex: 1,
+  },
 });

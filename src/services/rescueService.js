@@ -85,17 +85,21 @@ export async function createRescueReportFirebase(reportData) {
 /**
  * Advocate responds to / claims a rescue report
  */
-export async function claimRescueReportFirebase(reportId, advocateId, advocateName) {
+export async function claimRescueReportFirebase(reportId, advocateId, advocateName, advocateAvatar = null) {
   if (isMockFirebase() || !db) return { isMock: true };
 
   try {
     const reportRef = doc(db, RESCUES_COLLECTION, reportId);
-    await updateDoc(reportRef, {
+    const updatePayload = {
       status: 'Responded',
       responderId: advocateId,
       responderName: advocateName,
       respondedAt: new Date().toISOString(),
-    });
+    };
+    if (advocateAvatar) {
+      updatePayload.responderAvatar = advocateAvatar;
+    }
+    await updateDoc(reportRef, updatePayload);
     return { success: true };
   } catch (error) {
     console.warn('[rescueService] Claim sync notice:', error.message);

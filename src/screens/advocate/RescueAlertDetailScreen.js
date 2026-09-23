@@ -33,6 +33,15 @@ function countComments(comments = []) {
   return count;
 }
 
+function fmtAgo(iso) {
+  if (!iso) return '';
+  const s = (Date.now() - new Date(iso)) / 1000;
+  if (s < 60) return 'Just now';
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
 export default function RescueAlertDetailScreen({ route, navigation }) {
   const { reportId } = route.params || {};
   const {
@@ -257,6 +266,22 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
     });
   };
 
+  const handleChatWithResponder = () => {
+    if (!report?.responderId) return;
+    const convId = startConversation(
+      report.responderId,
+      report.responderName || 'Advocate'
+    );
+    navigation.navigate('Chat', {
+      conversationId: convId,
+      otherName: report.responderName || 'Advocate',
+      otherId: report.responderId,
+      otherAvatar: report.responderAvatar,
+      initialDraft: `Hi ${report.responderName || ''}! I am reaching out regarding the rescue alert for the ${report.animalType || 'animal'}.`,
+      linkedReport: report,
+    });
+  };
+
   const handleSendComment = () => {
     if (!commentText.trim()) return;
     addComment(report.id, commentText.trim(), replyTarget?.id || null);
@@ -477,104 +502,197 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
             />
           </View>
 
-          {/* ── Dynamic Rescue Action Panel ────────────────────── */}
-          {report.status === 'Open' ? (
-            isAdvocate ? (
-              <TouchableOpacity
-                style={styles.respondBtn}
-                onPress={handleRespond}
-                activeOpacity={0.88}
-              >
-                <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                <Text style={styles.respondBtnText}>Respond (I’ll help!)</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.awaitingCard}>
-                <View style={styles.awaitingIconWrap}>
-                  <Ionicons name="time-outline" size={22} color="#2E7A99" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.awaitingTitle}>Awaiting Advocate Response</Text>
-                  <Text style={styles.awaitingSub}>
-                    Nearby advocates have been alerted to this rescue case and will coordinate assistance shortly.
-                  </Text>
-                </View>
-              </View>
-            )
-          ) : report.status === 'Responded' ? (
-            <View style={styles.respondedCard}>
-              <View style={styles.respondedHeaderRow}>
-                <View style={styles.respondedIconWrap}>
-                  <Ionicons name="shield-checkmark" size={22} color="#2E7A99" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.respondedTitle}>
-                    {isResponder
-                      ? 'You are responding to this case'
-                      : `Claimed by ${report.responderName || 'Advocate'}`}
-                  </Text>
-                  <Text style={styles.respondedSub}>
-                    {isResponder
-                      ? 'Coordinate directly with the reporter or mark safe when secured.'
-                      : 'An advocate is currently responding to assist this animal.'}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.respondedActionsRow}>
-                {isAdvocate ? (
-                  <TouchableOpacity
-                    style={styles.actionChatBtn}
-                    onPress={handleMessageAdvocate}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="chatbubbles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.actionChatBtnText}>Chat with Reporter</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.actionChatBtn}
-                    onPress={() => {
-                      if (!report.responderId) return;
-                      const convId = startConversation(report.responderId, report.responderName || 'Advocate');
-                      navigation.navigate('Chat', {
-                        conversationId: convId,
-                        otherName: report.responderName || 'Advocate',
-                        otherId: report.responderId,
-                        initialDraft: `Hi ${report.responderName || ''}! Thank you for responding to my rescue report. Here is the latest update:`,
-                        linkedReport: report,
-                      });
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="chatbubbles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.actionChatBtnText}>Chat with {report.responderName || 'Advocate'}</Text>
-                  </TouchableOpacity>
-                )}
-
-                {isResponder && (
-                  <TouchableOpacity
-                    style={styles.actionRescuedBtn}
-                    onPress={handleMarkRescued}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="checkmark-circle" size={16} color="#2E7D32" style={{ marginRight: 6 }} />
-                    <Text style={styles.actionRescuedBtnText}>Mark Rescued</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+          {/* ── Rescue Status & Ongoing Responders ──────────────── */}
+          <View style={styles.hairline} />
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons name="shield-checkmark-outline" size={16} color="#2E7A99" style={{ marginRight: 6 }} />
+              <Text style={styles.sectionTitle}>Rescue Status & Ongoing Responders</Text>
             </View>
-          ) : (
-            <View style={styles.rescuedBanner}>
-              <Ionicons name="checkmark-circle" size={24} color="#2E7D32" />
-              <View style={{ marginLeft: 10, flex: 1 }}>
-                <Text style={styles.rescuedTitle}>Animal Safely Rescued 🎉</Text>
-                <Text style={styles.rescuedSub}>
-                  This case is closed and the animal has been secured.
+
+            {/* Status Overview Card */}
+            <View
+              style={[
+                styles.rescueStatusCard,
+                report.status === 'Responded'
+                  ? styles.statusCardResponded
+                  : report.status === 'Rescued'
+                  ? styles.statusCardRescued
+                  : styles.statusCardOpen,
+              ]}
+            >
+              {/* Header with Live Status Dot */}
+              <View style={styles.rescueStatusHeader}>
+                <View
+                  style={[
+                    styles.statusIndicatorDot,
+                    {
+                      backgroundColor:
+                        report.status === 'Rescued'
+                          ? '#2E7D32'
+                          : report.status === 'Responded'
+                          ? '#0284C7'
+                          : '#D97706',
+                    },
+                  ]}
+                />
+                <Text style={styles.rescueStatusTitle}>
+                  {report.status === 'Rescued'
+                    ? 'Case Closed · Animal Safely Rescued'
+                    : report.status === 'Responded'
+                    ? 'In Progress · Ongoing Responders En Route'
+                    : 'Open · Awaiting Responders'}
                 </Text>
               </View>
+
+              <Text style={styles.rescueStatusDescription}>
+                {report.status === 'Rescued'
+                  ? 'This rescue operation is complete. The animal was safely retrieved and provided with necessary care.'
+                  : report.status === 'Responded'
+                  ? 'A verified advocate has claimed this case and is actively coordinating the rescue.'
+                  : 'This alert is currently open. Nearby verified animal advocates have been alerted to assist.'}
+              </Text>
+
+              {/* Responder Details Box */}
+              {Boolean(report.responderName || report.status === 'Responded' || report.status === 'Rescued') ? (
+                <View style={styles.responderBox}>
+                  <Text style={styles.responderBoxHeader}>
+                    {report.status === 'Rescued' ? 'RESCUE LEAD / HERO' : 'CURRENTLY ONGOING RESPONDER'}
+                  </Text>
+
+                  <View style={styles.responderProfileRow}>
+                    <Avatar
+                      name={report.responderName || 'Advocate'}
+                      uri={report.responderAvatar}
+                      userId={report.responderId}
+                      size={46}
+                    />
+                    <View style={styles.responderInfo}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={styles.responderNameText} numberOfLines={1}>
+                          {report.responderName || 'Advocate Responder'}
+                        </Text>
+                        <View
+                          style={[
+                            styles.ongoingBadge,
+                            {
+                              backgroundColor:
+                                report.status === 'Rescued' ? '#E8F5E9' : '#E0F2FE',
+                            },
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.ongoingBadgeDot,
+                              {
+                                backgroundColor:
+                                  report.status === 'Rescued' ? '#2E7D32' : '#0284C7',
+                              },
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              styles.ongoingBadgeText,
+                              {
+                                color:
+                                  report.status === 'Rescued' ? '#2E7D32' : '#0284C7',
+                              },
+                            ]}
+                          >
+                            {report.status === 'Rescued' ? 'Rescued' : 'Ongoing'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text style={styles.responderRoleSub}>
+                        {report.status === 'Rescued'
+                          ? 'Verified Animal Rescuer'
+                          : isResponder
+                          ? 'You are the active responder for this case'
+                          : 'Active Rescue Advocate · En Route'}
+                      </Text>
+
+                      {Boolean(report.respondedAt) && (
+                        <Text style={styles.respondedTimeText}>
+                          Claimed {fmtAgo(report.respondedAt)}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Actions for Responder / Users */}
+                  <View style={styles.responderActionsRow}>
+                    {/* If current user is NOT the responder, allow chatting with the responder */}
+                    {!isResponder && Boolean(report.responderId) && (
+                      <TouchableOpacity
+                        style={styles.actionChatBtn}
+                        onPress={handleChatWithResponder}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="chatbubbles" size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={styles.actionChatBtnText}>
+                          Chat with {report.responderName?.split(' ')[0] || 'Responder'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* If current user IS the responder, allow chatting with reporter */}
+                    {isResponder && Boolean(report.reporterId) && report.reporterId !== currentUser?.id && (
+                      <TouchableOpacity
+                        style={styles.actionChatBtn}
+                        onPress={handleMessageAdvocate}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="chatbubbles" size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={styles.actionChatBtnText}>Chat with Reporter</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* If current user IS the responder and status is Responded, allow marking safe */}
+                    {isResponder && report.status === 'Responded' && (
+                      <TouchableOpacity
+                        style={styles.actionRescuedBtn}
+                        onPress={handleMarkRescued}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="checkmark-circle" size={16} color="#2E7D32" style={{ marginRight: 6 }} />
+                        <Text style={styles.actionRescuedBtnText}>Mark Rescued</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              ) : (
+                /* No responder yet */
+                <View style={styles.noResponderBox}>
+                  <Ionicons name="time-outline" size={20} color="#D97706" style={{ marginRight: 8 }} />
+                  <Text style={styles.noResponderText}>
+                    No advocates have claimed this rescue case yet.
+                  </Text>
+                </View>
+              )}
+
+              {/* Respond button for Advocates when Open */}
+              {report.status === 'Open' && (
+                isAdvocate ? (
+                  <TouchableOpacity
+                    style={styles.respondBtn}
+                    onPress={handleRespond}
+                    activeOpacity={0.88}
+                  >
+                    <Ionicons name="shield-checkmark" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <Text style={styles.respondBtnText}>Respond & Claim Rescue (I’ll help!)</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.awaitingNote}>
+                    <Ionicons name="information-circle-outline" size={15} color="#2E7A99" style={{ marginRight: 5 }} />
+                    <Text style={styles.awaitingNoteText}>
+                      Nearby advocates have been alerted and will coordinate rescue shortly.
+                    </Text>
+                  </View>
+                )
+              )}
             </View>
-          )}
+          </View>
 
           {/* Comments Section */}
           <View style={styles.commentsSection}>
@@ -1194,6 +1312,150 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: 'PlusJakartaSans_700Bold',
     letterSpacing: 0.2,
+  },
+  rescueStatusCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1.5,
+    marginBottom: 20,
+    ...SHADOWS.sm,
+  },
+  statusCardOpen: {
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFDF5',
+  },
+  statusCardResponded: {
+    borderColor: '#BAE6FD',
+    backgroundColor: '#F8FCFF',
+  },
+  statusCardRescued: {
+    borderColor: '#BBF7D0',
+    backgroundColor: '#F6FCF7',
+  },
+  rescueStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  statusIndicatorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  rescueStatusTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#261B0E',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  rescueStatusDescription: {
+    fontSize: 12.5,
+    color: '#5C4830',
+    lineHeight: 18,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    marginBottom: 14,
+  },
+  responderBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: '#E6DFD5',
+  },
+  responderBoxHeader: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#8C7A68',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  responderProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  responderInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  responderNameText: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#2E1E0E',
+    fontFamily: 'PlusJakartaSans_700Bold',
+    flexShrink: 1,
+  },
+  ongoingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  ongoingBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 4,
+  },
+  ongoingBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  responderRoleSub: {
+    fontSize: 12,
+    color: '#6E5C49',
+    marginTop: 2,
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  respondedTimeText: {
+    fontSize: 11,
+    color: '#9E8D7B',
+    marginTop: 2,
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  responderActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F0ECE4',
+  },
+  noResponderBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    padding: 12,
+    marginBottom: 12,
+  },
+  noResponderText: {
+    fontSize: 12.5,
+    color: '#92400E',
+    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    flex: 1,
+  },
+  awaitingNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FC',
+    borderRadius: 10,
+    padding: 10,
+  },
+  awaitingNoteText: {
+    fontSize: 11.5,
+    color: '#2E7A99',
+    fontFamily: 'PlusJakartaSans_500Medium',
+    flex: 1,
   },
   respondedCard: {
     backgroundColor: '#FFFFFF',

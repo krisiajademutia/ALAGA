@@ -27,8 +27,17 @@ fix_*.cjs
 
 # Documentation & doc generators
 *.docx
+*.pptx
 ALAGA_Final_Documentation.md
 generate_diagrams.py
 generate_docx.py
+generate_pitch_deck.py
+generate_story_pitch_deck.py
 assets/docs/
 scratch/
+Pitching*
+ALAGA_Pitch_Deck*
+ALAGA_Pitching_Script*
+
+
+

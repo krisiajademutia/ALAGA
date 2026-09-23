@@ -5,11 +5,11 @@ import { IMGBB_API_KEY, isMockStorage } from '../config/storageConfig';
  * @param {string|object} imageInput Local device URI or asset object { uri, base64 }
  * @returns {Promise<string>} Public HTTPS image URL or valid data URI fallback
  */
-export async function uploadImageToImgBB(imageInput) {
+export async function uploadImageToImgBB(imageInput, optionalBase64 = null) {
   if (!imageInput) return null;
 
   const localUri = typeof imageInput === 'string' ? imageInput : imageInput.uri;
-  const base64 = typeof imageInput === 'object' ? imageInput.base64 : null;
+  const base64 = optionalBase64 || (typeof imageInput === 'object' ? imageInput.base64 : null);
 
   // If already a remote web URL, return as-is
   if (localUri && (localUri.startsWith('http://') || localUri.startsWith('https://'))) {

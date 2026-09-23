@@ -87,7 +87,7 @@ export default function CommunityHomeScreen({ navigation }) {
               onPress={() => navigation.navigate('Profile')}
               style={styles.avatarWrap}
             >
-              <Avatar name={currentUser?.name || 'Kareena Jane'} uri={currentUser?.avatar} size={42} />
+              <Avatar name={currentUser?.name || 'Kareena Jane'} uri={currentUser?.avatar} userId={currentUser?.id} size={42} />
             </TouchableOpacity>
           </View>
         </View>

@@ -81,7 +81,15 @@ export default function ChatScreen({ route, navigation }) {
     const unsub = subscribeToMessages(
       conversationId,
       (firestoreMsgs) => {
-        setMessages(firestoreMsgs);
+        if (Array.isArray(firestoreMsgs)) {
+          setMessages((prev) => {
+            // Keep any locally created messages that Firestore hasn't returned yet
+            const pending = prev.filter(
+              (p) => p.id?.startsWith('m_') && !firestoreMsgs.some((f) => f.id === p.id || (f.time === p.time && f.type === p.type))
+            );
+            return [...firestoreMsgs, ...pending];
+          });
+        }
       },
       (err) => {
         console.warn('[ChatScreen] Messages listener error:', err?.message);
@@ -153,36 +161,46 @@ export default function ChatScreen({ route, navigation }) {
     }
   }, [initialDraft]);
 
-  const reportLinkAutoSentRef = useRef(false);
-  useEffect(() => {
-    if (
-      !linkedReport ||
-      !convo?.id ||
-      reportLinkAutoSentRef.current
-    ) return;
-    const alreadySent = messages.some(
-      (m) => m.type === 'report_link' && m.reportId === linkedReport.id
-    );
-    if (messages.length === 0 || (!alreadySent && messages.length > 0 && messages.every((m) => m.type !== 'report_link'))) {
-      if (messages.length === 0) {
-        reportLinkAutoSentRef.current = true;
-        sendMessage(convo.id, {
-          type: 'report_link',
-          reportId: linkedReport.id,
-          animalType: linkedReport.animalType || 'Animal',
-          condition: linkedReport.condition || 'Rescue',
-          address: linkedReport.location?.address || '',
-          status: linkedReport.status || 'Open',
-          reporterName: linkedReport.reporterName || '',
-          text: `📋 Rescue Report: ${linkedReport.animalType || 'Animal'} (${linkedReport.condition || 'Rescue'}) at ${linkedReport.location?.address || 'reported location'}`,
-        });
-      }
-    }
-  }, [convo?.id, messages.length, linkedReport]);
+  // Manual send state for linked rescue report: stays visible until user taps "Send Case" or closes with "✕"
+  const [showLinkedReportBanner, setShowLinkedReportBanner] = useState(Boolean(linkedReport));
+
+  const handleSendLinkedReport = () => {
+    if (!linkedReport || !convo?.id) return;
+    const reportMsg = {
+      id: `m_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      senderId: currentUser?.id,
+      senderName: currentUser?.name || 'User',
+      senderAvatar: currentUser?.avatar || null,
+      type: 'report_link',
+      reportId: linkedReport.id,
+      animalType: linkedReport.animalType || 'Animal',
+      condition: linkedReport.condition || 'Rescue',
+      address: linkedReport.location?.address || '',
+      status: linkedReport.status || 'Open',
+      reporterName: linkedReport.reporterName || '',
+      text: `📋 Rescue Report: ${linkedReport.animalType || 'Animal'} (${linkedReport.condition || 'Rescue'}) at ${linkedReport.location?.address || 'reported location'}`,
+      time: new Date().toISOString(),
+    };
+    // Optimistically render in chat so it stays immediately and permanently
+    setMessages((prev) => [...prev, reportMsg]);
+    sendMessage(convo.id, reportMsg);
+    setShowLinkedReportBanner(false);
+    setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
+  };
 
   const handleSend = () => {
     if (!text.trim() || !convo) return;
-    sendMessage(convo.id, { text: text.trim(), type: 'text' });
+    const userMsg = {
+      id: `m_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      senderId: currentUser?.id,
+      senderName: currentUser?.name || 'User',
+      senderAvatar: currentUser?.avatar || null,
+      type: 'text',
+      text: text.trim(),
+      time: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    sendMessage(convo.id, userMsg);
     setText('');
     setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
   };
@@ -806,6 +824,40 @@ export default function ChatScreen({ route, navigation }) {
         }}
       />
 
+      {/* ── Optional Manual Link Rescue Report Banner ───────── */}
+      {showLinkedReportBanner && Boolean(linkedReport) && (
+        <View style={styles.linkedReportBanner}>
+          <View style={styles.linkedReportBannerLeft}>
+            <View style={styles.linkedReportIconCircle}>
+              <Ionicons name="document-text" size={17} color="#2E7A99" />
+            </View>
+            <View style={{ flex: 1, marginLeft: 9 }}>
+              <Text style={styles.linkedReportBannerTitle} numberOfLines={1}>
+                Attach Case: {linkedReport.animalType || 'Animal'} ({linkedReport.condition || 'Rescue'})
+              </Text>
+              <Text style={styles.linkedReportBannerSub} numberOfLines={1}>
+                {linkedReport.location?.address || 'Reported rescue location'}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.sendReportBannerBtn}
+            onPress={handleSendLinkedReport}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="send" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+            <Text style={styles.sendReportBannerBtnText}>Send Case</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.dismissReportBannerBtn}
+            onPress={() => setShowLinkedReportBanner(false)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="close" size={18} color="#8C7D6A" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* ── Input Bar ─────────────────────────────────────────── */}
       <View style={styles.inputBar}>
         <TouchableOpacity
@@ -872,6 +924,22 @@ export default function ChatScreen({ route, navigation }) {
             <Text style={styles.attachSheetTitle}>Share in Chat</Text>
 
             <View style={styles.attachGrid}>
+              {Boolean(linkedReport) && (
+                <TouchableOpacity
+                  style={styles.attachOption}
+                  onPress={() => {
+                    setAttachModalVisible(false);
+                    handleSendLinkedReport();
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.attachIconCircle, { backgroundColor: '#E0F2FE' }]}>
+                    <Ionicons name="document-text" size={22} color="#0284C7" />
+                  </View>
+                  <Text style={styles.attachOptionLabel}>Send Case</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
                 style={styles.attachOption}
                 onPress={handlePickImage}
@@ -2340,5 +2408,56 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#2E7A99',
     fontWeight: '600',
+  },
+  linkedReportBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FC',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#D4EEF7',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  linkedReportBannerLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  linkedReportIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#D9F0F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  linkedReportBannerTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1A535C',
+  },
+  linkedReportBannerSub: {
+    fontSize: 11,
+    color: '#5C7480',
+    marginTop: 1,
+  },
+  sendReportBannerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2E7A99',
+    borderRadius: 14,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    marginRight: 6,
+  },
+  sendReportBannerBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  dismissReportBannerBtn: {
+    padding: 4,
   },
 });

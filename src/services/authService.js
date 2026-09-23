@@ -10,6 +10,34 @@ import { doc, setDoc, getDoc, updateDoc, deleteDoc, writeBatch, collection, getD
 import { auth, db } from './firebase';
 import { isMockFirebase } from '../config/firebaseConfig';
 
+// Curated high-resolution default portraits for community members & advocates
+export const DEFAULT_USER_AVATARS = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=240&q=80',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=240&q=80',
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=240&q=80',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=240&q=80',
+  'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=240&q=80',
+  'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=240&q=80',
+  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=240&q=80',
+  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=240&q=80',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=240&q=80',
+  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=240&q=80',
+];
+
+/**
+ * Deterministically return a consistent, beautiful portrait avatar based on user name/id
+ */
+export function getDefaultUserAvatar(name = '', userId = '') {
+  const str = (userId || name || 'alaga_member').toString();
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  const idx = Math.abs(hash) % DEFAULT_USER_AVATARS.length;
+  return DEFAULT_USER_AVATARS[idx];
+}
+
 // In-memory profile & avatar cache for instant rendering across all screens
 const userAvatarCache = new Map();
 const userProfileCache = new Map();
@@ -32,7 +60,11 @@ export async function loginWithFirebase(email, password) {
     const userDocSnap = await getDoc(userDocRef);
 
     if (userDocSnap.exists()) {
-      return { success: true, user: { id: uid, ...userDocSnap.data() } };
+      const data = userDocSnap.data();
+      const avatar = data.avatar || getDefaultUserAvatar(data.name, uid);
+      const user = { id: uid, ...data, avatar };
+      cacheUserProfile(user);
+      return { success: true, user };
     } else {
       const derivedName = cleanEmail.split('@')[0].replace(/[._]/g, ' ');
       const newUserData = {
@@ -40,7 +72,7 @@ export async function loginWithFirebase(email, password) {
         email: cleanEmail,
         name: userCredential?.user?.displayName || derivedName,
         role: 'community',
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(derivedName)}&background=1A535C&color=fff&bold=true`,
+        avatar: getDefaultUserAvatar(derivedName, uid),
         location: '',
         organization: '',
         joinedAt: new Date().toISOString().split('T')[0],
@@ -48,6 +80,7 @@ export async function loginWithFirebase(email, password) {
         reportCount: 0,
       };
       await setDoc(userDocRef, newUserData);
+      cacheUserProfile(newUserData);
       return { success: true, user: newUserData };
     }
   } catch (signErr) {
@@ -74,6 +107,7 @@ export async function registerWithFirebase({ email, password, name, role, locati
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
     const uid = userCredential.user.uid;
+    const defaultAvatar = getDefaultUserAvatar(name, uid);
 
     const newUserData = {
       id: uid,
@@ -82,7 +116,7 @@ export async function registerWithFirebase({ email, password, name, role, locati
       role: role || 'community',
       location: location?.trim() || '',
       organization: organization?.trim() || '',
-      avatar: null,
+      avatar: defaultAvatar,
       joinedAt: new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString(),
       ...(role === 'advocate' ? { rescueCount: 0, animalCount: 0 } : { reportCount: 0 }),
@@ -90,6 +124,7 @@ export async function registerWithFirebase({ email, password, name, role, locati
 
     // Save profile to Firestore users/{uid}
     await setDoc(doc(db, 'users', uid), newUserData);
+    cacheUserProfile(newUserData);
 
     return { success: true, user: newUserData };
   } catch (error) {
@@ -103,15 +138,18 @@ export async function registerWithFirebase({ email, password, name, role, locati
 
         let userData;
         if (userDocSnap.exists()) {
+          const data = userDocSnap.data();
+          const avatar = data.avatar || getDefaultUserAvatar(data.name || name, uid);
           const updates = {
             name: name.trim(),
             role: role || 'community',
             location: location?.trim() || '',
             organization: organization?.trim() || '',
+            avatar,
             updatedAt: new Date().toISOString(),
           };
           await updateDoc(userDocRef, updates);
-          userData = { id: uid, ...userDocSnap.data(), ...updates };
+          userData = { id: uid, ...data, ...updates };
         } else {
           userData = {
             id: uid,
@@ -120,13 +158,14 @@ export async function registerWithFirebase({ email, password, name, role, locati
             role: role || 'community',
             location: location?.trim() || '',
             organization: organization?.trim() || '',
-            avatar: null,
+            avatar: getDefaultUserAvatar(name, uid),
             joinedAt: new Date().toISOString().split('T')[0],
             createdAt: new Date().toISOString(),
             ...(role === 'advocate' ? { rescueCount: 0, animalCount: 0 } : { reportCount: 0 }),
           };
           await setDoc(userDocRef, userData);
         }
+        cacheUserProfile(userData);
         return { success: true, user: userData };
       } catch (signErr) {
         return {
@@ -363,7 +402,9 @@ export async function getUserProfileFirebase(userId) {
     const userDocRef = doc(db, 'users', userId);
     const userDocSnap = await getDoc(userDocRef);
     if (userDocSnap.exists()) {
-      const profile = { id: userId, ...userDocSnap.data() };
+      const data = userDocSnap.data();
+      const avatar = data.avatar || getDefaultUserAvatar(data.name, userId);
+      const profile = { id: userId, ...data, avatar };
       cacheUserProfile(profile);
       return profile;
     }
@@ -378,7 +419,7 @@ export async function getUserProfileFirebase(userId) {
  * Asynchronously resolve a user's avatar URL from cache or Firestore
  */
 export async function resolveUserAvatar(userId, name) {
-  const cached = getCachedUserAvatar(userId, name);
+  const cached = getCachedUserAvatar(userId);
   if (cached) return cached;
 
   if (userId) {
@@ -387,7 +428,7 @@ export async function resolveUserAvatar(userId, name) {
       return profile.avatar;
     }
   }
-  return null;
+  return getDefaultUserAvatar(name, userId);
 }
 
 /**
@@ -399,7 +440,9 @@ export async function getAllUsersFirebase() {
     const usersSnap = await getDocs(collection(db, 'users'));
     const list = [];
     usersSnap.forEach((d) => {
-      const userObj = { id: d.id, ...d.data() };
+      const data = d.data();
+      const avatar = data.avatar || getDefaultUserAvatar(data.name, d.id);
+      const userObj = { id: d.id, ...data, avatar };
       list.push(userObj);
       cacheUserProfile(userObj);
     });

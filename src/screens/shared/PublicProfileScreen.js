@@ -18,7 +18,7 @@ import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import EmptyState from '../../components/EmptyState';
 import StatusPill from '../../components/StatusPill';
-import { getUserProfileFirebase } from '../../services/authService';
+import { getUserProfileFirebase, getDefaultUserAvatar } from '../../services/authService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GRID_CARD_WIDTH = (SCREEN_WIDTH - 44) / 2;
@@ -178,15 +178,10 @@ export default function PublicProfileScreen({ route, navigation }) {
           
           {/* Avatar Circle */}
           <View style={styles.avatarWrap}>
-            {user.avatar && typeof user.avatar === 'string' && user.avatar.trim().length > 0 ? (
-              <Image source={{ uri: user.avatar }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                <Text style={styles.avatarInitials}>
-                  {user.name ? user.name.split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() : 'AL'}
-                </Text>
-              </View>
-            )}
+            <Image
+              source={{ uri: (user.avatar && typeof user.avatar === 'string' && user.avatar.trim().length > 0) ? user.avatar : getDefaultUserAvatar(user.name, user.id) }}
+              style={styles.avatar}
+            />
           </View>
 
           {/* User Name */}

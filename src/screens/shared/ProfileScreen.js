@@ -27,6 +27,7 @@ import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import AlertModal from '../../components/AlertModal';
 import PhotoPickerModal from '../../components/PhotoPickerModal';
 import { uploadImageToImgBB } from '../../services/storageService';
+import { getDefaultUserAvatar } from '../../services/authService';
 
 export default function ProfileScreen({ route, navigation }) {
   const {
@@ -369,8 +370,8 @@ export default function ProfileScreen({ route, navigation }) {
       const asset = result.assets[0];
       setUploadingPhoto(true);
       try {
-        const cloudUrl = await uploadImageToImgBB(asset.uri, asset.base64);
-        updateUser({ avatar: cloudUrl });
+        const cloudUrl = await uploadImageToImgBB({ uri: asset.uri, base64: asset.base64 });
+        updateUser({ avatar: cloudUrl || asset.uri });
       } catch (err) {
         console.error('Avatar upload error:', err);
         updateUser({ avatar: asset.uri });
@@ -426,14 +427,11 @@ export default function ProfileScreen({ route, navigation }) {
               <View style={styles.avatar}>
                 <ActivityIndicator color="#2E7A99" />
               </View>
-            ) : currentUser?.avatar ? (
-              <Image source={{ uri: currentUser.avatar }} style={styles.avatar} />
             ) : (
-              <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                <Text style={styles.avatarInitials}>
-                  {currentUser?.name?.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase() || 'AL'}
-                </Text>
-              </View>
+              <Image
+                source={{ uri: currentUser?.avatar || getDefaultUserAvatar(currentUser?.name, currentUser?.id) }}
+                style={styles.avatar}
+              />
             )}
             <View style={styles.cameraIconBadge}>
               <Ionicons name="camera" size={13} color="#FFFFFF" />

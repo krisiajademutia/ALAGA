@@ -16,6 +16,7 @@ import {
   deleteNotificationFirebase,
   clearAllNotificationsFirebase,
   subscribeAuthState,
+  getDefaultUserAvatar,
 } from '../services/authService';
 import {
   subscribeToRescueReports,
@@ -810,6 +811,9 @@ export function AppProvider({ children }) {
         if (savedUserStr) {
           const parsed = JSON.parse(savedUserStr);
           if (parsed && (parsed.id || parsed.uid)) {
+            if (!parsed.avatar) {
+              parsed.avatar = getDefaultUserAvatar(parsed.name, parsed.id || parsed.uid);
+            }
             setCurrentUser(parsed);
             currentUserRef.current = parsed;
             cacheUserProfile(parsed);
@@ -833,6 +837,9 @@ export function AppProvider({ children }) {
           const profile = await getUserProfileFirebase(fbUser.uid);
           if (profile && isMounted) {
             const merged = { ...profile, id: fbUser.uid, email: fbUser.email || profile.email };
+            if (!merged.avatar) {
+              merged.avatar = getDefaultUserAvatar(merged.name, fbUser.uid);
+            }
             setCurrentUser((prev) => {
               const updated = { ...(prev || {}), ...merged };
               currentUserRef.current = updated;
@@ -1249,7 +1256,7 @@ export function AppProvider({ children }) {
       reporterId: authorId,
       reporterName: currentUser?.name || 'Community Member',
       reporterEmail: currentUser?.email || '',
-      reporterAvatar: currentUser?.avatar || null,
+      reporterAvatar: currentUser?.avatar || getDefaultUserAvatar(currentUser?.name, authorId),
       status: 'Open',
       createdAt: new Date().toISOString(),
       responderId: null,
@@ -1299,6 +1306,8 @@ export function AppProvider({ children }) {
   };
 
   const respondToReport = (reportId) => {
+    const responderAvatar = currentUser?.avatar || getDefaultUserAvatar(currentUser?.name, currentUser?.id);
+    const respondedAt = new Date().toISOString();
     setRescueReports((prev) =>
       prev.map((r) =>
         r.id === reportId
@@ -1307,12 +1316,13 @@ export function AppProvider({ children }) {
               status: 'Responded',
               responderId: currentUser?.id,
               responderName: currentUser?.name,
-              responderAvatar: currentUser?.avatar || null,
+              responderAvatar,
+              respondedAt,
             }
           : r
       )
     );
-    claimRescueReportFirebase(reportId, currentUser?.id, currentUser?.name);
+    claimRescueReportFirebase(reportId, currentUser?.id, currentUser?.name, responderAvatar);
   };
 
   const markRescued = (reportId) => {
@@ -1336,7 +1346,7 @@ export function AppProvider({ children }) {
     const activeUser = currentUserRef.current || currentUser;
     const authorId = activeUser?.id || activeUser?.uid || 'u_anon';
     const authorName = activeUser?.name || 'Community Member';
-    const authorAvatar = activeUser?.avatar || null;
+    const authorAvatar = activeUser?.avatar || getDefaultUserAvatar(authorName, authorId);
 
     const newComment = {
       id: `c${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
@@ -1395,7 +1405,7 @@ export function AppProvider({ children }) {
       id: `a${Date.now()}`,
       advocateId: currentUser?.id || currentUser?.uid || 'u2',
       advocateName: currentUser?.name || 'Elena Ramos',
-      advocateAvatar: currentUser?.avatar || null,
+      advocateAvatar: currentUser?.avatar || getDefaultUserAvatar(currentUser?.name, currentUser?.id || currentUser?.uid),
       advocateEmail: currentUser?.email || null,
       createdAt: new Date().toISOString(),
       fosterId: null,
@@ -1493,7 +1503,7 @@ export function AppProvider({ children }) {
       id: `req${Date.now()}`,
       requesterId: currentUser?.id || 'u1',
       requesterName: currentUser?.name || 'Community Member',
-      requesterAvatar: currentUser?.avatar || null,
+      requesterAvatar: currentUser?.avatar || getDefaultUserAvatar(currentUser?.name, currentUser?.id || 'u1'),
       status: 'Pending',
       createdAt: new Date().toISOString(),
       ...requestData,
@@ -1698,7 +1708,7 @@ export function AppProvider({ children }) {
         id: `m${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         senderId: uId,
         senderName: activeUser.name || 'User',
-        senderAvatar: activeUser.avatar || null,
+        senderAvatar: activeUser.avatar || getDefaultUserAvatar(activeUser.name, uId),
         text: trimmed,
         type: 'text',
         time: new Date().toISOString(),
@@ -1708,7 +1718,7 @@ export function AppProvider({ children }) {
         id: `m${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         senderId: uId,
         senderName: activeUser.name || 'User',
-        senderAvatar: activeUser.avatar || null,
+        senderAvatar: activeUser.avatar || getDefaultUserAvatar(activeUser.name, uId),
         text: messageData.text || '',
         type: messageData.type || 'text',
         mediaUri: messageData.mediaUri || null,

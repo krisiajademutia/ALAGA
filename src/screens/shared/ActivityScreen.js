@@ -427,6 +427,16 @@ function ReportCard({ item, isAdvocate, navigation }) {
             <Ionicons name="location-outline" size={11} color="#8C7D6A" /> {item.location.address}
           </Text>
         ) : null}
+        {item.status === 'Responded' && Boolean(item.responderName) && (
+          <Text style={styles.responderActivityTag} numberOfLines={1}>
+            <Ionicons name="shield-checkmark" size={11} color="#0284C7" /> Ongoing Responder: {item.responderName}
+          </Text>
+        )}
+        {item.status === 'Rescued' && Boolean(item.responderName) && (
+          <Text style={[styles.responderActivityTag, { color: '#2E7D32' }]} numberOfLines={1}>
+            <Ionicons name="checkmark-circle" size={11} color="#2E7D32" /> Rescued by: {item.responderName}
+          </Text>
+        )}
         <View style={styles.cardFooter}>
           <Text style={styles.urgencyText}>{item.urgency || 'Normal'} Priority</Text>
           <Text style={styles.cardDate}>{fmtDate(item.createdAt)}</Text>
@@ -748,6 +758,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#8C7D6A',
     marginBottom: 2,
+  },
+  responderActivityTag: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#0284C7',
+    marginBottom: 3,
+    marginTop: 1,
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
   typeTagText: {
     fontSize: 11,
