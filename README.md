@@ -193,5 +193,5 @@ Make sure you have the following installed on your development machine:
 ---
 
 <p align="center">
-  <strong>ALAGA</strong> — <em>Where every life deserves alaga, compassion, and a safe home.</em>
+  <strong>ALAGA</strong> — <em>Where every life deserves alaga.</em>
 </p>
