@@ -17,6 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import Button from '../../components/Button';
@@ -39,11 +40,13 @@ const READINESS = [
 ];
 
 export default function AddAnimalScreen({ route, navigation }) {
-  const { addAnimal, getAdvocateRescuedCases, showAlert } = useApp();
+  const { addAnimal, getAdvocateRescuedCases, showAlert, currentUser } = useApp();
   const rescueReportId = route.params?.rescueReportId || null;
   const rescuedCases = (getAdvocateRescuedCases ? getAdvocateRescuedCases() : []) || [];
 
   const [name, setName] = useState('');
+  const [location, setLocation] = useState(currentUser?.location || '');
+  const [detectingLocation, setDetectingLocation] = useState(false);
   const [species, setSpecies] = useState('');
   const [otherSpecies, setOtherSpecies] = useState('');
   const [breed, setBreed] = useState('');
@@ -83,6 +86,43 @@ export default function AddAnimalScreen({ route, navigation }) {
         : 14;
 
   const needsFosterDuration = listingType === 'Foster' || listingType === 'Both';
+
+  const detectLocation = async () => {
+    try {
+      setDetectingLocation(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        showAlert({
+          type: 'warning',
+          title: 'Permission Denied',
+          message: 'Please allow location access to auto-detect the animal’s current area.',
+        });
+        setDetectingLocation(false);
+        return;
+      }
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const reverseList = await Location.reverseGeocodeAsync({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      });
+      if (reverseList && reverseList.length > 0) {
+        const item = reverseList[0];
+        const parts = [
+          item.district || item.subregion || item.city,
+          item.city && item.region && item.city !== item.region ? item.region : null,
+        ].filter(Boolean);
+        const resolved = parts.join(', ') || item.city || item.region || item.name || 'Metro Manila';
+        setLocation(resolved);
+        setErrors((e) => ({ ...e, location: null }));
+      }
+    } catch (err) {
+      console.warn('[AddAnimal] Location detect error:', err.message);
+    } finally {
+      setDetectingLocation(false);
+    }
+  };
 
   const pickPhoto = async () => {
     setPhotoPickerVisible(false);
@@ -190,6 +230,10 @@ export default function AddAnimalScreen({ route, navigation }) {
             setPhotos(rescuePhotos);
           }
         }
+        if (!location && c.location?.address) {
+          setLocation(c.location.address);
+          setErrors((e) => ({ ...e, location: null }));
+        }
       }
     }
   };
@@ -197,6 +241,7 @@ export default function AddAnimalScreen({ route, navigation }) {
   const validate = () => {
     const e = {};
     if (!name.trim()) e.name = 'Animal name is required.';
+    if (!location.trim()) e.location = 'Please specify the animal location or city.';
     if (!species) e.species = 'Select the species.';
     else if (species === 'Other' && !otherSpecies.trim()) e.species = 'Please specify the species.';
     if (!gender) e.gender = 'Select gender.';
@@ -235,6 +280,7 @@ export default function AddAnimalScreen({ route, navigation }) {
       const tags = tagsText.split(',').map((t) => t.trim()).filter(Boolean);
       addAnimal({
         name: name.trim(),
+        location: location.trim() || currentUser?.location || 'Pasig City',
         species: species === 'Other' ? otherSpecies.trim() : species,
         breed: breed.trim() || 'Unknown',
         age: age.trim() || 'Unknown',
@@ -417,6 +463,39 @@ export default function AddAnimalScreen({ route, navigation }) {
           autoCapitalize="words"
           error={errors.name}
         />
+
+        {/* ── Location Input ─────────────────────────────────── */}
+        <View style={{ marginBottom: 4 }}>
+          <View style={styles.locationHeaderRow}>
+            <Text style={lbl.text}>
+              LOCATION (CITY / AREA)
+              {errors.location ? <Text style={lbl.err}> · {errors.location}</Text> : null}
+            </Text>
+            <TouchableOpacity
+              onPress={detectLocation}
+              disabled={detectingLocation}
+              style={styles.gpsDetectBtn}
+              activeOpacity={0.7}
+            >
+              {detectingLocation ? (
+                <ActivityIndicator size="small" color={COLORS.primaryDeep} style={{ marginRight: 4 }} />
+              ) : (
+                <Ionicons name="navigate-outline" size={13} color={COLORS.primaryDeep} style={{ marginRight: 4 }} />
+              )}
+              <Text style={styles.gpsDetectText}>
+                {detectingLocation ? 'Detecting...' : 'Use Current GPS'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <Input
+            placeholder="e.g. Pasig City, Metro Manila"
+            value={location}
+            onChangeText={(t) => { setLocation(t); setErrors((e) => ({ ...e, location: null })); }}
+            autoCapitalize="words"
+            error={errors.location}
+            icon={<Ionicons name="location-outline" size={18} color={COLORS.textMuted} />}
+          />
+        </View>
 
         <Label text="SPECIES" error={errors.species} />
         <View style={styles.scrollRow}>
@@ -719,6 +798,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
+  },
+  locationHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  gpsDetectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    backgroundColor: '#EBF4F7',
+    borderRadius: 8,
+  },
+  gpsDetectText: {
+    fontSize: 11,
+    color: COLORS.primaryDeep,
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
   photoSubLabel: {
     fontSize: SIZES.xs,

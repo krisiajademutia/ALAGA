@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import AnimalCard from '../../components/AnimalCard';
@@ -23,7 +24,7 @@ const TYPE_FILTERS = [
 ];
 
 export default function ListingsScreen({ navigation }) {
-  const { animals } = useApp();
+  const { animals, currentUser } = useApp();
   const [species, setSpecies] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
 
@@ -58,8 +59,20 @@ export default function ListingsScreen({ navigation }) {
       <View style={[styles.header, { paddingTop: safeTop }]}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>Adopt &amp; Foster</Text>
-          <View style={styles.countBadge}>
-            <Text style={styles.countNum}>{filtered.length} Available</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={styles.countBadge}>
+              <Text style={styles.countNum}>{filtered.length} Available</Text>
+            </View>
+            {currentUser?.role === 'advocate' && (
+              <TouchableOpacity
+                style={styles.addBtn}
+                onPress={() => navigation.navigate('AddAnimal')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="add" size={16} color="#FFFFFF" />
+                <Text style={styles.addBtnText}>Add Pet</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -180,6 +193,21 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '700',
     color: '#2E7A99',
+  },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2E7A99',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 2,
+  },
+  addBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11.5,
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
   segmentedContainer: {

@@ -257,9 +257,9 @@ export default function AnimalDetailScreen({ route, navigation }) {
   const breedVal = animal.breed || 'Puspin Tabby';
   const advocateNameVal = animal.advocateName || 'Elena Ramos';
   const advocateRoleVal = animal.advocateRole || 'Verified Community Foster Advocate';
-  const locationTextVal = animal.rescueNote || animal.location
-    ? `${animal.location || 'Pasig City'} • ${animal.rescueNote || 'Rescued 3 months ago (1.2 km away)'}`
-    : 'Pasig City • Rescued 3 months ago (1.2 km away)';
+  const locationTextVal = animal.location && animal.rescueNote
+    ? `${animal.location} • ${animal.rescueNote}`
+    : animal.location || animal.rescueNote || 'Pasig City';
 
   return (
     <View style={styles.flex}>

@@ -67,6 +67,7 @@ export default function AnimalCard({ animal, onPress, style, horizontal = false 
             {animal.species} · {animal.breed} · {animal.ageTag || animal.age}
           </Text>
           <View style={styles.locRow}>
+            <Ionicons name="location-outline" size={11} color="#8C7D6A" style={{ marginRight: 2 }} />
             <Text style={styles.locText} numberOfLines={1}>
               {animal.location ? animal.location.replace(/\s*\(.*?\)/g, '') : 'Pasig City'}
             </Text>
