@@ -3,6 +3,7 @@ import {
   doc,
   setDoc,
   updateDoc,
+  deleteDoc,
   onSnapshot,
   query,
   where,
@@ -200,3 +201,20 @@ export async function updateApplicationFirebase(appId, updates) {
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * Delete an animal listing from Firestore
+ */
+export async function deleteAnimalFirebase(animalId) {
+  if (isMockFirebase() || !db || !animalId) return { isMock: true };
+  try {
+    const docId = String(animalId);
+    const docRef = doc(db, ANIMALS_COLLECTION, docId);
+    await deleteDoc(docRef);
+    return { success: true };
+  } catch (error) {
+    console.error('[animalService] Delete animal error:', error);
+    return { success: false, error: error.message };
+  }
+}
+

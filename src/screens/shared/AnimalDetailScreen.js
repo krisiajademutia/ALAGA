@@ -34,9 +34,10 @@ export default function AnimalDetailScreen({ route, navigation }) {
     startConversation,
     markAnimalAdopted,
     returnAnimalToListings,
+    deleteAnimal,
     showAlert,
   } = useApp();
-  const animal = animals.find((a) => a.id === animalId) || animals[0];
+  const animal = animals.find((a) => a.id === animalId) || null;
 
   const [isFav, setIsFav] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -53,7 +54,23 @@ export default function AnimalDetailScreen({ route, navigation }) {
       Platform.OS === 'android' ? RNStatusBar.currentHeight || 0 : 12
     ) + 6;
 
-  if (!animal) return null;
+  if (!animal) {
+    return (
+      <View style={[styles.flex, { alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#FFF' }]}>
+        <Ionicons name="paw-outline" size={48} color={COLORS.border} />
+        <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.brown, marginTop: 12 }}>Animal Not Found</Text>
+        <Text style={{ fontSize: 13, color: COLORS.textMuted, textAlign: 'center', marginTop: 4, marginBottom: 16 }}>
+          This animal listing has been removed or is no longer available.
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{ paddingHorizontal: 20, paddingVertical: 10, backgroundColor: COLORS.primary, borderRadius: 12 }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const allPhotos = (animal.photos && animal.photos.length > 0)
     ? animal.photos
@@ -111,6 +128,21 @@ export default function AnimalDetailScreen({ route, navigation }) {
             primaryText: 'OK',
           });
         }, 300);
+      },
+    });
+  };
+
+  const handleDeleteAnimal = () => {
+    showAlert({
+      title: `Delete ${animal.name}?`,
+      message: `Are you sure you want to delete this listing? All associated notifications and applications will also be removed.`,
+      type: 'warning',
+      customIcon: 'trash-outline',
+      secondaryText: 'Cancel',
+      primaryText: 'Delete',
+      onPrimaryPress: async () => {
+        await deleteAnimal(animal.id);
+        navigation.goBack();
       },
     });
   };
@@ -502,6 +534,14 @@ export default function AnimalDetailScreen({ route, navigation }) {
                 <Text style={styles.relistBtnText}>End Foster</Text>
               </TouchableOpacity>
             )}
+
+            <TouchableOpacity
+              style={styles.deleteAnimalBtn}
+              onPress={handleDeleteAnimal}
+              activeOpacity={0.88}
+            >
+              <Ionicons name="trash-outline" size={18} color="#C23E3E" />
+            </TouchableOpacity>
           </View>
         </View>
       ) : isAdvocate ? (
@@ -1215,6 +1255,15 @@ const styles = StyleSheet.create({
     ...FONTS.button,
     fontSize: 14,
     color: COLORS.primaryDeep,
+  },
+  deleteAnimalBtn: {
+    width: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF5F5',
+    borderWidth: 1.5,
+    borderColor: '#FCD8D8',
+    borderRadius: SIZES.r24 + 1,
   },
   ownerBadgePill: {
     flexDirection: 'row',

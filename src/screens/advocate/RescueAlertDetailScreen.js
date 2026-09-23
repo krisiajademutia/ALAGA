@@ -33,16 +33,58 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
     respondToReport,
     markRescued,
     updateRescueReportUrgency,
+    deleteRescueReport,
     startConversation,
     showAlert,
   } = useApp();
 
-  const report = rescueReports.find((r) => r.id === reportId) || rescueReports[0];
+  const report = rescueReports.find((r) => r.id === reportId) || null;
   const [commentText, setCommentText] = useState('');
   const [isFav, setIsFav] = useState(false);
   const [previewImageIndex, setPreviewImageIndex] = useState(null);
   const [urgencyModalVisible, setUrgencyModalVisible] = useState(false);
   const isAdvocate = currentUser?.role === 'advocate';
+
+  if (!report) {
+    return (
+      <View style={[styles.flex, { alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#FFF' }]}>
+        <Ionicons name="shield-outline" size={48} color={COLORS.border} />
+        <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.brown, marginTop: 12 }}>Report Not Found</Text>
+        <Text style={{ fontSize: 13, color: COLORS.textMuted, textAlign: 'center', marginTop: 4, marginBottom: 16 }}>
+          This rescue alert has been resolved or removed.
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{ paddingHorizontal: 20, paddingVertical: 10, backgroundColor: COLORS.primary, borderRadius: 12 }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const isAuthor = Boolean(
+    currentUser && (
+      currentUser.id === report?.reporterId ||
+      (currentUser.email && report?.reporterEmail && currentUser.email.toLowerCase() === report?.reporterEmail.toLowerCase())
+    )
+  );
+  const canDelete = isAuthor || isAdvocate;
+
+  const handleDeleteReport = () => {
+    showAlert({
+      title: 'Delete Rescue Report?',
+      message: 'Are you sure you want to delete this rescue report? All related alerts will also be removed.',
+      type: 'warning',
+      customIcon: 'trash-outline',
+      secondaryText: 'Cancel',
+      primaryText: 'Delete',
+      onPrimaryPress: async () => {
+        await deleteRescueReport(reportId);
+        navigation.goBack();
+      },
+    });
+  };
 
   const photosList = (report?.photos && report.photos.length > 0)
     ? report.photos
@@ -253,6 +295,17 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
           >
             <Ionicons name="arrow-back" size={20} color="#473018" />
           </TouchableOpacity>
+
+          {/* Floating Delete */}
+          {canDelete && (
+            <TouchableOpacity
+              style={[styles.floatingDelete, { top: safeTop }]}
+              onPress={handleDeleteReport}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="trash-outline" size={19} color="#C23E3E" />
+            </TouchableOpacity>
+          )}
 
           {/* Floating Heart */}
           <TouchableOpacity
@@ -721,6 +774,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.94)',
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.14,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  floatingDelete: {
+    position: 'absolute',
+    right: 66,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    borderWidth: 1,
+    borderColor: '#FCD8D8',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000000',

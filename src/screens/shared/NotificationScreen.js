@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   Image,
   Platform,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,6 +41,151 @@ function formatTimeAgo(timestamp) {
   return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
 }
 
+function SwipeableNotificationItem({
+  item,
+  onTap,
+  onDelete,
+  renderIcon,
+  navigation,
+  markNotificationRead,
+}) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const itemOpacity = useRef(new Animated.Value(1)).current;
+  const isDeletingRef = useRef(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Trigger only on distinct horizontal swipe
+        return (
+          Math.abs(gestureState.dx) > 10 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5
+        );
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (isDeletingRef.current) return;
+        if (gestureState.dx < 0) {
+          translateX.setValue(gestureState.dx);
+        } else {
+          // Resist swiping to the right
+          translateX.setValue(gestureState.dx * 0.15);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (isDeletingRef.current) return;
+        // If swiped left past threshold or with strong left flick
+        if (gestureState.dx < -100 || (gestureState.dx < -40 && gestureState.vx < -0.5)) {
+          isDeletingRef.current = true;
+          Animated.parallel([
+            Animated.timing(translateX, {
+              toValue: -Dimensions.get('window').width,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+            Animated.timing(itemOpacity, {
+              toValue: 0,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+          ]).start(() => {
+            if (onDelete) onDelete(item.id);
+          });
+        } else {
+          Animated.spring(translateX, {
+            toValue: 0,
+            friction: 8,
+            tension: 50,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateX, {
+          toValue: 0,
+          friction: 8,
+          tension: 50,
+          useNativeDriver: true,
+        }).start();
+      },
+    })
+  ).current;
+
+  const isUnread = !item.read;
+
+  return (
+    <View style={styles.swipeContainer}>
+      {/* Background Red Delete Strip */}
+      <View style={styles.swipeDeleteBackground}>
+        <Ionicons name="trash" size={20} color="#FFFFFF" />
+        <Text style={styles.swipeDeleteText}>Delete</Text>
+      </View>
+
+      {/* Foreground Notification Card */}
+      <Animated.View
+        style={[
+          styles.swipeForeground,
+          {
+            transform: [{ translateX }],
+            opacity: itemOpacity,
+          },
+        ]}
+        {...panResponder.panHandlers}
+      >
+        <TouchableOpacity
+          style={[styles.rowItem, isUnread && styles.rowItemUnread]}
+          onPress={() => onTap(item)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.dotSlot}>
+            {isUnread && <View style={styles.unreadDot} />}
+          </View>
+
+          {renderIcon(item.type, item.icon, item.iconColor, item.iconBg)}
+
+          <View style={styles.contentWrap}>
+            <View style={styles.titleRow}>
+              <Text
+                style={[styles.titleText, isUnread && styles.titleTextUnread]}
+                numberOfLines={1}
+              >
+                {item.title}
+              </Text>
+              <Text style={styles.timeText}>
+                {formatTimeAgo(item.createdAt)}
+              </Text>
+            </View>
+
+            <Text style={styles.bodyText} numberOfLines={2}>
+              {item.body || item.message || ''}
+            </Text>
+
+            {item.type === 'donation' && item.animalPhoto ? (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                  if (item.animalId) {
+                    markNotificationRead(item.id);
+                    navigation.navigate('AnimalDetail', { animalId: item.animalId });
+                  }
+                }}
+                style={styles.animalThumbRow}
+              >
+                <Image
+                  source={{ uri: item.animalPhoto }}
+                  style={styles.animalThumb}
+                  resizeMode="cover"
+                />
+                <Text style={styles.animalThumbLabel}>View animal profile →</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+}
+
 const FILTER_TABS = [
   { key: 'all', label: 'All' },
   { key: 'unread', label: 'Unread' },
@@ -52,6 +200,11 @@ export default function NotificationScreen({ navigation }) {
     getUnreadCount,
     markNotificationRead,
     markAllNotificationsRead,
+    deleteNotification,
+    clearAllNotifications,
+    showAlert,
+    rescueReports,
+    animals,
   } = useApp();
 
   const [activeFilter, setActiveFilter] = useState('all');
@@ -103,6 +256,17 @@ export default function NotificationScreen({ navigation }) {
     return sections;
   }, [filteredNotifs]);
 
+  const handleClearAll = () => {
+    showAlert({
+      type: 'warning',
+      title: 'Clear All Notifications',
+      message: 'Are you sure you want to remove all notifications? This will delete them across all devices.',
+      primaryText: 'Clear All',
+      onPrimaryPress: () => clearAllNotifications(),
+      secondaryText: 'Cancel',
+    });
+  };
+
   const handleTap = (item) => {
     markNotificationRead(item.id);
 
@@ -113,10 +277,36 @@ export default function NotificationScreen({ navigation }) {
     } else if (item.type === 'adoption' || item.requestId) {
       navigation.navigate('Activity', { tab: 'requests' });
     } else if (item.reportId) {
+      const exists = (rescueReports || []).some((r) => r.id === item.reportId);
+      if (!exists) {
+        showAlert({
+          type: 'info',
+          title: 'Report Unavailable',
+          message: 'This rescue report is no longer available or was removed.',
+          primaryText: 'Delete Notification',
+          onPrimaryPress: () => deleteNotification(item.id),
+          secondaryText: 'Close',
+        });
+        return;
+      }
       navigation.navigate(
         currentUser?.role === 'advocate' ? 'RescueAlertDetail' : 'ReportDetail',
         { reportId: item.reportId }
       );
+    } else if (item.animalId) {
+      const exists = (animals || []).some((a) => a.id === item.animalId);
+      if (!exists) {
+        showAlert({
+          type: 'info',
+          title: 'Animal Unavailable',
+          message: 'This animal listing is no longer available or was removed.',
+          primaryText: 'Delete Notification',
+          onPrimaryPress: () => deleteNotification(item.id),
+          secondaryText: 'Close',
+        });
+        return;
+      }
+      navigation.navigate('AnimalDetail', { animalId: item.animalId });
     } else if (item.conversationId) {
       navigation.navigate('Chat', {
         conversationId: item.conversationId,
@@ -175,15 +365,27 @@ export default function NotificationScreen({ navigation }) {
             )}
           </View>
 
-          {unreadCount > 0 && (
-            <TouchableOpacity
-              onPress={markAllNotificationsRead}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.markReadText}>Mark all read</Text>
-            </TouchableOpacity>
-          )}
+          <View style={styles.headerRightActions}>
+            {unreadCount > 0 && (
+              <TouchableOpacity
+                onPress={markAllNotificationsRead}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.markReadText}>Mark read</Text>
+              </TouchableOpacity>
+            )}
+            {notifs.length > 0 && (
+              <TouchableOpacity
+                onPress={handleClearAll}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.7}
+                style={unreadCount > 0 ? { marginLeft: 12 } : null}
+              >
+                <Text style={styles.clearAllText}>Clear all</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Filter Tabs */}
@@ -258,58 +460,15 @@ export default function NotificationScreen({ navigation }) {
             );
           }
 
-          const isUnread = !item.read;
-
           return (
-            <TouchableOpacity
-              style={[styles.rowItem, isUnread && styles.rowItemUnread]}
-              onPress={() => handleTap(item)}
-              activeOpacity={0.75}
-            >
-              <View style={styles.dotSlot}>
-                {isUnread && <View style={styles.unreadDot} />}
-              </View>
-
-              {renderIcon(item.type, item.icon, item.iconColor, item.iconBg)}
-
-              <View style={styles.contentWrap}>
-                <View style={styles.titleRow}>
-                  <Text
-                    style={[styles.titleText, isUnread && styles.titleTextUnread]}
-                    numberOfLines={1}
-                  >
-                    {item.title}
-                  </Text>
-                  <Text style={styles.timeText}>
-                    {formatTimeAgo(item.createdAt)}
-                  </Text>
-                </View>
-
-                <Text style={styles.bodyText} numberOfLines={2}>
-                  {item.body || item.message || ''}
-                </Text>
-
-                {item.type === 'donation' && item.animalPhoto ? (
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    onPress={() => {
-                      if (item.animalId) {
-                        markNotificationRead(item.id);
-                        navigation.navigate('AnimalDetail', { animalId: item.animalId });
-                      }
-                    }}
-                    style={styles.animalThumbRow}
-                  >
-                    <Image
-                      source={{ uri: item.animalPhoto }}
-                      style={styles.animalThumb}
-                      resizeMode="cover"
-                    />
-                    <Text style={styles.animalThumbLabel}>View animal profile →</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            </TouchableOpacity>
+            <SwipeableNotificationItem
+              item={item}
+              onTap={handleTap}
+              onDelete={deleteNotification}
+              renderIcon={renderIcon}
+              navigation={navigation}
+              markNotificationRead={markNotificationRead}
+            />
           );
         }}
       />
@@ -362,11 +521,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   markReadText: {
     ...FONTS.button,
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.primaryDeep,
+  },
+  clearAllText: {
+    ...FONTS.button,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#A84848',
   },
 
   // Filter Row
@@ -524,6 +693,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2E7A99',
     textDecorationLine: 'underline',
+  },
+  swipeContainer: {
+    position: 'relative',
+    backgroundColor: '#D94343',
+    overflow: 'hidden',
+  },
+  swipeDeleteBackground: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 100,
+    backgroundColor: '#D94343',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'column',
+    paddingRight: 16,
+    zIndex: 1,
+  },
+  swipeDeleteText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  swipeForeground: {
+    backgroundColor: '#FFFFFF',
+    zIndex: 2,
   },
 
   emptyState: {

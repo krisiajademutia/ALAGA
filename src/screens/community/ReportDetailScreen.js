@@ -19,19 +19,57 @@ export default function ReportDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const safeTop = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
   const { reportId } = route.params || {};
-  const { rescueReports, currentUser, addComment, respondToReport, markRescued, startConversation, showAlert } = useApp();
+  const { rescueReports, currentUser, addComment, respondToReport, markRescued, deleteRescueReport, startConversation, showAlert } = useApp();
   const report = rescueReports.find((r) => r.id === reportId);
   const [commentText, setCommentText] = useState('');
   const [replyTarget, setReplyTarget] = useState(null); // { id, name }
   const [previewImageIndex, setPreviewImageIndex] = useState(null);
 
-  if (!report) return null;
+  if (!report) {
+    return (
+      <View style={[styles.flex, { alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#FFF' }]}>
+        <Ionicons name="shield-outline" size={48} color={COLORS.border} />
+        <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.brown, marginTop: 12 }}>Report Not Found</Text>
+        <Text style={{ fontSize: 13, color: COLORS.textMuted, textAlign: 'center', marginTop: 4, marginBottom: 16 }}>
+          This rescue report has been resolved or removed.
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{ paddingHorizontal: 20, paddingVertical: 10, backgroundColor: COLORS.primary, borderRadius: 12 }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const urgency    = URGENCY_LEVELS.find((u) => u.label === report.urgency) || URGENCY_LEVELS[2];
   const isAdvocate = currentUser?.role === 'advocate';
   const isResponder = currentUser?.id === report.responderId;
+  const isAuthor = Boolean(
+    currentUser && (
+      currentUser.id === report.reporterId ||
+      (currentUser.email && report.reporterEmail && currentUser.email.toLowerCase() === report.reporterEmail.toLowerCase())
+    )
+  );
+  const canDelete = isAuthor || isAdvocate;
   const canRespond  = isAdvocate && report.status === 'Open';
   const canMarkRescued = isAdvocate && isResponder && report.status === 'Responded';
+
+  const handleDeleteReport = () => {
+    showAlert({
+      title: 'Delete Rescue Report?',
+      message: 'Are you sure you want to delete this rescue report? All related alerts will also be removed.',
+      type: 'warning',
+      customIcon: 'trash-outline',
+      secondaryText: 'Cancel',
+      primaryText: 'Delete',
+      onPrimaryPress: async () => {
+        await deleteRescueReport(reportId);
+        navigation.goBack();
+      },
+    });
+  };
 
   const handleComment = () => {
     if (!commentText.trim()) return;
@@ -75,6 +113,17 @@ export default function ReportDetailScreen({ route, navigation }) {
       <Header
         title="Rescue Report"
         onBack={() => navigation.goBack()}
+        rightComponent={
+          canDelete ? (
+            <TouchableOpacity
+              onPress={handleDeleteReport}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={{ padding: 4 }}
+            >
+              <Ionicons name="trash-outline" size={20} color="#C23E3E" />
+            </TouchableOpacity>
+          ) : null
+        }
       />
 
       <ScrollView

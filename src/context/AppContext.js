@@ -13,6 +13,8 @@ import {
   getAllUsersFirebase,
   saveNotificationFirebase,
   subscribeToNotificationsFirebase,
+  deleteNotificationFirebase,
+  clearAllNotificationsFirebase,
 } from '../services/authService';
 import {
   subscribeToRescueReports,
@@ -21,11 +23,13 @@ import {
   markReportRescuedFirebase,
   addRescueCommentFirebase,
   updateRescueReportUrgencyFirebase,
+  deleteRescueReportFirebase,
 } from '../services/rescueService';
 import {
   subscribeToAnimals,
   addAnimalFirebase,
   updateAnimalFirebase,
+  deleteAnimalFirebase,
   subscribeToApplications,
   submitApplicationFirebase,
   updateApplicationFirebase,
@@ -73,12 +77,14 @@ const defaultContext = {
   updateUser: () => {},
   getUserProfile: () => Promise.resolve(null),
   addRescueReport: () => {},
+  deleteRescueReport: () => {},
   respondToReport: () => {},
   markRescued: () => {},
   addComment: () => {},
   updateRescueReportUrgency: () => {},
   addAnimal: () => {},
   updateAnimal: () => {},
+  deleteAnimal: () => {},
   returnAnimalToListings: () => {},
   markAnimalAdopted: () => {},
   submitRequest: () => {},
@@ -109,6 +115,8 @@ const defaultContext = {
   getUnreadCount: () => 0,
   markNotificationRead: () => {},
   markAllNotificationsRead: () => {},
+  deleteNotification: () => {},
+  clearAllNotifications: () => {},
   pushNotification: () => {},
   getAdvocateRescuedCases: () => [],
   getOpenAlertsCount: () => 0,
@@ -244,7 +252,7 @@ export function AppProvider({ children }) {
       id: notifId,
       createdAt: notifData.createdAt || new Date().toISOString(),
       read: false,
-      userId: notifData.userId || currentUser?.id || 'all',
+      userId: notifData.userId || currentUserRef.current?.id || 'all',
       title: notifData.title || 'Notification',
       body: notifData.body || notifData.message || '',
       message: notifData.body || notifData.message || '',
@@ -255,25 +263,37 @@ export function AppProvider({ children }) {
       section: 'TODAY',
       ...notifData,
     };
+
+    // Clean undefined properties so Firestore setDoc never throws unsupported field error
+    const cleanNotif = {};
+    Object.keys(newNotif).forEach((key) => {
+      if (newNotif[key] !== undefined) {
+        cleanNotif[key] = newNotif[key];
+      }
+    });
+
+    let isDuplicate = false;
     setNotifications((prev) => {
       if (
         prev.some(
           (n) =>
-            n.id === newNotif.id ||
-            (newNotif.reportId && n.reportId === newNotif.reportId && n.userId === newNotif.userId)
+            n.id === cleanNotif.id ||
+            (cleanNotif.reportId && n.reportId === cleanNotif.reportId && n.userId === cleanNotif.userId)
         )
       ) {
+        isDuplicate = true;
         return prev;
       }
-      // Persist to Firestore subcollection for cross-device sync (Gap 2 fix)
-      const targetUserId = newNotif.userId && newNotif.userId !== 'all'
-        ? newNotif.userId
-        : currentUserRef.current?.id;
-      if (targetUserId) {
-        saveNotificationFirebase(targetUserId, newNotif);
-      }
-      return [newNotif, ...prev];
+      return [cleanNotif, ...prev];
     });
+
+    // Persist to Firestore subcollection for cross-device sync
+    const targetUserId = cleanNotif.userId && cleanNotif.userId !== 'all'
+      ? cleanNotif.userId
+      : currentUserRef.current?.id;
+    if (targetUserId && !isDuplicate) {
+      saveNotificationFirebase(targetUserId, cleanNotif);
+    }
   };
 
   const triggerRescueAlertNotification = async (report) => {
@@ -364,7 +384,7 @@ export function AppProvider({ children }) {
   };
 
   const syncRescueAlertNotifications = async (user, reports) => {
-    if (!user || !user.id || !Array.isArray(reports) || reports.length === 0) return;
+    if (!user || !user.id || !Array.isArray(reports)) return;
     const uId = user.id || user.uid;
 
     const storageKey = `@alaga_notified_reports_${uId}`;
@@ -377,6 +397,30 @@ export function AppProvider({ children }) {
         }
       }
     } catch (e) {}
+
+    // ── Orphan Pruning: Delete rescue notifications for reports that no longer exist ──
+    const validReportIds = new Set(reports.map((r) => r.id));
+    setNotifications((prev) => {
+      let changed = false;
+      const kept = prev.filter((n) => {
+        if (n.type === 'rescue' && n.reportId && !validReportIds.has(n.reportId)) {
+          changed = true;
+          // Delete from Firestore
+          deleteNotificationFirebase(uId, n.id);
+          // Remove from notified reports cache
+          notifiedReportIdsRef.current.delete(n.reportId);
+          return false;
+        }
+        return true;
+      });
+      if (changed) {
+        const arr = Array.from(notifiedReportIdsRef.current);
+        AsyncStorage.setItem(storageKey, JSON.stringify(arr)).catch(() => {});
+      }
+      return changed ? kept : prev;
+    });
+
+    if (reports.length === 0) return;
 
     let hasNewToPersist = false;
 
@@ -637,6 +681,24 @@ export function AppProvider({ children }) {
             cacheUserProfile({ id: a.advocateId, name: a.advocateName, avatar: a.advocateAvatar });
           }
         });
+
+        // ── Orphan Pruning: Delete notifications for animals that no longer exist ──
+        const validAnimalIds = new Set(animalsList.map((a) => a.id));
+        const activeUser = currentUserRef.current;
+        setNotifications((prev) => {
+          let changed = false;
+          const kept = prev.filter((n) => {
+            if (n.animalId && !validAnimalIds.has(n.animalId)) {
+              changed = true;
+              if (activeUser?.id) {
+                deleteNotificationFirebase(activeUser.id, n.id);
+              }
+              return false;
+            }
+            return true;
+          });
+          return changed ? kept : prev;
+        });
       });
 
       // Load all registered users from Firestore to prime global avatar & profile cache
@@ -722,13 +784,23 @@ export function AppProvider({ children }) {
       const unsubNotifs = subscribeToNotificationsFirebase(
         currentUser.id,
         (firestoreNotifs) => {
-          if (!Array.isArray(firestoreNotifs) || firestoreNotifs.length === 0) return;
+          if (!Array.isArray(firestoreNotifs)) return;
+          const remoteList = firestoreNotifs || [];
           setNotifications((prev) => {
-            // Merge Firestore notifs with local ones, deduplicating by id
-            const existingIds = new Set(prev.map((n) => n.id));
-            const incoming = firestoreNotifs.filter((n) => !existingIds.has(n.id));
-            if (incoming.length === 0) return prev;
-            return [...incoming, ...prev].sort(
+            // Keep notifications that belong to 'all' or other users
+            const otherUserNotifs = prev.filter(
+              (n) => n.userId && n.userId !== 'all' && n.userId !== currentUser.id
+            );
+            // Deduplicate remoteList
+            const seenIds = new Set();
+            const deduplicated = [];
+            [...remoteList, ...otherUserNotifs].forEach((n) => {
+              if (n && n.id && !seenIds.has(n.id)) {
+                seenIds.add(n.id);
+                deduplicated.push(n);
+              }
+            });
+            return deduplicated.sort(
               (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
             );
           });
@@ -859,6 +931,37 @@ export function AppProvider({ children }) {
     return newReport;
   };
 
+  const deleteRescueReport = async (reportId) => {
+    if (!reportId) return;
+    const strId = String(reportId);
+    setRescueReports((prev) => prev.filter((r) => r.id !== strId));
+    mySubmittedReportIds.current?.delete(strId);
+    notifiedReportIdsRef.current?.delete(strId);
+
+    const activeUser = currentUserRef.current || currentUser;
+    if (activeUser?.id) {
+      const storageKey = `@alaga_notified_reports_${activeUser.id}`;
+      const arr = Array.from(notifiedReportIdsRef.current || []);
+      AsyncStorage.setItem(storageKey, JSON.stringify(arr)).catch(() => {});
+    }
+
+    // Cascade delete any notifications referencing this report
+    setNotifications((prev) =>
+      prev.filter((n) => {
+        if (n.reportId && String(n.reportId) === strId) {
+          if (activeUser?.id) {
+            deleteNotificationFirebase(activeUser.id, n.id);
+          }
+          return false;
+        }
+        return true;
+      })
+    );
+
+    // Delete in Firestore
+    await deleteRescueReportFirebase(strId);
+  };
+
   const respondToReport = (reportId) => {
     setRescueReports((prev) =>
       prev.map((r) =>
@@ -961,6 +1064,32 @@ export function AppProvider({ children }) {
     );
     const existing = animals.find((a) => a.id === animalId);
     updateAnimalFirebase(animalId, updates, fullUpdated || (existing ? { ...existing, ...updates } : null));
+  };
+
+  const deleteAnimal = async (animalId) => {
+    if (!animalId) return;
+    const strId = String(animalId);
+    setAnimals((prev) => prev.filter((a) => a.id !== strId));
+
+    // Cascade delete any notifications referencing this animal
+    const activeUser = currentUserRef.current || currentUser;
+    setNotifications((prev) =>
+      prev.filter((n) => {
+        if (n.animalId && String(n.animalId) === strId) {
+          if (activeUser?.id) {
+            deleteNotificationFirebase(activeUser.id, n.id);
+          }
+          return false;
+        }
+        return true;
+      })
+    );
+
+    // Remove any adoption / foster applications for this animal
+    setRequests((prev) => prev.filter((r) => String(r.animalId) !== strId));
+
+    // Delete from Firestore
+    await deleteAnimalFirebase(strId);
   };
 
   // Return a fostered animal back to available listings
@@ -1728,6 +1857,28 @@ export function AppProvider({ children }) {
     );
   };
 
+  const deleteNotification = (notifId) => {
+    if (!notifId) return;
+    const activeUser = currentUserRef.current || currentUser;
+    setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+    if (activeUser?.id) {
+      deleteNotificationFirebase(activeUser.id, notifId);
+    }
+  };
+
+  const clearAllNotifications = () => {
+    const activeUser = currentUserRef.current || currentUser;
+    setNotifications((prev) =>
+      prev.filter((n) => n.userId && n.userId !== 'all' && n.userId !== activeUser?.id)
+    );
+    if (activeUser?.id) {
+      clearAllNotificationsFirebase(activeUser.id);
+      AsyncStorage.removeItem(`@alaga_notified_reports_${activeUser.id}`).catch(() => {});
+      notifiedReportIdsRef.current.clear();
+    }
+    AsyncStorage.removeItem('@alaga_realtime_notifications_v2').catch(() => {});
+  };
+
 
   // ── Rescue Case Linking ───────────────────────────────────────────────────
   const getAdvocateRescuedCases = () =>
@@ -1755,6 +1906,7 @@ export function AppProvider({ children }) {
         updateUser,
         // rescue
         addRescueReport,
+        deleteRescueReport,
         respondToReport,
         markRescued,
         addComment,
@@ -1762,6 +1914,7 @@ export function AppProvider({ children }) {
         // animals
         addAnimal,
         updateAnimal,
+        deleteAnimal,
         returnAnimalToListings,
         markAnimalAdopted,
         // requests
@@ -1798,6 +1951,8 @@ export function AppProvider({ children }) {
         getUnreadCount,
         markNotificationRead,
         markAllNotificationsRead,
+        deleteNotification,
+        clearAllNotifications,
         pushNotification,
         // rescue linking
         getAdvocateRescuedCases,

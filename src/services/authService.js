@@ -6,7 +6,7 @@ import {
   GoogleAuthProvider,
   signInWithCredential,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, collection, getDocs, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, deleteDoc, writeBatch, collection, getDocs, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { isMockFirebase } from '../config/firebaseConfig';
 
@@ -412,19 +412,60 @@ export async function getAllUsersFirebase() {
 
 /**
  * Save a notification to the Firestore users/{userId}/notifications subcollection.
- * Matches Firestore rule: allow read, write: if isOwner(userId);
+ * Sanitizes all undefined values so Firestore setDoc never throws an unsupported field value error.
  */
 export async function saveNotificationFirebase(userId, notification) {
   if (isMockFirebase() || !db || !userId || !notification?.id) return;
   try {
     const docRef = doc(db, 'users', userId, 'notifications', notification.id);
+    // Strip undefined properties to ensure Firestore compatibility
+    const sanitized = {};
+    Object.keys(notification).forEach((key) => {
+      const val = notification[key];
+      if (val !== undefined) {
+        sanitized[key] = val;
+      }
+    });
+
     await setDoc(docRef, {
-      ...notification,
+      ...sanitized,
       timestamp: serverTimestamp(),
     }, { merge: true });
   } catch (err) {
-    // Non-critical — local state is source of truth; Firestore is cross-device sync
-    console.warn('[authService] saveNotificationFirebase warning:', err?.message);
+    console.warn('[authService] saveNotificationFirebase warning:', err?.message || err);
+  }
+}
+
+/**
+ * Delete a specific notification from Firestore
+ */
+export async function deleteNotificationFirebase(userId, notificationId) {
+  if (isMockFirebase() || !db || !userId || !notificationId) return;
+  try {
+    const docRef = doc(db, 'users', userId, 'notifications', String(notificationId));
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.warn('[authService] deleteNotificationFirebase warning:', err?.message || err);
+  }
+}
+
+/**
+ * Clear all notifications for a user in Firestore
+ */
+export async function clearAllNotificationsFirebase(userId) {
+  if (isMockFirebase() || !db || !userId) return;
+  try {
+    const notifsRef = collection(db, 'users', userId, 'notifications');
+    const snapshot = await getDocs(notifsRef);
+    if (snapshot.empty) return;
+
+    const batch = writeBatch(db);
+    snapshot.forEach((docSnap) => {
+      batch.delete(docSnap.ref);
+    });
+    await batch.commit();
+  } catch (err) {
+    console.warn('[authService] clearAllNotificationsFirebase warning:', err?.message || err);
   }
 }
 

@@ -29,7 +29,8 @@ service cloud.firestore {
 
       // Subcollection: Notifications
       match /notifications/{notifId} {
-        allow read, write: if isOwner(userId);
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isAuthenticated();
       }
     }
 

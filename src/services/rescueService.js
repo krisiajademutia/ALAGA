@@ -4,6 +4,7 @@ import {
   addDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   onSnapshot,
   query,
   orderBy,
@@ -153,4 +154,21 @@ export async function updateRescueReportUrgencyFirebase(reportId, urgency) {
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * Delete a rescue report from Firestore
+ */
+export async function deleteRescueReportFirebase(reportId) {
+  if (isMockFirebase() || !db || !reportId) return { isMock: true };
+  try {
+    const docId = String(reportId);
+    const docRef = doc(db, RESCUES_COLLECTION, docId);
+    await deleteDoc(docRef);
+    return { success: true };
+  } catch (error) {
+    console.warn('[rescueService] Delete rescue report error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 
