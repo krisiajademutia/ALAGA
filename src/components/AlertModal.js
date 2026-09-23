@@ -147,7 +147,14 @@ export default function AlertModal({
                 onPress={onSecondaryPress || onClose}
                 activeOpacity={0.75}
               >
-                <Text style={styles.secondaryBtnText}>{secondaryText}</Text>
+                <Text
+                  style={styles.secondaryBtnText}
+                  numberOfLines={2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  {secondaryText}
+                </Text>
               </TouchableOpacity>
             )}
 
@@ -165,6 +172,9 @@ export default function AlertModal({
                   styles.primaryBtnText,
                   type === 'error' && styles.primaryBtnTextDanger,
                 ]}
+                numberOfLines={2}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
               >
                 {primaryText}
               </Text>
@@ -181,7 +191,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 28,
+    paddingHorizontal: 20,
   },
   backdropOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -189,10 +199,10 @@ const styles = StyleSheet.create({
   },
   dialogCard: {
     width: '100%',
-    maxWidth: Math.min(width - 44, 360),
+    maxWidth: Math.min(width - 32, 380),
     backgroundColor: '#FFFDF8',
     borderRadius: 22,
-    paddingHorizontal: 22,
+    paddingHorizontal: 18,
     paddingTop: 24,
     paddingBottom: 20,
     alignItems: 'center',
@@ -227,18 +237,20 @@ const styles = StyleSheet.create({
     color: '#685038',
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 22,
+    marginBottom: 20,
     paddingHorizontal: 4,
   },
   buttonRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     gap: 10,
     width: '100%',
   },
   secondaryBtn: {
     flex: 1,
-    height: 46,
+    minHeight: 48,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     borderRadius: 14,
     backgroundColor: '#FAF5E8',
     alignItems: 'center',
@@ -248,12 +260,16 @@ const styles = StyleSheet.create({
   },
   secondaryBtnText: {
     fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 13.5,
+    fontSize: 13,
     color: '#685038',
+    textAlign: 'center',
+    lineHeight: 18,
   },
   primaryBtn: {
     flex: 1,
-    height: 46,
+    minHeight: 48,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     borderRadius: 14,
     backgroundColor: '#92CDE5',
     alignItems: 'center',
@@ -273,8 +289,10 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: {
     fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 13.5,
+    fontSize: 13,
     color: '#473018',
+    textAlign: 'center',
+    lineHeight: 18,
   },
   primaryBtnTextDanger: {
     color: '#FFFFFF',
