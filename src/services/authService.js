@@ -10,32 +10,35 @@ import { doc, setDoc, getDoc, updateDoc, deleteDoc, writeBatch, collection, getD
 import { auth, db } from './firebase';
 import { isMockFirebase } from '../config/firebaseConfig';
 
-// Curated high-resolution default portraits for community members & advocates
-export const DEFAULT_USER_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=240&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=240&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=240&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=240&q=80',
-  'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=240&q=80',
-  'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=240&q=80',
-  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=240&q=80',
-  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=240&q=80',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=240&q=80',
-  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=240&q=80',
-];
-
 /**
- * Deterministically return a consistent, beautiful portrait avatar based on user name/id
+ * Return null so that when a user hasn't chosen or uploaded their own profile photo,
+ * the app displays their clean initial letters instead of random stranger portraits.
  */
 export function getDefaultUserAvatar(name = '', userId = '') {
-  const str = (userId || name || 'alaga_member').toString();
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i);
-    hash |= 0;
+  return null;
+}
+
+/**
+ * Robustly extract a user's uploaded avatar URL from any supported Firestore/Auth field naming
+ */
+export function extractUserAvatar(data, firebaseAuthUser = null) {
+  if (!data && !firebaseAuthUser) return null;
+  const candidate =
+    data?.avatar ||
+    data?.photoURL ||
+    data?.photoUrl ||
+    data?.avatarUrl ||
+    data?.photo ||
+    data?.image ||
+    data?.profileImage ||
+    data?.profilePicture ||
+    firebaseAuthUser?.photoURL ||
+    null;
+
+  if (candidate && typeof candidate === 'string' && candidate.trim().length > 0) {
+    return candidate.trim();
   }
-  const idx = Math.abs(hash) % DEFAULT_USER_AVATARS.length;
-  return DEFAULT_USER_AVATARS[idx];
+  return null;
 }
 
 // In-memory profile & avatar cache for instant rendering across all screens
@@ -61,18 +64,19 @@ export async function loginWithFirebase(email, password) {
 
     if (userDocSnap.exists()) {
       const data = userDocSnap.data();
-      const avatar = data.avatar || getDefaultUserAvatar(data.name, uid);
+      const avatar = extractUserAvatar(data, userCredential?.user);
       const user = { id: uid, ...data, avatar };
       cacheUserProfile(user);
       return { success: true, user };
     } else {
       const derivedName = cleanEmail.split('@')[0].replace(/[._]/g, ' ');
+      const avatar = userCredential?.user?.photoURL || null;
       const newUserData = {
         id: uid,
         email: cleanEmail,
         name: userCredential?.user?.displayName || derivedName,
         role: 'community',
-        avatar: getDefaultUserAvatar(derivedName, uid),
+        avatar,
         location: '',
         organization: '',
         joinedAt: new Date().toISOString().split('T')[0],
@@ -116,7 +120,7 @@ export async function registerWithFirebase({ email, password, name, role, locati
       role: role || 'community',
       location: location?.trim() || '',
       organization: organization?.trim() || '',
-      avatar: defaultAvatar,
+      avatar: null,
       joinedAt: new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString(),
       ...(role === 'advocate' ? { rescueCount: 0, animalCount: 0 } : { reportCount: 0 }),
@@ -139,18 +143,19 @@ export async function registerWithFirebase({ email, password, name, role, locati
         let userData;
         if (userDocSnap.exists()) {
           const data = userDocSnap.data();
-          const avatar = data.avatar || getDefaultUserAvatar(data.name || name, uid);
+          const avatar = extractUserAvatar(data, signCred.user);
           const updates = {
             name: name.trim(),
             role: role || 'community',
             location: location?.trim() || '',
             organization: organization?.trim() || '',
-            avatar,
+            ...(avatar ? { avatar } : {}),
             updatedAt: new Date().toISOString(),
           };
           await updateDoc(userDocRef, updates);
-          userData = { id: uid, ...data, ...updates };
+          userData = { id: uid, ...data, ...updates, avatar };
         } else {
+          const avatar = signCred.user?.photoURL || null;
           userData = {
             id: uid,
             name: name.trim(),
@@ -158,7 +163,7 @@ export async function registerWithFirebase({ email, password, name, role, locati
             role: role || 'community',
             location: location?.trim() || '',
             organization: organization?.trim() || '',
-            avatar: getDefaultUserAvatar(name, uid),
+            avatar,
             joinedAt: new Date().toISOString().split('T')[0],
             createdAt: new Date().toISOString(),
             ...(role === 'advocate' ? { rescueCount: 0, animalCount: 0 } : { reportCount: 0 }),
@@ -359,20 +364,19 @@ export async function loginWithGoogleProfile({ email, name, photoURL, role = 'co
 export function cacheUserProfile(user) {
   if (!user) return;
   const id = user.id || user.uid;
-  const avatar = user.avatar || user.photoURL || user.photo || user.reporterAvatar || user.advocateAvatar || null;
+  const avatar = extractUserAvatar(user);
   if (id) {
-    userProfileCache.set(id, user);
-    if (avatar && typeof avatar === 'string' && avatar.trim().length > 0) {
-      userAvatarCache.set(id, avatar.trim());
+    userProfileCache.set(id, { ...user, avatar });
+    if (avatar) {
+      userAvatarCache.set(id, avatar);
+    } else {
+      userAvatarCache.delete(id);
     }
   }
-  // NOTE: We intentionally do NOT cache by name.
-  // Names are not unique identifiers and name-keyed entries cause cross-user
-  // avatar leakage (User A's photo appearing on User B who shares a similar name).
 }
 
 /**
- * Get synchronously cached avatar URL by userId or user's display name
+ * Get synchronously cached avatar URL by userId
  */
 export function getCachedUserAvatar(userId) {
   if (userId && userAvatarCache.has(userId)) {
@@ -395,23 +399,24 @@ export function getCachedUserProfile(userId) {
 export async function getUserProfileFirebase(userId) {
   if (!userId) return null;
   const cached = getCachedUserProfile(userId);
-  if (cached) return cached;
+  if (cached && cached.avatar) return cached;
 
-  if (isMockFirebase() || !db) return null;
+  if (isMockFirebase() || !db) return cached || null;
   try {
     const userDocRef = doc(db, 'users', userId);
     const userDocSnap = await getDoc(userDocRef);
     if (userDocSnap.exists()) {
       const data = userDocSnap.data();
-      const avatar = data.avatar || getDefaultUserAvatar(data.name, userId);
+      const authUser = auth?.currentUser?.uid === userId ? auth.currentUser : null;
+      const avatar = extractUserAvatar(data, authUser);
       const profile = { id: userId, ...data, avatar };
       cacheUserProfile(profile);
       return profile;
     }
-    return null;
+    return cached || null;
   } catch (err) {
-    console.warn('[authService] Error fetching user profile:', err);
-    return null;
+    console.warn('[authService] Error fetching user profile:', err?.message || err);
+    return cached || null;
   }
 }
 
@@ -428,7 +433,7 @@ export async function resolveUserAvatar(userId, name) {
       return profile.avatar;
     }
   }
-  return getDefaultUserAvatar(name, userId);
+  return null;
 }
 
 /**
@@ -441,14 +446,14 @@ export async function getAllUsersFirebase() {
     const list = [];
     usersSnap.forEach((d) => {
       const data = d.data();
-      const avatar = data.avatar || getDefaultUserAvatar(data.name, d.id);
+      const avatar = extractUserAvatar(data);
       const userObj = { id: d.id, ...data, avatar };
       list.push(userObj);
       cacheUserProfile(userObj);
     });
     return list;
   } catch (err) {
-    console.warn('[authService] Error fetching all users:', err);
+    console.warn('[authService] Error fetching all users:', err?.message || err);
     return [];
   }
 }

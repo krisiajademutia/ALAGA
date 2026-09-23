@@ -67,6 +67,8 @@ export default function ChatScreen({ route, navigation }) {
 
   const flatRef = useRef(null);
   const inputRef = useRef(null);
+  const isSendingReportRef = useRef(false);
+  const isSendingTextRef = useRef(false);
 
   const insets = useSafeAreaInsets();
   const safeTopPadding =
@@ -83,11 +85,35 @@ export default function ChatScreen({ route, navigation }) {
       (firestoreMsgs) => {
         if (Array.isArray(firestoreMsgs)) {
           setMessages((prev) => {
-            // Keep any locally created messages that Firestore hasn't returned yet
-            const pending = prev.filter(
-              (p) => p.id?.startsWith('m_') && !firestoreMsgs.some((f) => f.id === p.id || (f.time === p.time && f.type === p.type))
+            const map = new Map();
+            // 1. First add all ground truth messages confirmed by Firestore
+            firestoreMsgs.forEach((f) => {
+              if (f && f.id) map.set(f.id, f);
+            });
+            // 2. Only keep pending local optimistic messages if they have NOT landed in firestoreMsgs yet
+            prev.forEach((p) => {
+              if (!p || !p.id) return;
+              if (map.has(p.id)) return; // Already in map by ID
+              const isDuplicate = firestoreMsgs.some((f) => {
+                if (f.id === p.id) return true;
+                // De-duplicate rescue report links: same reportId is NEVER duplicated
+                if (p.type === 'report_link' && f.type === 'report_link' && f.reportId === p.reportId) {
+                  return true;
+                }
+                // De-duplicate text messages: same sender, same type, same text within 5 seconds
+                if (f.senderId === p.senderId && f.type === p.type && f.text === p.text) {
+                  const diff = Math.abs(new Date(f.time || 0) - new Date(p.time || 0));
+                  if (diff < 5000) return true;
+                }
+                return false;
+              });
+              if (!isDuplicate) {
+                map.set(p.id, p);
+              }
+            });
+            return Array.from(map.values()).sort(
+              (a, b) => new Date(a.time || 0) - new Date(b.time || 0)
             );
-            return [...firestoreMsgs, ...pending];
           });
         }
       },
@@ -164,10 +190,31 @@ export default function ChatScreen({ route, navigation }) {
   // Manual send state for linked rescue report: stays visible until user taps "Send Case" or closes with "✕"
   const [showLinkedReportBanner, setShowLinkedReportBanner] = useState(Boolean(linkedReport));
 
+  // Auto-hide the linked report banner if this case has already been linked in the chat
+  useEffect(() => {
+    if (linkedReport && messages.some((m) => m.type === 'report_link' && m.reportId === linkedReport.id)) {
+      setShowLinkedReportBanner(false);
+    }
+  }, [messages, linkedReport]);
+
   const handleSendLinkedReport = () => {
     if (!linkedReport || !convo?.id) return;
+    if (isSendingReportRef.current) return;
+    isSendingReportRef.current = true;
+    setShowLinkedReportBanner(false);
+
+    // If this rescue report is already linked in messages, don't duplicate it
+    const alreadyLinked = messages.some(
+      (m) => m.type === 'report_link' && m.reportId === linkedReport.id
+    );
+    if (alreadyLinked) {
+      isSendingReportRef.current = false;
+      return;
+    }
+
+    const reportMsgId = `m_rep_${linkedReport.id}_${Date.now()}`;
     const reportMsg = {
-      id: `m_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      id: reportMsgId,
       senderId: currentUser?.id,
       senderName: currentUser?.name || 'User',
       senderAvatar: currentUser?.avatar || null,
@@ -181,27 +228,40 @@ export default function ChatScreen({ route, navigation }) {
       text: `📋 Rescue Report: ${linkedReport.animalType || 'Animal'} (${linkedReport.condition || 'Rescue'}) at ${linkedReport.location?.address || 'reported location'}`,
       time: new Date().toISOString(),
     };
-    // Optimistically render in chat so it stays immediately and permanently
-    setMessages((prev) => [...prev, reportMsg]);
+
+    setMessages((prev) => {
+      if (prev.some((m) => m.type === 'report_link' && m.reportId === linkedReport.id)) {
+        return prev;
+      }
+      return [...prev, reportMsg];
+    });
+
     sendMessage(convo.id, reportMsg);
-    setShowLinkedReportBanner(false);
-    setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
+    setTimeout(() => {
+      isSendingReportRef.current = false;
+      flatRef.current?.scrollToEnd({ animated: true });
+    }, 400);
   };
 
   const handleSend = () => {
-    if (!text.trim() || !convo) return;
+    const trimmed = text.trim();
+    if (!trimmed || !convo) return;
+    if (isSendingTextRef.current) return;
+    isSendingTextRef.current = true;
+    setTimeout(() => { isSendingTextRef.current = false; }, 350);
+
     const userMsg = {
       id: `m_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       senderId: currentUser?.id,
       senderName: currentUser?.name || 'User',
       senderAvatar: currentUser?.avatar || null,
       type: 'text',
-      text: text.trim(),
+      text: trimmed,
       time: new Date().toISOString(),
     };
+    setText('');
     setMessages((prev) => [...prev, userMsg]);
     sendMessage(convo.id, userMsg);
-    setText('');
     setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
   };
 

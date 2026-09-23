@@ -26,8 +26,8 @@ import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import AlertModal from '../../components/AlertModal';
 import PhotoPickerModal from '../../components/PhotoPickerModal';
+import Avatar from '../../components/Avatar';
 import { uploadImageToImgBB } from '../../services/storageService';
-import { getDefaultUserAvatar } from '../../services/authService';
 
 export default function ProfileScreen({ route, navigation }) {
   const {
@@ -371,10 +371,21 @@ export default function ProfileScreen({ route, navigation }) {
       setUploadingPhoto(true);
       try {
         const cloudUrl = await uploadImageToImgBB({ uri: asset.uri, base64: asset.base64 });
-        updateUser({ avatar: cloudUrl || asset.uri });
+        const finalUrl = cloudUrl || (asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : null);
+        if (finalUrl) {
+          await updateUser({ avatar: finalUrl, photoURL: finalUrl });
+          showAlert('success', 'Profile Photo Updated', 'Your profile picture has been updated.');
+        } else {
+          showAlert('error', 'Upload Error', 'Could not upload photo. Please check your network connection.');
+        }
       } catch (err) {
         console.error('Avatar upload error:', err);
-        updateUser({ avatar: asset.uri });
+        const fallbackUrl = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : null;
+        if (fallbackUrl) {
+          await updateUser({ avatar: fallbackUrl, photoURL: fallbackUrl });
+        } else {
+          showAlert('error', 'Upload Error', 'Could not upload photo: ' + (err?.message || 'Network error'));
+        }
       } finally {
         setUploadingPhoto(false);
       }
@@ -424,12 +435,15 @@ export default function ProfileScreen({ route, navigation }) {
           {/* Avatar with Camera Badge */}
           <TouchableOpacity style={styles.avatarWrap} onPress={handleChangePhoto} activeOpacity={0.85}>
             {uploadingPhoto ? (
-              <View style={styles.avatar}>
+              <View style={[styles.avatar, styles.avatarPlaceholder]}>
                 <ActivityIndicator color="#2E7A99" />
               </View>
             ) : (
-              <Image
-                source={{ uri: currentUser?.avatar || getDefaultUserAvatar(currentUser?.name, currentUser?.id) }}
+              <Avatar
+                name={currentUser?.name || 'Community Member'}
+                uri={currentUser?.avatar}
+                userId={currentUser?.id}
+                size={86}
                 style={styles.avatar}
               />
             )}

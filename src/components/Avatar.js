@@ -6,21 +6,18 @@ import { getCachedUserAvatar, resolveUserAvatar, cacheUserProfile, getDefaultUse
 /**
  * Avatar component.
  *
- * Priority for displayed image:
- *   1. Fresh value fetched from Firestore (via userId) — ground truth
- *   2. In-memory cache hit for this userId
- *   3. The `uri` / `avatar` / `photo` prop (uploaded custom photo)
- *   4. High-resolution deterministic portrait avatar (never blanks out to initials)
- *   5. Initials only as a last-resort offline fallback.
+ * Behavior:
+ *   1. If the user has a custom chosen/uploaded photo (via propUri, cache, or Firestore), display it.
+ *   2. If no photo has been chosen/uploaded yet, cleanly render the user's initial letters (no random portraits).
  */
 export default function Avatar({ name, uri, avatar, photo, url, userId, size = 44, style }) {
   // Prop-supplied URI — custom uploaded photo
-  const propUri = uri || avatar || photo || url || null;
-  const defaultFallback = getDefaultUserAvatar(name, userId);
+  const rawProp = uri || avatar || photo || url || null;
+  const cleanPropUri = typeof rawProp === 'string' && rawProp.trim().length > 0 ? rawProp.trim() : null;
 
-  // Initial display: prefer cache, else prop, else default portrait
-  const cached = getCachedUserAvatar(userId);
-  const [resolvedUri, setResolvedUri] = useState(cached || propUri || defaultFallback);
+  // Initial display: prefer prop, else synchronous cache hit, else null (initials)
+  const cached = userId ? getCachedUserAvatar(userId) : null;
+  const [resolvedUri, setResolvedUri] = useState(cleanPropUri || cached || null);
   const [hasError, setHasError] = useState(false);
   const isMounted = useRef(true);
 
@@ -29,40 +26,40 @@ export default function Avatar({ name, uri, avatar, photo, url, userId, size = 4
     return () => { isMounted.current = false; };
   }, []);
 
-  // Re-run when either userId, propUri, or name changes
+  // Re-run when either userId, cleanPropUri, or name changes
   useEffect(() => {
     setHasError(false);
-    const fallback = getDefaultUserAvatar(name, userId);
 
-    if (!userId) {
-      setResolvedUri(propUri || fallback);
+    // 1. Direct propUri passed
+    if (cleanPropUri) {
+      setResolvedUri(cleanPropUri);
+      if (userId) cacheUserProfile({ id: userId, name, avatar: cleanPropUri });
       return;
     }
 
-    // If propUri is a valid custom URL, use it immediately
-    if (propUri) {
-      setResolvedUri(propUri);
-      cacheUserProfile({ id: userId, name, avatar: propUri });
+    if (!userId) {
+      setResolvedUri(null);
+      return;
     }
 
-    // Check cache first (synchronous, instant)
+    // 2. Synchronous in-memory cache hit
     const hit = getCachedUserAvatar(userId);
     if (hit) {
       setResolvedUri(hit);
       return;
     }
 
-    // Fetch from Firestore or resolve to fallback portrait
+    // 3. Resolve from Firestore (in case this user's avatar was updated or set in Firestore)
     resolveUserAvatar(userId, name).then((found) => {
       if (!isMounted.current) return;
-      const target = found || propUri || fallback;
-      setResolvedUri(target);
-      if (target) {
-        cacheUserProfile({ id: userId, name, avatar: target });
+      if (found) {
+        setResolvedUri(found);
+        cacheUserProfile({ id: userId, name, avatar: found });
+      } else {
+        setResolvedUri(null);
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, propUri, name]);
+  }, [userId, cleanPropUri, name]);
 
   const initials = name
     ? name.split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
@@ -73,14 +70,8 @@ export default function Avatar({ name, uri, avatar, photo, url, userId, size = 4
   const showImage = !hasError && resolvedUri && typeof resolvedUri === 'string' && resolvedUri.trim().length > 0;
 
   const handleImageError = () => {
-    const fallback = getDefaultUserAvatar(name, userId);
-    if (resolvedUri !== fallback) {
-      setResolvedUri(fallback);
-      setHasError(false);
-    } else {
-      setHasError(true);
-      setResolvedUri(null);
-    }
+    setHasError(true);
+    setResolvedUri(null);
   };
 
   if (showImage) {
@@ -95,7 +86,7 @@ export default function Avatar({ name, uri, avatar, photo, url, userId, size = 4
 
   return (
     <View style={[styles.placeholder, base, style]}>
-      <Text style={[styles.initials, { fontSize: size * 0.36 }]}>{initials}</Text>
+      <Text style={[styles.initials, { fontSize: size * 0.38 }]}>{initials}</Text>
     </View>
   );
 }
@@ -106,12 +97,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#E8DEC5',
   },
   placeholder: {
-    backgroundColor: COLORS.tagBg,
+    backgroundColor: '#EBF4EF',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#D4E7DC',
   },
   initials: {
-    color: COLORS.primaryDeep,
+    color: '#306B4D',
     fontWeight: '800',
   },
 });

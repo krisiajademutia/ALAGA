@@ -837,17 +837,24 @@ export function AppProvider({ children }) {
         try {
           const profile = await getUserProfileFirebase(fbUser.uid);
           if (profile && isMounted) {
-            const merged = { ...profile, id: fbUser.uid, email: fbUser.email || profile.email };
-            if (!merged.avatar) {
-              merged.avatar = getDefaultUserAvatar(merged.name, fbUser.uid);
-            }
-            setCurrentUser((prev) => {
-              const updated = { ...(prev || {}), ...merged };
-              currentUserRef.current = updated;
-              cacheUserProfile(updated);
-              AsyncStorage.setItem('@alaga_saved_user_v1', JSON.stringify(updated)).catch(() => {});
-              return updated;
-            });
+            const resolvedAvatar =
+              profile.avatar ||
+              profile.photoURL ||
+              profile.photoUrl ||
+              profile.avatarUrl ||
+              fbUser.photoURL ||
+              currentUserRef.current?.avatar ||
+              null;
+            const updatedProfile = {
+              ...profile,
+              id: fbUser.uid,
+              email: fbUser.email || profile.email,
+              avatar: resolvedAvatar,
+            };
+            setCurrentUser(updatedProfile);
+            currentUserRef.current = updatedProfile;
+            cacheUserProfile(updatedProfile);
+            AsyncStorage.setItem('@alaga_saved_user_v1', JSON.stringify(updatedProfile)).catch(() => {});
             setIsOnboardingCompleted(true);
             AsyncStorage.setItem('@alaga_onboarding_completed_v1', 'true').catch(() => {});
           }
@@ -1209,21 +1216,25 @@ export function AppProvider({ children }) {
 
   // ── Update current user profile ───────────────────────────────────────────
   const updateUser = async (updates) => {
+    const normalizedUpdates = { ...updates };
+    if (updates.avatar !== undefined) {
+      normalizedUpdates.photoURL = updates.avatar;
+    }
     setUsers((prev) => {
       const exists = (prev || []).some((u) => u.id === currentUser?.id);
       if (exists) {
-        return prev.map((u) => (u.id === currentUser?.id ? { ...u, ...updates } : u));
+        return prev.map((u) => (u.id === currentUser?.id ? { ...u, ...normalizedUpdates } : u));
       }
-      return [...(prev || []), { ...currentUser, ...updates }];
+      return [...(prev || []), { ...currentUser, ...normalizedUpdates }];
     });
-    const updated = { ...currentUser, ...updates };
+    const updated = { ...currentUser, ...normalizedUpdates };
     setCurrentUser(updated);
     currentUserRef.current = updated;
     cacheUserProfile(updated);
     AsyncStorage.setItem('@alaga_saved_user_v1', JSON.stringify(updated)).catch(() => {});
     if (currentUser?.id) {
       userProfilesCacheRef.current.delete(currentUser.id);
-      await updateUserProfile(currentUser.id, updates);
+      await updateUserProfile(currentUser.id, normalizedUpdates);
     }
   };
 
@@ -1706,26 +1717,26 @@ export function AppProvider({ children }) {
       const trimmed = messageData.trim();
       if (!trimmed) return;
       newMsg = {
-        id: `m${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        id: `m_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         senderId: uId,
         senderName: activeUser.name || 'User',
-        senderAvatar: activeUser.avatar || getDefaultUserAvatar(activeUser.name, uId),
+        senderAvatar: activeUser.avatar || null,
         text: trimmed,
         type: 'text',
         time: new Date().toISOString(),
       };
     } else {
       newMsg = {
-        id: `m${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        id: messageData.id || `m_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         senderId: uId,
         senderName: activeUser.name || 'User',
-        senderAvatar: activeUser.avatar || getDefaultUserAvatar(activeUser.name, uId),
+        senderAvatar: activeUser.avatar || null,
         text: messageData.text || '',
         type: messageData.type || 'text',
         mediaUri: messageData.mediaUri || null,
         location: messageData.location || null,
         duration: messageData.duration || null,
-        time: new Date().toISOString(),
+        time: messageData.time || new Date().toISOString(),
         // Extra fields for special message types (e.g. report_link)
         ...(messageData.reportId ? { reportId: messageData.reportId } : {}),
         ...(messageData.animalType ? { animalType: messageData.animalType } : {}),
