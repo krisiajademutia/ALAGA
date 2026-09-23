@@ -94,11 +94,12 @@ export default function ReportRescueScreen({ navigation }) {
     onPrimaryPress: null,
   });
 
-  // Real-time GPS State
+  // Real-time GPS & Location State
   const [gpsLoading, setGpsLoading] = useState(true);
   const [gpsStatus, setGpsStatus] = useState('fetching'); // 'fetching' | 'success' | 'error' | 'denied'
   const [coords, setCoords] = useState(null);
-  const [detectedAddress, setDetectedAddress] = useState('');
+  const [address, setAddress] = useState('');
+  const [addressError, setAddressError] = useState(null);
 
   useEffect(() => {
     fetchRealtimeLocation();
@@ -115,7 +116,7 @@ export default function ReportRescueScreen({ navigation }) {
     });
   };
 
-  const fetchRealtimeLocation = async () => {
+  const fetchRealtimeLocation = async (isManualRetry = false) => {
     setGpsLoading(true);
     setGpsStatus('fetching');
 
@@ -123,7 +124,6 @@ export default function ReportRescueScreen({ navigation }) {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setGpsStatus('denied');
-        setDetectedAddress('Location permission denied');
         setGpsLoading(false);
         return;
       }
@@ -149,16 +149,19 @@ export default function ReportRescueScreen({ navigation }) {
         ].filter(Boolean);
 
         const fullAddr = parts.length > 0 ? parts.join(', ') : `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-        setDetectedAddress(fullAddr);
-      } else {
-        setDetectedAddress(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
+        // If manual retry or if user hasn't typed an address yet, populate address
+        if (isManualRetry || !address.trim()) {
+          setAddress(fullAddr);
+        }
+      } else if (isManualRetry || !address.trim()) {
+        setAddress(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
       }
 
       setGpsStatus('success');
+      setAddressError(null);
     } catch (error) {
       console.warn('Real-time GPS error:', error);
       setGpsStatus('error');
-      setDetectedAddress('Location detection unavailable');
     } finally {
       setGpsLoading(false);
     }
@@ -211,15 +214,37 @@ export default function ReportRescueScreen({ navigation }) {
   };
 
   const handleSubmit = async () => {
-    const finalAddress = detectedAddress.trim();
-    if (!finalAddress && !landmark.trim()) {
-      showAlert('warning', 'Location Required', 'Please wait for GPS to detect your location or enter a landmark description.');
+    const finalAddress = address.trim();
+    const finalLandmark = landmark.trim();
+    if (!finalAddress && !finalLandmark) {
+      setAddressError('Please provide an address or landmark');
+      showAlert(
+        'warning',
+        'Location Required',
+        'Please enter the street address, area, or landmark description so advocates can find the animal.'
+      );
       return;
     }
 
     setLoading(true);
 
     try {
+      // If user typed a manual address but GPS coordinates are not set, attempt geocoding
+      let reportCoords = coords;
+      if (!reportCoords && finalAddress) {
+        try {
+          const geoRes = await Location.geocodeAsync(finalAddress);
+          if (geoRes && geoRes.length > 0) {
+            reportCoords = {
+              latitude: geoRes[0].latitude,
+              longitude: geoRes[0].longitude,
+            };
+          }
+        } catch (geoErr) {
+          console.warn('[ReportRescue] Geocode fallback notice:', geoErr.message);
+        }
+      }
+
       // Upload all attached photos
       const uploadedUrls = [];
       for (const item of photos) {
@@ -236,19 +261,21 @@ export default function ReportRescueScreen({ navigation }) {
           ? 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=600&q=80'
           : 'https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=600&q=80');
 
+      const resolvedDisplayAddress = finalAddress || finalLandmark || 'Reported Location';
+
       const reportPayload = {
         title,
         animalType: selectedType,
         condition: condObj.label,
         urgency: selectedUrgency,
-        description: description.trim() || `${selectedType} spotted at ${finalAddress}`,
+        description: description.trim() || `${selectedType} spotted at ${resolvedDisplayAddress}`,
         photo: primaryPhoto,
         photos: uploadedUrls.length > 0 ? uploadedUrls : [primaryPhoto],
         location: {
-          latitude: coords ? coords.latitude : 14.5764,
-          longitude: coords ? coords.longitude : 121.0851,
-          address: finalAddress || 'Real-time GPS Location',
-          landmark: landmark.trim() || 'Near detected coordinates',
+          latitude: reportCoords ? reportCoords.latitude : 14.5764,
+          longitude: reportCoords ? reportCoords.longitude : 121.0851,
+          address: resolvedDisplayAddress,
+          landmark: finalLandmark || 'Near reported location',
         },
         reporterId: currentUser?.id || currentUser?.uid || 'u_reporter',
         reporterName: currentUser?.name || 'Community Member',
@@ -261,7 +288,7 @@ export default function ReportRescueScreen({ navigation }) {
       showAlert(
         'success',
         'Rescue Alert Broadcasted',
-        'Your report, photos, and real-time GPS coordinates have been broadcasted to registered rescuers and foster volunteers in this area.',
+        'Your report, photos, and rescue location have been broadcasted to registered rescuers and foster volunteers in this area.',
         () => {
           setAlertConfig((prev) => ({ ...prev, visible: false }));
           navigation.goBack();
@@ -325,14 +352,16 @@ export default function ReportRescueScreen({ navigation }) {
                   {gpsStatus === 'fetching'
                     ? 'Detecting GPS...'
                     : gpsStatus === 'success'
-                    ? 'Real-time GPS'
-                    : 'Location'}
+                    ? 'GPS Locked'
+                    : gpsStatus === 'denied'
+                    ? 'GPS Denied (Manual)'
+                    : 'GPS Unavailable'}
                 </Text>
               </View>
 
               <TouchableOpacity
                 style={styles.locRefreshBtn}
-                onPress={fetchRealtimeLocation}
+                onPress={() => fetchRealtimeLocation(true)}
                 disabled={gpsLoading}
                 activeOpacity={0.7}
               >
@@ -340,23 +369,57 @@ export default function ReportRescueScreen({ navigation }) {
                   <ActivityIndicator size="small" color="#2E7A99" />
                 ) : (
                   <>
-                    <Ionicons name="sync-outline" size={13} color="#2E7A99" />
-                    <Text style={styles.locRefreshText}>Update</Text>
+                    <Ionicons
+                      name={gpsStatus === 'success' ? 'sync-outline' : 'navigate-outline'}
+                      size={13}
+                      color="#2E7A99"
+                    />
+                    <Text style={styles.locRefreshText}>
+                      {gpsStatus === 'success' ? 'Update GPS' : 'Retry GPS'}
+                    </Text>
                   </>
                 )}
               </TouchableOpacity>
             </View>
 
             <View style={styles.locAddressRow}>
-              <Ionicons name="location-sharp" size={18} color="#D94F4F" style={{ marginRight: 6 }} />
-              <Text style={styles.locAddressText} numberOfLines={2}>
-                {gpsLoading ? 'Detecting current coordinates...' : detectedAddress || 'Locating...'}
-              </Text>
+              <Ionicons
+                name="location-sharp"
+                size={18}
+                color={addressError ? '#D94F4F' : '#D94F4F'}
+                style={{ marginRight: 6, marginTop: Platform.OS === 'ios' ? 2 : 4 }}
+              />
+              <TextInput
+                style={[styles.locAddressInput, addressError ? styles.locInputError : null]}
+                placeholder={
+                  gpsLoading
+                    ? 'Detecting GPS location...'
+                    : 'Street address, barangay, or city (tap to edit)...'
+                }
+                placeholderTextColor="#947E68"
+                value={address}
+                onChangeText={(t) => {
+                  setAddress(t);
+                  if (addressError) setAddressError(null);
+                }}
+                multiline
+                numberOfLines={2}
+              />
             </View>
 
-            {coords && (
+            {addressError ? (
+              <Text style={styles.locErrorText}>{addressError}</Text>
+            ) : coords ? (
               <Text style={styles.locCoordsText}>
-                {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}
+                GPS: {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}
+              </Text>
+            ) : (
+              <Text style={styles.locHintText}>
+                {gpsStatus === 'denied'
+                  ? 'GPS permission denied. You can manually type the address above.'
+                  : gpsStatus === 'error'
+                  ? 'Unable to acquire GPS lock. Please type the address above.'
+                  : 'Type street/area above or use landmark.'}
               </Text>
             )}
 
@@ -759,12 +822,31 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 4,
   },
-  locAddressText: {
+  locAddressInput: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '700',
     color: '#473018',
-    lineHeight: 18,
+    lineHeight: 19,
+    paddingVertical: 2,
+    paddingHorizontal: 0,
+  },
+  locInputError: {
+    color: '#D94F4F',
+  },
+  locErrorText: {
+    fontSize: 11,
+    color: '#D94F4F',
+    fontWeight: '700',
+    marginLeft: 24,
+    marginBottom: 6,
+  },
+  locHintText: {
+    fontSize: 11,
+    color: '#947E68',
+    marginLeft: 24,
+    marginBottom: 6,
+    fontStyle: 'italic',
   },
   locCoordsText: {
     fontSize: 10,
