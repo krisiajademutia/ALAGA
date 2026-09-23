@@ -16,8 +16,11 @@ export default function SplashScreen({ navigation }) {
         Animated.spring(scale,   { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
         Animated.timing(opacity, { toValue: 1, duration: 600, useNativeDriver: true }),
       ]),
-      Animated.timing(textOp, { toValue: 1, duration: 500, useNativeDriver: true }),
-    ]).start(() => setTimeout(() => navigation.replace('Onboarding'), 1200));
+    ]).start(() => {
+      if (navigation?.replace) {
+        setTimeout(() => navigation.replace('Onboarding'), 1200);
+      }
+    });
   }, []);
 
   return (

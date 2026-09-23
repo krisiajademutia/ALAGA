@@ -11,6 +11,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES } from '../../constants/theme';
+import { useApp } from '../../context/AppContext';
 
 const { width: W } = Dimensions.get('window');
 
@@ -44,15 +45,21 @@ const SLIDES = [
 ];
 
 export default function OnboardingScreen({ navigation }) {
+  const { completeOnboarding } = useApp();
   const [idx, setIdx] = useState(0);
   const listRef = useRef(null);
   const scrollX = useRef(new Animated.Value(0)).current;
+
+  const handleFinish = () => {
+    if (completeOnboarding) completeOnboarding();
+    navigation.replace('Login');
+  };
 
   const next = () => {
     if (idx < SLIDES.length - 1) {
       listRef.current?.scrollToIndex({ index: idx + 1 });
     } else {
-      navigation.replace('Login');
+      handleFinish();
     }
   };
 
@@ -63,7 +70,7 @@ export default function OnboardingScreen({ navigation }) {
       {/* Skip Button */}
       <TouchableOpacity
         style={styles.skipBtn}
-        onPress={() => navigation.replace('Login')}
+        onPress={handleFinish}
         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
       >
         <Text style={styles.skipText}>Skip</Text>
@@ -126,7 +133,7 @@ export default function OnboardingScreen({ navigation }) {
 
           {/* Login Link */}
           <TouchableOpacity
-            onPress={() => navigation.replace('Login')}
+            onPress={handleFinish}
             style={styles.loginLink}
           >
             <Text style={styles.loginText}>

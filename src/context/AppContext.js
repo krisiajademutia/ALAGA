@@ -15,6 +15,7 @@ import {
   subscribeToNotificationsFirebase,
   deleteNotificationFirebase,
   clearAllNotificationsFirebase,
+  subscribeAuthState,
 } from '../services/authService';
 import {
   subscribeToRescueReports,
@@ -123,6 +124,9 @@ const defaultContext = {
   markAlertsAsViewed: () => {},
   showInAppNotification: () => {},
   hideInAppNotification: () => {},
+  isAuthLoading: true,
+  isOnboardingCompleted: false,
+  completeOnboarding: () => {},
   showAlert: () => {},
   hideAlert: () => {},
 };
@@ -131,6 +135,8 @@ const AppContext = createContext(defaultContext);
 
 export function AppProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isOnboardingCompleted, setIsOnboardingCompleted] = useState(false);
   const [users, setUsers] = useState([]);
   const [rescueReports, setRescueReports] = useState([]);
   const [animals, setAnimals] = useState([]);
@@ -779,6 +785,76 @@ export function AppProvider({ children }) {
     };
   }, [currentUser?.role]);
 
+  const completeOnboarding = async () => {
+    setIsOnboardingCompleted(true);
+    await AsyncStorage.setItem('@alaga_onboarding_completed_v1', 'true').catch(() => {});
+  };
+
+  // ── Load & Restore Saved User Auth Session & Onboarding State ─────────────
+  useEffect(() => {
+    let isMounted = true;
+
+    (async () => {
+      try {
+        const [savedUserStr, onboardedStr] = await Promise.all([
+          AsyncStorage.getItem('@alaga_saved_user_v1'),
+          AsyncStorage.getItem('@alaga_onboarding_completed_v1'),
+        ]);
+
+        if (!isMounted) return;
+
+        if (onboardedStr === 'true') {
+          setIsOnboardingCompleted(true);
+        }
+
+        if (savedUserStr) {
+          const parsed = JSON.parse(savedUserStr);
+          if (parsed && (parsed.id || parsed.uid)) {
+            setCurrentUser(parsed);
+            currentUserRef.current = parsed;
+            cacheUserProfile(parsed);
+            setIsOnboardingCompleted(true);
+          }
+        }
+      } catch (err) {
+        console.warn('[AppContext] Error restoring saved auth session:', err);
+      } finally {
+        if (isMounted) {
+          setIsAuthLoading(false);
+        }
+      }
+    })();
+
+    // Background Firebase Auth state listener to sync profile changes & keep token fresh
+    const unsubAuth = subscribeAuthState(async (fbUser) => {
+      if (!isMounted) return;
+      if (fbUser) {
+        try {
+          const profile = await getUserProfileFirebase(fbUser.uid);
+          if (profile && isMounted) {
+            const merged = { ...profile, id: fbUser.uid, email: fbUser.email || profile.email };
+            setCurrentUser((prev) => {
+              const updated = { ...(prev || {}), ...merged };
+              currentUserRef.current = updated;
+              cacheUserProfile(updated);
+              AsyncStorage.setItem('@alaga_saved_user_v1', JSON.stringify(updated)).catch(() => {});
+              return updated;
+            });
+            setIsOnboardingCompleted(true);
+            AsyncStorage.setItem('@alaga_onboarding_completed_v1', 'true').catch(() => {});
+          }
+        } catch (e) {
+          console.warn('[AppContext] Auth sync notice:', e);
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubAuth?.();
+    };
+  }, []);
+
   // ── Load & Persist Real-Time Notifications ─────────────────────────────────
   useEffect(() => {
     (async () => {
@@ -1056,6 +1132,13 @@ export function AppProvider({ children }) {
     const fbResult = await loginWithFirebase(email, password);
     if (fbResult.success) {
       setCurrentUser(fbResult.user);
+      currentUserRef.current = fbResult.user;
+      cacheUserProfile(fbResult.user);
+      setIsOnboardingCompleted(true);
+      await Promise.all([
+        AsyncStorage.setItem('@alaga_saved_user_v1', JSON.stringify(fbResult.user)),
+        AsyncStorage.setItem('@alaga_onboarding_completed_v1', 'true'),
+      ]).catch(() => {});
       return { success: true, user: fbResult.user };
     }
     return { success: false, error: fbResult.error || 'Invalid email or password.' };
@@ -1065,7 +1148,14 @@ export function AppProvider({ children }) {
     const fbResult = await registerWithFirebase(data);
     if (fbResult.success) {
       setCurrentUser(fbResult.user);
+      currentUserRef.current = fbResult.user;
+      cacheUserProfile(fbResult.user);
       setUsers((prev) => [...prev, fbResult.user]);
+      setIsOnboardingCompleted(true);
+      await Promise.all([
+        AsyncStorage.setItem('@alaga_saved_user_v1', JSON.stringify(fbResult.user)),
+        AsyncStorage.setItem('@alaga_onboarding_completed_v1', 'true'),
+      ]).catch(() => {});
       return { success: true, user: fbResult.user };
     }
     return { success: false, error: fbResult.error || 'Registration failed.' };
@@ -1081,10 +1171,17 @@ export function AppProvider({ children }) {
 
     if (result.success) {
       setCurrentUser(result.user);
+      currentUserRef.current = result.user;
+      cacheUserProfile(result.user);
       setUsers((prev) => {
         const exists = prev.some((u) => u.id === result.user.id);
         return exists ? prev : [...prev, result.user];
       });
+      setIsOnboardingCompleted(true);
+      await Promise.all([
+        AsyncStorage.setItem('@alaga_saved_user_v1', JSON.stringify(result.user)),
+        AsyncStorage.setItem('@alaga_onboarding_completed_v1', 'true'),
+      ]).catch(() => {});
       return { success: true, user: result.user };
     }
     return { success: false, error: result.error || 'Google login failed' };
@@ -1092,7 +1189,9 @@ export function AppProvider({ children }) {
 
   const logout = () => {
     logoutFromFirebase();
+    AsyncStorage.removeItem('@alaga_saved_user_v1').catch(() => {});
     setCurrentUser(null);
+    currentUserRef.current = null;
     mySubmittedReportIds.current.clear();
     notifiedReportIdsRef.current.clear();
     notifiedMessageIdsRef.current.clear();
@@ -1111,7 +1210,9 @@ export function AppProvider({ children }) {
     });
     const updated = { ...currentUser, ...updates };
     setCurrentUser(updated);
+    currentUserRef.current = updated;
     cacheUserProfile(updated);
+    AsyncStorage.setItem('@alaga_saved_user_v1', JSON.stringify(updated)).catch(() => {});
     if (currentUser?.id) {
       userProfilesCacheRef.current.delete(currentUser.id);
       await updateUserProfile(currentUser.id, updates);
@@ -2178,6 +2279,9 @@ export function AppProvider({ children }) {
         loginWithGoogle,
         logout,
         updateUser,
+        isAuthLoading,
+        isOnboardingCompleted,
+        completeOnboarding,
         // rescue
         addRescueReport,
         deleteRescueReport,

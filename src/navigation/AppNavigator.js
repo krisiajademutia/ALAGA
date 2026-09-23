@@ -195,13 +195,16 @@ function RootStack() {
 // ─────────────────────────────────────────────────────────────────────────────
 // Auth Stack
 // ─────────────────────────────────────────────────────────────────────────────
-function AuthStack() {
+function AuthStack({ initialRoute = 'Login' }) {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Splash"     component={SplashScreen} />
-      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+    <Stack.Navigator
+      key={initialRoute}
+      screenOptions={{ headerShown: false }}
+      initialRouteName={initialRoute}
+    >
       <Stack.Screen name="Login"      component={LoginScreen} />
       <Stack.Screen name="Register"   component={RegisterScreen} />
+      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
     </Stack.Navigator>
   );
 }
@@ -210,10 +213,19 @@ function AuthStack() {
 // Root Navigator — switches between Auth and App based on login state
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AppNavigator() {
-  const { currentUser } = useApp();
+  const { currentUser, isAuthLoading, isOnboardingCompleted } = useApp();
+
+  if (isAuthLoading) {
+    return <SplashScreen />;
+  }
+
   return (
     <NavigationContainer ref={navigationRef}>
-      {currentUser ? <RootStack /> : <AuthStack />}
+      {currentUser ? (
+        <RootStack />
+      ) : (
+        <AuthStack initialRoute={isOnboardingCompleted ? 'Login' : 'Onboarding'} />
+      )}
     </NavigationContainer>
   );
 }
