@@ -24,6 +24,15 @@ import StatusPill from '../../components/StatusPill';
 import { URGENCY_LEVELS } from '../../data/mockData';
 import { getDistanceInKm } from '../../services/notificationService';
 
+function countComments(comments = []) {
+  let count = 0;
+  (comments || []).forEach((c) => {
+    count += 1;
+    if (Array.isArray(c.replies)) count += countComments(c.replies);
+  });
+  return count;
+}
+
 export default function RescueAlertDetailScreen({ route, navigation }) {
   const { reportId } = route.params || {};
   const {
@@ -40,6 +49,7 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
 
   const report = rescueReports.find((r) => r.id === reportId) || null;
   const [commentText, setCommentText] = useState('');
+  const [replyTarget, setReplyTarget] = useState(null);
   const [isFav, setIsFav] = useState(false);
   const [previewImageIndex, setPreviewImageIndex] = useState(null);
   const [urgencyModalVisible, setUrgencyModalVisible] = useState(false);
@@ -249,8 +259,9 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
 
   const handleSendComment = () => {
     if (!commentText.trim()) return;
-    addComment(report.id, commentText.trim());
+    addComment(report.id, commentText.trim(), replyTarget?.id || null);
     setCommentText('');
+    setReplyTarget(null);
   };
 
   return (
@@ -407,18 +418,20 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
                   <Ionicons name="checkmark-circle" size={14} color="#2E7A99" style={{ marginLeft: 4 }} />
                 </View>
                 <Text style={styles.reporterRole}>
-                  Reported this rescue case
+                  {isAuthor ? 'You reported this rescue case' : 'Reported this rescue case'}
                 </Text>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.chatBtn}
-              onPress={handleMessageAdvocate}
-              activeOpacity={0.82}
-            >
-              <Ionicons name="chatbubble-ellipses" size={14} color="#2E7A99" style={{ marginRight: 5 }} />
-              <Text style={styles.chatBtnText}>Message</Text>
-            </TouchableOpacity>
+            {!isAuthor && (
+              <TouchableOpacity
+                style={styles.chatBtn}
+                onPress={handleMessageAdvocate}
+                activeOpacity={0.82}
+              >
+                <Ionicons name="chatbubble-ellipses" size={14} color="#2E7A99" style={{ marginRight: 5 }} />
+                <Text style={styles.chatBtnText}>Message</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* ── Description / Report Details (Unboxed) ─────────── */}
@@ -466,14 +479,28 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
 
           {/* ── Dynamic Rescue Action Panel ────────────────────── */}
           {report.status === 'Open' ? (
-            <TouchableOpacity
-              style={styles.respondBtn}
-              onPress={handleRespond}
-              activeOpacity={0.88}
-            >
-              <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.respondBtnText}>Respond (I’ll help!)</Text>
-            </TouchableOpacity>
+            isAdvocate ? (
+              <TouchableOpacity
+                style={styles.respondBtn}
+                onPress={handleRespond}
+                activeOpacity={0.88}
+              >
+                <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                <Text style={styles.respondBtnText}>Respond (I’ll help!)</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.awaitingCard}>
+                <View style={styles.awaitingIconWrap}>
+                  <Ionicons name="time-outline" size={22} color="#2E7A99" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.awaitingTitle}>Awaiting Advocate Response</Text>
+                  <Text style={styles.awaitingSub}>
+                    Nearby advocates have been alerted to this rescue case and will coordinate assistance shortly.
+                  </Text>
+                </View>
+              </View>
+            )
           ) : report.status === 'Responded' ? (
             <View style={styles.respondedCard}>
               <View style={styles.respondedHeaderRow}>
@@ -482,7 +509,9 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.respondedTitle}>
-                    {isResponder ? 'You are responding to this case' : `Claimed by ${report.responderName || 'Advocate'}`}
+                    {isResponder
+                      ? 'You are responding to this case'
+                      : `Claimed by ${report.responderName || 'Advocate'}`}
                   </Text>
                   <Text style={styles.respondedSub}>
                     {isResponder
@@ -493,14 +522,35 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
               </View>
 
               <View style={styles.respondedActionsRow}>
-                <TouchableOpacity
-                  style={styles.actionChatBtn}
-                  onPress={handleMessageAdvocate}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="chatbubbles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.actionChatBtnText}>Chat with Reporter</Text>
-                </TouchableOpacity>
+                {isAdvocate ? (
+                  <TouchableOpacity
+                    style={styles.actionChatBtn}
+                    onPress={handleMessageAdvocate}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="chatbubbles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.actionChatBtnText}>Chat with Reporter</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.actionChatBtn}
+                    onPress={() => {
+                      if (!report.responderId) return;
+                      const convId = startConversation(report.responderId, report.responderName || 'Advocate');
+                      navigation.navigate('Chat', {
+                        conversationId: convId,
+                        otherName: report.responderName || 'Advocate',
+                        otherId: report.responderId,
+                        initialDraft: `Hi ${report.responderName || ''}! Thank you for responding to my rescue report. Here is the latest update:`,
+                        linkedReport: report,
+                      });
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="chatbubbles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.actionChatBtnText}>Chat with {report.responderName || 'Advocate'}</Text>
+                  </TouchableOpacity>
+                )}
 
                 {isResponder && (
                   <TouchableOpacity
@@ -529,26 +579,78 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
           {/* Comments Section */}
           <View style={styles.commentsSection}>
             <Text style={styles.commentsTitle}>
-              Comments ({report.comments?.length || 0})
+              Comments ({countComments(report.comments)})
             </Text>
 
             {report.comments && report.comments.length > 0 ? (
               report.comments.map((c) => (
-                <View key={c.id} style={styles.commentItem}>
-                  <TouchableOpacity onPress={() => navigation.navigate('PublicProfile', { userId: c.userId, userName: c.userName, userAvatar: c.userAvatar })} activeOpacity={0.8}>
-                    <Avatar name={c.userName} uri={c.userAvatar} userId={c.userId} size={36} />
-                  </TouchableOpacity>
-                  <View style={styles.commentBubble}>
-                    <TouchableOpacity onPress={() => navigation.navigate('PublicProfile', { userId: c.userId, userName: c.userName, userAvatar: c.userAvatar })} activeOpacity={0.8}>
-                      <Text style={styles.commentUser}>{c.userName}</Text>
+                <View key={c.id} style={styles.commentNodeWrap}>
+                  <View style={styles.commentItem}>
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('PublicProfile', { userId: c.userId, userName: c.userName, userAvatar: c.userAvatar })}
+                      activeOpacity={0.8}
+                    >
+                      <Avatar name={c.userName} uri={c.userAvatar} userId={c.userId} size={36} />
                     </TouchableOpacity>
-                    <Text style={styles.commentContent}>{c.text}</Text>
-                    <View style={styles.commentBottomRow}>
-                      <Text style={styles.commentTime}>
-                        {c.createdAt ? (c.createdAt.includes('T') ? new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : c.createdAt) : 'Just now'}
-                      </Text>
+                    <View style={styles.commentBubble}>
+                      <TouchableOpacity
+                        onPress={() => navigation.navigate('PublicProfile', { userId: c.userId, userName: c.userName, userAvatar: c.userAvatar })}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.commentUser}>{c.userName}</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.commentContent}>{c.text}</Text>
+                      <View style={styles.commentBottomRow}>
+                        <Text style={styles.commentTime}>
+                          {c.createdAt
+                            ? (c.createdAt.includes('T')
+                                ? new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                : c.createdAt)
+                            : 'Just now'}
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.replyBtn}
+                          onPress={() => setReplyTarget({ id: c.id, name: c.userName })}
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        >
+                          <Ionicons name="arrow-undo-outline" size={12} color="#2E7A99" />
+                          <Text style={styles.replyBtnText}>Reply</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
+
+                  {/* Render nested replies if present */}
+                  {Array.isArray(c.replies) && c.replies.length > 0 && (
+                    <View style={styles.repliesList}>
+                      {c.replies.map((reply) => (
+                        <View key={reply.id} style={styles.replyItem}>
+                          <TouchableOpacity
+                            onPress={() => navigation.navigate('PublicProfile', { userId: reply.userId, userName: reply.userName, userAvatar: reply.userAvatar })}
+                            activeOpacity={0.8}
+                          >
+                            <Avatar name={reply.userName} uri={reply.userAvatar} userId={reply.userId} size={28} />
+                          </TouchableOpacity>
+                          <View style={styles.replyBubble}>
+                            <TouchableOpacity
+                              onPress={() => navigation.navigate('PublicProfile', { userId: reply.userId, userName: reply.userName, userAvatar: reply.userAvatar })}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.commentUser}>{reply.userName}</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.commentContent}>{reply.text}</Text>
+                            <Text style={styles.commentTime}>
+                              {reply.createdAt
+                                ? (reply.createdAt.includes('T')
+                                    ? new Date(reply.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                    : reply.createdAt)
+                                : 'Just now'}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
               ))
             ) : (
@@ -559,21 +661,42 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
               </View>
             )}
 
+            {/* Replying Banner */}
+            {replyTarget && (
+              <View style={styles.replyBanner}>
+                <View style={styles.replyBannerContent}>
+                  <Ionicons name="arrow-undo" size={13} color="#2E7A99" style={{ marginRight: 6 }} />
+                  <Text style={styles.replyBannerText}>
+                    Replying to <Text style={{ fontWeight: '700', color: '#2E7A99' }}>{replyTarget.name}</Text>
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setReplyTarget(null)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="close-circle" size={18} color="#8C7D6A" />
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Write comment input */}
             <View style={styles.writeCommentRow}>
               <Avatar name={currentUser?.name || 'User'} uri={currentUser?.avatar} userId={currentUser?.id} size={34} />
               <View style={styles.commentInputWrap}>
                 <TextInput
                   style={styles.commentInput}
-                  placeholder="Write a comment..."
+                  placeholder={replyTarget ? `Reply to ${replyTarget.name}...` : "Write a comment..."}
                   placeholderTextColor="#8C7D6A"
                   value={commentText}
                   onChangeText={setCommentText}
+                  returnKeyType="send"
+                  onSubmitEditing={handleSendComment}
                 />
               </View>
               <TouchableOpacity
                 style={styles.sendIconBtn}
                 onPress={handleSendComment}
+                disabled={!commentText.trim()}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Ionicons name="paper-plane" size={20} color={commentText.trim() ? '#2E7A99' : '#C4B8A5'} />
@@ -1173,6 +1296,39 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_500Medium',
   },
 
+  awaitingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F7FAFC',
+    borderWidth: 1,
+    borderColor: '#D4E5ED',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 24,
+    gap: 12,
+  },
+  awaitingIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EAF3F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  awaitingTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1C4A5E',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  awaitingSub: {
+    fontSize: 12,
+    color: '#5B7A8C',
+    marginTop: 2,
+    lineHeight: 16,
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+
   commentsSection: {
     marginTop: 4,
   },
@@ -1182,6 +1338,52 @@ const styles = StyleSheet.create({
     color: '#473018',
     marginBottom: 12,
     fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  commentNodeWrap: {
+    marginBottom: 14,
+  },
+  repliesList: {
+    marginLeft: 32,
+    marginTop: 8,
+    paddingLeft: 12,
+    borderLeftWidth: 2,
+    borderLeftColor: '#E2EBF0',
+    gap: 8,
+  },
+  replyItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  replyBubble: {
+    flex: 1,
+    backgroundColor: '#F7FAFB',
+    borderWidth: 1,
+    borderColor: '#D8E8F0',
+    borderRadius: 14,
+    padding: 10,
+  },
+  replyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#EDF5F8',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginTop: 8,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#CFE4EC',
+  },
+  replyBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  replyBannerText: {
+    fontSize: 12,
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_500Medium',
   },
   commentItem: {
     flexDirection: 'row',

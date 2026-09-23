@@ -658,7 +658,23 @@ export function AppProvider({ children }) {
       // Public feeds (Rescue alerts and Adoptable animals)
       const unsubRescues = subscribeToRescueReports((liveReports) => {
         const reportsList = Array.isArray(liveReports) ? liveReports : [];
-        setRescueReports(reportsList);
+        setRescueReports((prev) => {
+          return reportsList.map((remote) => {
+            const local = (prev || []).find((r) => r.id === remote.id);
+            const remoteComments = Array.isArray(remote.comments) ? remote.comments : [];
+            const localComments = Array.isArray(local?.comments) ? local.comments : [];
+
+            // Merge comments by id so local optimistic comments are never wiped out
+            const map = new Map();
+            localComments.forEach((c) => { if (c.id) map.set(c.id, c); });
+            remoteComments.forEach((c) => { if (c.id) map.set(c.id, c); });
+
+            return {
+              ...remote,
+              comments: Array.from(map.values()),
+            };
+          });
+        });
 
         const activeUser = currentUserRef.current;
         if (activeUser) {
@@ -1006,26 +1022,31 @@ export function AppProvider({ children }) {
       createdAt: new Date().toISOString(),
       replies: [],
     };
+    let updatedCommentsForReport = null;
     setRescueReports((prev) =>
       prev.map((r) => {
         if (r.id !== reportId) return r;
+        let newComments;
         if (!parentCommentId) {
-          return { ...r, comments: [...(r.comments || []), newComment] };
+          newComments = [...(r.comments || []), newComment];
+        } else {
+          const appendReply = (list) =>
+            (list || []).map((c) => {
+              if (c.id === parentCommentId) {
+                return { ...c, replies: [...(c.replies || []), newComment] };
+              }
+              if (c.replies && c.replies.length > 0) {
+                return { ...c, replies: appendReply(c.replies) };
+              }
+              return c;
+            });
+          newComments = appendReply(r.comments || []);
         }
-        const appendReply = (list) =>
-          (list || []).map((c) => {
-            if (c.id === parentCommentId) {
-              return { ...c, replies: [...(c.replies || []), newComment] };
-            }
-            if (c.replies && c.replies.length > 0) {
-              return { ...c, replies: appendReply(c.replies) };
-            }
-            return c;
-          });
-        return { ...r, comments: appendReply(r.comments) };
+        updatedCommentsForReport = newComments;
+        return { ...r, comments: newComments };
       })
     );
-    addRescueCommentFirebase(reportId, newComment);
+    addRescueCommentFirebase(reportId, newComment, updatedCommentsForReport);
   };
 
   // ── Animal Profiles ───────────────────────────────────────────────────────

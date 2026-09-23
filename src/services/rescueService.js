@@ -9,6 +9,7 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  arrayUnion,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { isMockFirebase } from '../config/firebaseConfig';
@@ -32,9 +33,11 @@ export function subscribeToRescueReports(onUpdate, onError) {
       (snapshot) => {
         const reports = [];
         snapshot.forEach((docSnap) => {
+          const data = docSnap.data() || {};
           reports.push({
             id: docSnap.id,
-            ...docSnap.data(),
+            ...data,
+            comments: Array.isArray(data.comments) ? data.comments : [],
           });
         });
         onUpdate(reports);
@@ -64,7 +67,8 @@ export async function createRescueReportFirebase(reportData) {
       status: 'Open',
       responderId: null,
       responderName: null,
-      createdAt: new Date().toISOString(),
+      comments: Array.isArray(reportData?.comments) ? reportData.comments : [],
+      createdAt: reportData?.createdAt || new Date().toISOString(),
       timestamp: serverTimestamp(),
     };
 
@@ -119,20 +123,59 @@ export async function markReportRescuedFirebase(reportId) {
 }
 
 /**
- * Add a comment to the rescue subcollection
+ * Add a comment to the rescue report in Firestore (updates doc and subcollection)
  */
-export async function addRescueCommentFirebase(reportId, commentData) {
-  if (isMockFirebase() || !db) return { isMock: true };
+export async function addRescueCommentFirebase(reportId, commentData, allComments = null) {
+  if (isMockFirebase() || !db || !reportId) return { isMock: true };
 
   try {
-    const commentsRef = collection(db, RESCUES_COLLECTION, reportId, 'comments');
-    const newComment = {
-      ...commentData,
-      createdAt: new Date().toISOString(),
-      timestamp: serverTimestamp(),
+    const docId = String(reportId);
+    const reportRef = doc(db, RESCUES_COLLECTION, docId);
+
+    // Deep clean comment object so Firestore never encounters undefined values
+    const cleanComment = {
+      id: String(commentData.id || `c${Date.now()}_${Math.random().toString(36).slice(2, 6)}`),
+      userId: String(commentData.userId || 'u_anon'),
+      userName: String(commentData.userName || 'Community Member'),
+      userAvatar: commentData.userAvatar || null,
+      text: String(commentData.text || ''),
+      createdAt: commentData.createdAt || new Date().toISOString(),
+      replies: Array.isArray(commentData.replies) ? commentData.replies : [],
     };
-    const docRef = await addDoc(commentsRef, newComment);
-    return { success: true, id: docRef.id };
+
+    if (allComments && Array.isArray(allComments)) {
+      // If full array was provided (e.g. for nested replies), sanitize and persist entire array
+      const sanitizeList = (list) =>
+        (list || []).map((c) => ({
+          id: String(c.id || `c${Date.now()}`),
+          userId: String(c.userId || 'u_anon'),
+          userName: String(c.userName || 'Community Member'),
+          userAvatar: c.userAvatar || null,
+          text: String(c.text || ''),
+          createdAt: c.createdAt || new Date().toISOString(),
+          replies: Array.isArray(c.replies) ? sanitizeList(c.replies) : [],
+        }));
+
+      await updateDoc(reportRef, { comments: sanitizeList(allComments) });
+    } else {
+      // Atomically append using arrayUnion directly to the report document
+      await updateDoc(reportRef, {
+        comments: arrayUnion(cleanComment),
+      });
+    }
+
+    // Also write to subcollection for backward-compatibility
+    try {
+      const commentsRef = collection(db, RESCUES_COLLECTION, docId, 'comments');
+      await addDoc(commentsRef, {
+        ...cleanComment,
+        timestamp: serverTimestamp(),
+      });
+    } catch (subErr) {
+      // Non-fatal
+    }
+
+    return { success: true };
   } catch (error) {
     console.warn('[rescueService] Add comment warning:', error.message);
     return { success: false, error: error.message };
