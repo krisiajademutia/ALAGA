@@ -530,8 +530,23 @@ export default function ChatScreen({ route, navigation }) {
     >
       <StatusBar style="dark" />
 
-      {/* ── Standardized Clean Header (No Back Button) ──────── */}
+      {/* ── Header (With Back Button) ──────── */}
       <View style={[styles.headerWrap, { paddingTop: safeTopPadding }]}>
+        <TouchableOpacity
+          onPress={() => {
+            if (navigation?.canGoBack && navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate('Home');
+            }
+          }}
+          style={styles.backBtn}
+          activeOpacity={0.78}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="arrow-back" size={20} color={COLORS.brown} />
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.navCenter}
           onPress={() => {
@@ -545,17 +560,6 @@ export default function ChatScreen({ route, navigation }) {
           }}
           activeOpacity={0.75}
         >
-          <View style={styles.navAvatarWrap}>
-            {isGroup
-              ? (groupPhoto
-                ? <Image source={{ uri: groupPhoto }} style={styles.navGroupAvatar} />
-                : <View style={styles.navGroupAvatarPlaceholder}>
-                  <Ionicons name="people" size={20} color="#2E7A99" />
-                </View>
-              )
-              : <Avatar name={name} userId={otherId} uri={otherAvatar} size={42} />
-            }
-          </View>
           <View style={styles.navTextWrap}>
             <Text style={styles.navName} numberOfLines={1}>{name}</Text>
             <View style={styles.navSubRow}>
@@ -1352,10 +1356,25 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F0ECE4',
   },
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: COLORS.borderLight || '#F4EDE0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    shadowColor: '#0D1B2A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
   navCenter: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
     flex: 1,
     paddingRight: 8,
   },
