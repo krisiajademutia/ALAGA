@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,9 @@ import {
   Alert,
   Modal,
   StatusBar as RNStatusBar,
+  Dimensions,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +26,14 @@ import MapCard from '../../components/MapCard';
 import StatusPill from '../../components/StatusPill';
 import { URGENCY_LEVELS } from '../../data/mockData';
 import { getDistanceInKm } from '../../services/notificationService';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// ── Sheet Positioning Math ──────────────────────────────
+const INITIAL_SHEET_TOP = SCREEN_HEIGHT * 0.38; // Normal state (Photo 1)
+const COLLAPSED_VISIBLE_HEIGHT = Platform.OS === 'ios' ? 190 : 175; // Dragged down state (Photo 2)
+const COLLAPSED_SHEET_TOP = SCREEN_HEIGHT - COLLAPSED_VISIBLE_HEIGHT;
+const MAX_DRAG_DOWN = Math.max(80, COLLAPSED_SHEET_TOP - INITIAL_SHEET_TOP);
 
 export default function RescueAlertDetailScreen({ route, navigation }) {
   const { reportId } = route.params || {};
@@ -42,7 +53,80 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
   const [isFav, setIsFav] = useState(false);
   const [previewImageIndex, setPreviewImageIndex] = useState(null);
   const [urgencyModalVisible, setUrgencyModalVisible] = useState(false);
+  const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const isAdvocate = currentUser?.role === 'advocate';
+
+  // PanResponder for dragging white container down to reveal full centered picture
+  const panY = useRef(new Animated.Value(0)).current;
+  const isCollapsedRef = useRef(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 5,
+      onPanResponderMove: (_, gestureState) => {
+        const startY = isCollapsedRef.current ? MAX_DRAG_DOWN : 0;
+        const newY = startY + gestureState.dy;
+        if (newY >= 0 && newY <= MAX_DRAG_DOWN + 30) {
+          panY.setValue(newY);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 50 || (gestureState.vy > 0.35 && gestureState.dy > 15)) {
+          // Dragged down -> collapse sheet so full picture is revealed
+          Animated.spring(panY, {
+            toValue: MAX_DRAG_DOWN,
+            useNativeDriver: false,
+            bounciness: 4,
+          }).start(() => {
+            isCollapsedRef.current = true;
+            setIsCollapsed(true);
+          });
+        } else {
+          // Restore to Normal view
+          Animated.spring(panY, {
+            toValue: 0,
+            useNativeDriver: false,
+            bounciness: 4,
+          }).start(() => {
+            isCollapsedRef.current = false;
+            setIsCollapsed(false);
+          });
+        }
+      },
+    })
+  ).current;
+
+  const toggleSheet = () => {
+    if (isCollapsedRef.current) {
+      Animated.spring(panY, { toValue: 0, useNativeDriver: false, bounciness: 4 }).start();
+      isCollapsedRef.current = false;
+      setIsCollapsed(false);
+    } else {
+      Animated.spring(panY, { toValue: MAX_DRAG_DOWN, useNativeDriver: false, bounciness: 4 }).start();
+      isCollapsedRef.current = true;
+      setIsCollapsed(true);
+    }
+  };
+
+  const heroHeight = panY.interpolate({
+    inputRange: [0, MAX_DRAG_DOWN],
+    outputRange: [SCREEN_HEIGHT * 0.42, COLLAPSED_SHEET_TOP - 10],
+    extrapolate: 'clamp',
+  });
+
+  const bottomBarOpacity = panY.interpolate({
+    inputRange: [0, MAX_DRAG_DOWN * 0.6, MAX_DRAG_DOWN],
+    outputRange: [0, 0, 1],
+    extrapolate: 'clamp',
+  });
+
+  const bottomBarTranslateY = panY.interpolate({
+    inputRange: [0, MAX_DRAG_DOWN * 0.6, MAX_DRAG_DOWN],
+    outputRange: [100, 100, 0],
+    extrapolate: 'clamp',
+  });
 
   const photosList = (report?.photos && report.photos.length > 0)
     ? report.photos
@@ -212,66 +296,107 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.flex}>
       <StatusBar style="light" />
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* ── Top Hero Image & Floating Buttons ──────────────── */}
-        <View style={styles.heroWrap}>
-          {photosList.length > 0 ? (
-            <TouchableOpacity
-              activeOpacity={0.92}
-              onPress={() => setPreviewImageIndex(0)}
-              style={styles.heroTouch}
+      {/* ── Background Hero Picture Section ───────────────── */}
+      <Animated.View style={[styles.heroWrap, { height: heroHeight }]}>
+        {photosList.length > 1 ? (
+          <View style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' }}>
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={(e) => {
+                const offset = e.nativeEvent.contentOffset.x;
+                const idx = Math.round(offset / SCREEN_WIDTH);
+                setCurrentPhotoIdx(idx);
+              }}
+              style={{ width: '100%', height: '100%' }}
             >
-              <Image source={{ uri: photosList[0] }} style={styles.heroImage} resizeMode="cover" />
-              <View style={styles.tapToExpandBadge}>
-                <Ionicons name="images-outline" size={13} color="#FFFFFF" style={{ marginRight: 5 }} />
-                <Text style={styles.tapToExpandText}>
-                  {photosList.length > 1 ? `${photosList.length} Photos · Tap to view gallery` : 'Tap to view full image'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.placeholderWrap}>
-              <Ionicons name="paw" size={64} color="#92CDE5" />
+              {photosList.map((imgUri, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  activeOpacity={0.95}
+                  onPress={() => setPreviewImageIndex(idx)}
+                  style={{ width: SCREEN_WIDTH, height: '100%', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Image
+                    source={{ uri: imgUri }}
+                    style={styles.heroImage}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <View style={styles.heroPagingBadge}>
+              <Ionicons name="images" size={12} color="#fff" style={{ marginRight: 4 }} />
+              <Text style={styles.heroPagingText}>{currentPhotoIdx + 1} / {photosList.length}</Text>
             </View>
-          )}
-
-          {/* Floating Back */}
+          </View>
+        ) : photosList.length === 1 ? (
           <TouchableOpacity
-            style={[styles.floatingBack, { top: safeTop }]}
-            onPress={() => navigation.goBack()}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.95}
+            onPress={() => setPreviewImageIndex(0)}
+            style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
           >
-            <Ionicons name="arrow-back" size={20} color="#473018" />
-          </TouchableOpacity>
-
-          {/* Floating Heart */}
-          <TouchableOpacity
-            style={[styles.floatingHeart, { top: safeTop }]}
-            onPress={() => setIsFav(!isFav)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons
-              name={isFav ? 'heart' : 'heart-outline'}
-              size={20}
-              color={isFav ? '#D94F4F' : '#D94F4F'}
+            <Image
+              source={{ uri: photosList[0] }}
+              style={styles.heroImage}
+              resizeMode="cover"
             />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.placeholderWrap}>
+            <Ionicons name="paw" size={64} color="#92CDE5" />
+          </View>
+        )}
+
+        {/* Floating Back */}
+        <TouchableOpacity
+          style={[styles.floatingBack, { top: safeTop }]}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="arrow-back" size={20} color="#473018" />
+        </TouchableOpacity>
+
+        {/* Floating Heart */}
+        <TouchableOpacity
+          style={[styles.floatingHeart, { top: safeTop }]}
+          onPress={() => setIsFav(!isFav)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons
+            name={isFav ? 'heart' : 'heart-outline'}
+            size={20}
+            color="#D94F4F"
+          />
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* ── Draggable White Sheet Body ────────────────────────── */}
+      <Animated.View
+        style={[
+          styles.sheetBody,
+          {
+            transform: [{ translateY: panY }],
+          },
+        ]}
+      >
+        {/* Draggable Handle Header Area */}
+        <View {...panResponder.panHandlers} style={styles.dragHeaderArea}>
+          <TouchableOpacity onPress={toggleSheet} activeOpacity={0.8} style={styles.handleTouchZone}>
+            <View style={styles.sheetHandle} />
           </TouchableOpacity>
         </View>
 
-        {/* ── Sheet Body ────────────────────────────────────── */}
-        <View style={styles.sheetBody}>
-          <View style={styles.sheetHandle} />
-
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          bounces={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Status, Urgency & Distance Pills */}
           <View style={styles.metaBadgeRow}>
             <StatusPill status={report.status || 'Open'} />
@@ -317,7 +442,7 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
             </Text>
           </View>
 
-          {/* ── Dynamic Attribute Tags (Only Render Fields Present in Report) ── */}
+          {/* ── Dynamic Attribute Tags ── */}
           {detailTags.length > 0 && (
             <View style={styles.detailTagsRow}>
               {detailTags.map((tag) => (
@@ -334,7 +459,7 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
 
           <View style={styles.hairline} />
 
-          {/* ── Reporter Profile Row (Unboxed) ─────────────────── */}
+          {/* ── Reporter Profile Row ── */}
           <View style={styles.reporterRow}>
             <TouchableOpacity
               style={styles.reporterLeft}
@@ -368,7 +493,7 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
 
-          {/* ── Description / Report Details (Unboxed) ─────────── */}
+          {/* ── Description / Report Details ── */}
           {Boolean(report.description?.trim()) && (
             <>
               <View style={styles.hairline} />
@@ -398,7 +523,7 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
 
           <View style={styles.hairline} />
 
-          {/* ── Interactive Map View ─────────────────────────── */}
+          {/* ── Interactive Map View ── */}
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
               <Ionicons name="map-outline" size={15} color="#2E7A99" style={{ marginRight: 6 }} />
@@ -411,7 +536,7 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
             />
           </View>
 
-          {/* ── Dynamic Rescue Action Panel ────────────────────── */}
+          {/* ── Action / Status Panel (Original Inline Position) ── */}
           {report.status === 'Open' ? (
             <TouchableOpacity
               style={styles.respondBtn}
@@ -425,16 +550,12 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
             <View style={styles.respondedCard}>
               <View style={styles.respondedHeaderRow}>
                 <View style={styles.respondedIconWrap}>
-                  <Ionicons name="shield-checkmark" size={22} color="#2E7A99" />
+                  <Ionicons name="hand-left" size={22} color="#2E7A99" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.respondedTitle}>
-                    {isResponder ? 'You are responding to this case' : `Claimed by ${report.responderName || 'Advocate'}`}
-                  </Text>
+                  <Text style={styles.respondedTitle}>Rescue Claimed</Text>
                   <Text style={styles.respondedSub}>
-                    {isResponder
-                      ? 'Coordinate directly with the reporter or mark safe when secured.'
-                      : 'An advocate is currently responding to assist this animal.'}
+                    {report.responderName || 'An advocate'} is responding to this rescue case.
                   </Text>
                 </View>
               </View>
@@ -461,17 +582,15 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
                 )}
               </View>
             </View>
-          ) : (
+          ) : report.status === 'Rescued' ? (
             <View style={styles.rescuedBanner}>
-              <Ionicons name="checkmark-circle" size={24} color="#2E7D32" />
-              <View style={{ marginLeft: 10, flex: 1 }}>
-                <Text style={styles.rescuedTitle}>Animal Safely Rescued 🎉</Text>
-                <Text style={styles.rescuedSub}>
-                  This case is closed and the animal has been secured.
-                </Text>
+              <Ionicons name="checkmark-circle" size={24} color="#2E7D32" style={{ marginRight: 10 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rescuedTitle}>Animal Safely Rescued</Text>
+                <Text style={styles.rescuedSub}>This case has been resolved and the animal is in safe hands.</Text>
               </View>
             </View>
-          )}
+          ) : null}
 
           {/* Comments Section */}
           <View style={styles.commentsSection}>
@@ -527,8 +646,53 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </Animated.View>
+
+      {/* ── Fixed Bottom Action Bar (ONLY Shows When Dragged Down) ── */}
+      <Animated.View
+        pointerEvents={isCollapsed ? 'auto' : 'none'}
+        style={[
+          styles.fixedBottomBar,
+          {
+            opacity: bottomBarOpacity,
+            transform: [{ translateY: bottomBarTranslateY }],
+          },
+        ]}
+      >
+        {report.status === 'Open' ? (
+          <TouchableOpacity
+            style={[styles.respondBtn, { marginBottom: 0 }]}
+            onPress={handleRespond}
+            activeOpacity={0.88}
+          >
+            <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={styles.respondBtnText}>Respond (I’ll help!)</Text>
+          </TouchableOpacity>
+        ) : report.status === 'Responded' ? (
+          <View style={[styles.respondedActionsRow, { marginTop: 0, paddingTop: 0, borderTopWidth: 0 }]}>
+            <TouchableOpacity
+              style={styles.actionChatBtn}
+              onPress={handleMessageAdvocate}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="chatbubbles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+              <Text style={styles.actionChatBtnText}>Chat with Reporter</Text>
+            </TouchableOpacity>
+
+            {isResponder && (
+              <TouchableOpacity
+                style={styles.actionRescuedBtn}
+                onPress={handleMarkRescued}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="checkmark-circle" size={16} color="#2E7D32" style={{ marginRight: 6 }} />
+                <Text style={styles.actionRescuedBtnText}>Mark Rescued</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : null}
+      </Animated.View>
 
       {/* ── Full-Screen Image Viewer Modal ─────────────────── */}
       <Modal
@@ -659,7 +823,7 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
           </View>
         </TouchableOpacity>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -668,14 +832,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  scroll: {
-    paddingBottom: 40,
-  },
 
   heroWrap: {
-    position: 'relative',
-    height: 290,
-    backgroundColor: '#E8F2F6',
+    width: SCREEN_WIDTH,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#1C1C1C',
+    overflow: 'hidden',
   },
   heroTouch: {
     width: '100%',
@@ -686,23 +851,21 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  tapToExpandBadge: {
+  heroPagingBadge: {
     position: 'absolute',
-    bottom: 34,
+    bottom: 20,
     right: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(20, 20, 20, 0.74)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    backgroundColor: 'rgba(26, 21, 16, 0.75)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  tapToExpandText: {
-    color: '#FFFFFF',
-    fontSize: 11.5,
+  heroPagingText: {
+    fontSize: 12,
     fontWeight: '700',
+    color: '#fff',
     fontFamily: 'PlusJakartaSans_700Bold',
   },
   placeholderWrap: {
@@ -710,58 +873,83 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E8F2F6',
+    backgroundColor: '#1C1C1C',
   },
   floatingBack: {
     position: 'absolute',
-    left: 18,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.06)',
+    left: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.14,
-    shadowRadius: 6,
-    elevation: 4,
+    zIndex: 20,
+    ...SHADOWS.md,
   },
   floatingHeart: {
     position: 'absolute',
-    right: 18,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.06)',
+    right: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.14,
-    shadowRadius: 6,
-    elevation: 4,
+    zIndex: 20,
+    ...SHADOWS.md,
   },
 
   sheetBody: {
+    flex: 1,
+    marginTop: INITIAL_SHEET_TOP,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: -26,
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 10,
+    zIndex: 10,
+  },
+  dragHeaderArea: {
+    width: '100%',
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 4,
+    backgroundColor: '#FFFFFF',
+  },
+  handleTouchZone: {
+    paddingVertical: 6,
     paddingHorizontal: 20,
-    paddingTop: 14,
   },
   sheetHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#DDD6CA',
-    alignSelf: 'center',
-    marginBottom: 14,
+    width: 42,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#D6D3D1',
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: 40,
+  },
+
+  fixedBottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#EFE7DA',
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 14,
+    zIndex: 30,
+    ...SHADOWS.md,
   },
 
   metaBadgeRow: {

@@ -341,10 +341,30 @@ export default function DonateScreen({ route, navigation }) {
     >
       <StatusBar style="dark" />
 
-      {/* ── Matched Clean Header (Matches Messages Screen Layout) ── */}
+      {/* ── Matched Clean Header (Matches Notification Screen Layout) ── */}
       <View style={[styles.headerWrap, { paddingTop: safeTopPadding }]}>
         <View style={styles.topRow}>
-          <Text style={styles.headerTitle}>Support Animal Care</Text>
+          <TouchableOpacity
+            onPress={() => {
+              if (navigation?.canGoBack && navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate('Home');
+              }
+            }}
+            style={styles.backBtn}
+            activeOpacity={0.78}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="arrow-back" size={20} color={COLORS.brown} />
+          </TouchableOpacity>
+
+          <View style={styles.titleWrap}>
+            <Text style={styles.headerTitle}>Support Animal Care</Text>
+          </View>
+
+          {/* Symmetrical spacer keeping the title perfectly centered */}
+          <View style={{ width: 38 }} />
         </View>
       </View>
 
@@ -884,16 +904,40 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
 
-  // ── Header (Matched to MessagesScreen_2.js) ─────────────
+  // ── Header (Matched to NotificationScreen.js) ─────────────
   headerWrap: {
     paddingHorizontal: 16,
     paddingBottom: 10,
     backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0ECE4',
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 4,
+  },
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: COLORS.borderLight || '#F4EDE0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0D1B2A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  titleWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     ...FONTS.titleXl,
@@ -901,6 +945,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.brown,
     letterSpacing: -0.3,
+    textAlign: 'center',
   },
 
   scroll: {
