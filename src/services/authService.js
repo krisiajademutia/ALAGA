@@ -359,19 +359,28 @@ export async function loginWithGoogleProfile({ email, name, photoURL, role = 'co
 }
 
 /**
- * Cache a user profile object in-memory for instant avatar/name lookups across all screens
+ * Cache a user profile object in-memory for instant avatar/name lookups across all screens.
+ * Safely merges new properties without wiping out existing avatar, location, or organization.
  */
 export function cacheUserProfile(user) {
   if (!user) return;
   const id = user.id || user.uid;
-  const avatar = extractUserAvatar(user);
-  if (id) {
-    userProfileCache.set(id, { ...user, avatar });
-    if (avatar) {
-      userAvatarCache.set(id, avatar);
-    } else {
-      userAvatarCache.delete(id);
-    }
+  if (!id) return;
+
+  const existing = userProfileCache.get(id) || {};
+  const extracted = extractUserAvatar(user);
+  const avatar = extracted || (typeof user.avatar === 'string' && user.avatar.trim() ? user.avatar.trim() : null) || existing.avatar || null;
+
+  const merged = {
+    ...existing,
+    ...user,
+    id,
+    avatar,
+  };
+
+  userProfileCache.set(id, merged);
+  if (avatar) {
+    userAvatarCache.set(id, avatar);
   }
 }
 
@@ -396,10 +405,10 @@ export function getCachedUserProfile(userId) {
 /**
  * Fetch a specific user's profile from Firestore (including their real payoutMethods & avatar)
  */
-export async function getUserProfileFirebase(userId) {
+export async function getUserProfileFirebase(userId, forceFresh = false) {
   if (!userId) return null;
   const cached = getCachedUserProfile(userId);
-  if (cached && cached.avatar) return cached;
+  if (!forceFresh && cached && cached.avatar && cached.name && cached.email) return cached;
 
   if (isMockFirebase() || !db) return cached || null;
   try {
@@ -428,7 +437,7 @@ export async function resolveUserAvatar(userId, name) {
   if (cached) return cached;
 
   if (userId) {
-    const profile = await getUserProfileFirebase(userId);
+    const profile = await getUserProfileFirebase(userId, true);
     if (profile && profile.avatar) {
       return profile.avatar;
     }
@@ -455,6 +464,40 @@ export async function getAllUsersFirebase() {
   } catch (err) {
     console.warn('[authService] Error fetching all users:', err?.message || err);
     return [];
+  }
+}
+
+/**
+ * Real-time listener for all registered users in Firestore.
+ * Ensures any profile updates (name, avatar, location, organization, role)
+ * are instantly synced across all screens in real-time.
+ */
+export function subscribeToAllUsersFirebase(onUpdate) {
+  if (isMockFirebase() || !db) return () => {};
+  try {
+    const unsub = onSnapshot(
+      collection(db, 'users'),
+      (snapshot) => {
+        const list = [];
+        snapshot.forEach((d) => {
+          const data = d.data();
+          const avatar = extractUserAvatar(data);
+          const userObj = { id: d.id, ...data, avatar };
+          list.push(userObj);
+          cacheUserProfile(userObj);
+        });
+        if (typeof onUpdate === 'function') {
+          onUpdate(list);
+        }
+      },
+      (err) => {
+        console.warn('[authService] subscribeToAllUsersFirebase warning:', err?.message || err);
+      }
+    );
+    return unsub;
+  } catch (err) {
+    console.warn('[authService] subscribeToAllUsersFirebase setup warning:', err?.message || err);
+    return () => {};
   }
 }
 

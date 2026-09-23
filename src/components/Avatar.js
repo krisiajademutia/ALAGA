@@ -15,9 +15,9 @@ export default function Avatar({ name, uri, avatar, photo, url, userId, size = 4
   const rawProp = uri || avatar || photo || url || null;
   const cleanPropUri = typeof rawProp === 'string' && rawProp.trim().length > 0 ? rawProp.trim() : null;
 
-  // Initial display: prefer prop, else synchronous cache hit, else null (initials)
+  // Initial display: prefer live user avatar if userId is available, else prop URI
   const cached = userId ? getCachedUserAvatar(userId) : null;
-  const [resolvedUri, setResolvedUri] = useState(cleanPropUri || cached || null);
+  const [resolvedUri, setResolvedUri] = useState(cached || cleanPropUri || null);
   const [hasError, setHasError] = useState(false);
   const isMounted = useRef(true);
 
@@ -30,35 +30,38 @@ export default function Avatar({ name, uri, avatar, photo, url, userId, size = 4
   useEffect(() => {
     setHasError(false);
 
-    // 1. Direct propUri passed
+    // 1. If userId is provided, prioritize the live profile avatar
+    if (userId) {
+      const hit = getCachedUserAvatar(userId);
+      if (hit) {
+        setResolvedUri(hit);
+        return;
+      }
+      if (cleanPropUri) {
+        setResolvedUri(cleanPropUri);
+        cacheUserProfile({ id: userId, name, avatar: cleanPropUri });
+        return;
+      }
+
+      // Resolve from Firestore if not in cache
+      resolveUserAvatar(userId, name).then((found) => {
+        if (!isMounted.current) return;
+        if (found) {
+          setResolvedUri(found);
+          cacheUserProfile({ id: userId, name, avatar: found });
+        } else {
+          setResolvedUri(null);
+        }
+      });
+      return;
+    }
+
+    // 2. No userId, rely strictly on prop URI
     if (cleanPropUri) {
       setResolvedUri(cleanPropUri);
-      if (userId) cacheUserProfile({ id: userId, name, avatar: cleanPropUri });
-      return;
-    }
-
-    if (!userId) {
+    } else {
       setResolvedUri(null);
-      return;
     }
-
-    // 2. Synchronous in-memory cache hit
-    const hit = getCachedUserAvatar(userId);
-    if (hit) {
-      setResolvedUri(hit);
-      return;
-    }
-
-    // 3. Resolve from Firestore (in case this user's avatar was updated or set in Firestore)
-    resolveUserAvatar(userId, name).then((found) => {
-      if (!isMounted.current) return;
-      if (found) {
-        setResolvedUri(found);
-        cacheUserProfile({ id: userId, name, avatar: found });
-      } else {
-        setResolvedUri(null);
-      }
-    });
   }, [userId, cleanPropUri, name]);
 
   const initials = name

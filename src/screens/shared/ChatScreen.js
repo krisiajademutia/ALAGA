@@ -46,7 +46,7 @@ export default function ChatScreen({ route, navigation }) {
   } = route.params || {};
   const resolvedOtherName = otherName || routeUserName;
   const { conversations, currentUser, sendMessage, clearConversation, markConversationRead,
-    setActiveConversationId, showAlert, updateGroupInfo, getAllKnownUsers } = useApp();
+    setActiveConversationId, showAlert, updateGroupInfo, getAllKnownUsers, getUserById } = useApp();
   const [text, setText] = useState(initialDraft || '');
   const [messages, setMessages] = useState([]);
   const [attachModalVisible, setAttachModalVisible] = useState(false);
@@ -134,7 +134,9 @@ export default function ChatScreen({ route, navigation }) {
   const isGroup = convo?.isGroup || false;
   const detectedOtherId = convo?.participants?.find((p) => p !== currentUser?.id);
   const otherId = isGroup ? null : (routeOtherId || detectedOtherId || null);
+  const otherUser = otherId ? getUserById(otherId) : null;
   const otherAvatar =
+    otherUser?.avatar ||
     routeOtherAvatar ||
     routeUserAvatar ||
     (detectedOtherId && convo?.participantAvatars?.[detectedOtherId]) ||
@@ -144,18 +146,22 @@ export default function ChatScreen({ route, navigation }) {
   const groupPhoto = editGroupPhoto || convo?.groupPhoto || null;
   const name = isGroup
     ? groupName
-    : (resolvedOtherName ||
+    : (otherUser?.name ||
+      resolvedOtherName ||
       (detectedOtherId && convo?.participantNames?.[detectedOtherId]) ||
       (convo?.participant1 === currentUser?.id ? convo?.participant2Name : convo?.participant1Name) ||
       'Chat');
 
   const groupMembers = isGroup && convo?.participants
-    ? convo.participants.map((pid) => ({
-      id: pid,
-      name: convo.participantNames?.[pid] || 'Member',
-      avatar: convo.participantAvatars?.[pid] || null,
-      isMe: pid === currentUser?.id,
-    }))
+    ? convo.participants.map((pid) => {
+      const u = getUserById(pid);
+      return {
+        id: pid,
+        name: u?.name || convo.participantNames?.[pid] || 'Member',
+        avatar: u?.avatar || convo.participantAvatars?.[pid] || null,
+        isMe: pid === currentUser?.id,
+      };
+    })
     : [];
 
   const mediaMessages = messages.filter((m) => m.type === 'image' || m.type === 'video');
@@ -698,8 +704,9 @@ export default function ChatScreen({ route, navigation }) {
           const prevMsg = index > 0 ? messages[index - 1] : null;
           const isSameSenderAsPrev = prevMsg?.senderId === item.senderId;
 
+          const senderUser = !isMine && item.senderId ? getUserById(item.senderId) : null;
           const senderName = isGroup && !isMine && !isSameSenderAsPrev
-            ? (convo?.participantNames?.[item.senderId] || 'Member')
+            ? (senderUser?.name || convo?.participantNames?.[item.senderId] || 'Member')
             : null;
 
           return (
@@ -713,8 +720,9 @@ export default function ChatScreen({ route, navigation }) {
               {!isMine && (
                 !isSameSenderAsPrev ? (
                   <Avatar
-                    name={convo?.participantNames?.[item.senderId] || name}
+                    name={senderUser?.name || convo?.participantNames?.[item.senderId] || name}
                     userId={item.senderId || otherId}
+                    avatar={senderUser?.avatar}
                     size={30}
                     style={styles.senderAvatar}
                   />

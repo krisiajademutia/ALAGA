@@ -10,7 +10,9 @@ import {
   loginWithGoogleCredential,
   loginWithGoogleProfile,
   cacheUserProfile,
+  getCachedUserProfile,
   getAllUsersFirebase,
+  subscribeToAllUsersFirebase,
   saveNotificationFirebase,
   markNotificationReadFirebase,
   markAllNotificationsReadFirebase,
@@ -106,6 +108,7 @@ const defaultContext = {
   getUserConversations: () => [],
   getUnreadMessagesCount: () => 0,
   markConversationRead: () => {},
+  getUserById: () => null,
   getAllKnownUsers: () => [],
   getUserReports: () => [],
   getAdvocateResponses: () => [],
@@ -1010,16 +1013,37 @@ export function AppProvider({ children }) {
         });
       });
 
-      // Load all registered users from Firestore to prime global avatar & profile cache
-      getAllUsersFirebase().then((allUsers) => {
+      // Real-time listener for all registered users to keep profiles 100% consistent across all screens
+      const unsubUsers = subscribeToAllUsersFirebase((allUsers) => {
         if (Array.isArray(allUsers) && allUsers.length > 0) {
           setUsers(allUsers);
+          const activeUser = currentUserRef.current;
+          if (activeUser && (activeUser.id || activeUser.uid)) {
+            const myId = activeUser.id || activeUser.uid;
+            const updatedMe = allUsers.find((u) => u && (u.id === myId || u.uid === myId));
+            if (updatedMe) {
+              const merged = { ...activeUser, ...updatedMe };
+              if (
+                merged.name !== activeUser.name ||
+                merged.avatar !== activeUser.avatar ||
+                merged.location !== activeUser.location ||
+                merged.organization !== activeUser.organization ||
+                merged.role !== activeUser.role ||
+                merged.phone !== activeUser.phone
+              ) {
+                setCurrentUser(merged);
+                currentUserRef.current = merged;
+                cacheUserProfile(merged);
+              }
+            }
+          }
         }
       });
 
       return () => {
         unsubRescues();
         unsubAnimals();
+        unsubUsers?.();
       };
     }
   }, []);
@@ -1277,6 +1301,22 @@ export function AppProvider({ children }) {
       return remote;
     }
     return existing || null;
+  }, [currentUser, users]);
+
+  const getUserById = useCallback((id) => {
+    if (!id) return null;
+    const cleanId = String(id).trim();
+    const active = currentUserRef.current || currentUser;
+    if (active && (active.id === cleanId || active.uid === cleanId)) {
+      return active;
+    }
+    const foundInUsers = (users || []).find((u) => u && (u.id === cleanId || u.uid === cleanId));
+    if (foundInUsers) return foundInUsers;
+
+    const cached = getCachedUserProfile(cleanId);
+    if (cached) return cached;
+
+    return null;
   }, [currentUser, users]);
 
   // ── Rescue Reports ────────────────────────────────────────────────────────
@@ -2376,6 +2416,7 @@ export function AppProvider({ children }) {
         getUserConversations,
         getUnreadMessagesCount,
         markConversationRead,
+        getUserById,
         getAllKnownUsers,
         getUserReports,
         getAdvocateResponses,

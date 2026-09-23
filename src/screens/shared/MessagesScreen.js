@@ -27,6 +27,7 @@ export default function MessagesScreen({ navigation }) {
     startGroupConversation,
     markConversationRead,
     clearConversation,
+    getUserById,
     showAlert,
   } = useApp();
 
@@ -86,11 +87,12 @@ export default function MessagesScreen({ navigation }) {
       return { id: c.id, name: c.groupName || 'Group', isGroup: true };
     }
     const otherId = c.participants?.find((p) => p !== currentUser?.id);
+    const otherUser = otherId ? getUserById(otherId) : null;
     return {
       id: c.id,
-      name: c.participantNames?.[otherId] || 'Member',
+      name: otherUser?.name || c.participantNames?.[otherId] || 'Member',
       otherId,
-      otherAvatar: (otherId && c.participantAvatars?.[otherId]) || null,
+      otherAvatar: otherUser?.avatar || (otherId && c.participantAvatars?.[otherId]) || null,
     };
   });
 
@@ -316,10 +318,12 @@ export default function MessagesScreen({ navigation }) {
         renderItem={({ item }) => {
           const isGroup = item.isGroup;
           const otherId = !isGroup ? item.participants?.find((p) => p !== currentUser?.id) : null;
+          const otherUser = otherId ? getUserById(otherId) : null;
           const displayName = isGroup
             ? item.groupName || 'Group Chat'
-            : item.participantNames?.[otherId] || 'Community Member';
-          const otherAvatar = (!isGroup && otherId && item.participantAvatars?.[otherId]) || null;
+            : otherUser?.name || item.participantNames?.[otherId] || 'Community Member';
+          const otherAvatar =
+            (!isGroup && otherId && (otherUser?.avatar || item.participantAvatars?.[otherId])) || null;
           const groupPhoto = isGroup ? item.groupPhoto || null : null;
           const lastMsg = item.lastMessage || (isGroup ? 'Group created' : 'Sent a message');
           const time = formatTime(item.lastMessageTime);
