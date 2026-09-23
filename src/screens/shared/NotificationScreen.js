@@ -368,9 +368,24 @@ export default function NotificationScreen({ navigation }) {
     <View style={styles.root}>
       <StatusBar style="dark" />
 
-      {/* ── Matched Clean Header (Title Only, No Back Button) ── */}
+      {/* ── Matched Clean Header (With Back Button & Centered Title) ── */}
       <View style={[styles.header, { paddingTop: safeTopPadding }]}>
         <View style={styles.headerTop}>
+          <TouchableOpacity
+            onPress={() => {
+              if (navigation?.canGoBack && navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate('Home');
+              }
+            }}
+            style={styles.backBtn}
+            activeOpacity={0.78}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="arrow-back" size={20} color={COLORS.brown} />
+          </TouchableOpacity>
+
           <View style={styles.titleWrap}>
             <Text style={styles.headerTitle}>Notifications</Text>
             {unreadCount > 0 && (
@@ -380,27 +395,18 @@ export default function NotificationScreen({ navigation }) {
             )}
           </View>
 
-          <View style={styles.headerRightActions}>
-            {unreadCount > 0 && (
-              <TouchableOpacity
-                onPress={markAllNotificationsRead}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.markReadText}>Mark read</Text>
-              </TouchableOpacity>
-            )}
-            {notifs.length > 0 && (
-              <TouchableOpacity
-                onPress={handleClearAll}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                activeOpacity={0.7}
-                style={unreadCount > 0 ? { marginLeft: 12 } : null}
-              >
-                <Text style={styles.clearAllText}>Clear all</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          {unreadCount > 0 ? (
+            <TouchableOpacity
+              onPress={markAllNotificationsRead}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              activeOpacity={0.7}
+              style={styles.markReadBtn}
+            >
+              <Text style={styles.markReadText}>Mark read</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 38 }} />
+          )}
         </View>
 
         {/* Filter Tabs */}
@@ -511,9 +517,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: COLORS.borderLight || '#F4EDE0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0D1B2A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
   titleWrap: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
   },
   headerTitle: {
@@ -521,6 +544,12 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     color: COLORS.brown,
+    textAlign: 'center',
+  },
+  markReadBtn: {
+    minWidth: 38,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   unreadBadge: {
     backgroundColor: '#C23E3E',

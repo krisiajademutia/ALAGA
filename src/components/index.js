@@ -9,3 +9,4 @@ export { default as StatusPill } from './StatusPill';
 export { default as AnimalCard } from './AnimalCard';
 export { default as RescueCard } from './RescueCard';
 export { default as Header } from './Header';
+export { default as FloatingSprinkles } from './FloatingSprinkles';

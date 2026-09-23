@@ -12,6 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES } from '../../constants/theme';
 import { useApp } from '../../context/AppContext';
+import FloatingSprinkles from '../../components/FloatingSprinkles';
 
 const { width: W } = Dimensions.get('window');
 
@@ -66,6 +67,7 @@ export default function OnboardingScreen({ navigation }) {
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
+      <FloatingSprinkles />
 
       {/* Skip Button */}
       <TouchableOpacity

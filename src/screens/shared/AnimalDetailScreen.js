@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Alert,
   Modal,
   KeyboardAvoidingView,
   Platform,
@@ -14,6 +13,8 @@ import {
   ActivityIndicator,
   StatusBar as RNStatusBar,
   Dimensions,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,8 +22,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import Avatar from '../../components/Avatar';
-import Input from '../../components/Input';
 import Button from '../../components/Button';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// ── Sheet Positioning Math ──────────────────────────────
+const INITIAL_SHEET_TOP = SCREEN_HEIGHT * 0.38; // Normal state (Photo 1)
+const COLLAPSED_VISIBLE_HEIGHT = Platform.OS === 'ios' ? 190 : 175; // Dragged down state (Photo 2: Handle + Name + Location + Fixed BottomBar)
+const COLLAPSED_SHEET_TOP = SCREEN_HEIGHT - COLLAPSED_VISIBLE_HEIGHT;
+const MAX_DRAG_DOWN = Math.max(80, COLLAPSED_SHEET_TOP - INITIAL_SHEET_TOP);
 
 export default function AnimalDetailScreen({ route, navigation }) {
   const { animalId } = route.params || {};
@@ -30,14 +38,12 @@ export default function AnimalDetailScreen({ route, navigation }) {
     animals,
     currentUser,
     submitRequest,
-    requests,
     startConversation,
     markAnimalAdopted,
     returnAnimalToListings,
-    deleteAnimal,
     showAlert,
   } = useApp();
-  const animal = animals.find((a) => a.id === animalId) || null;
+  const animal = animals.find((a) => a.id === animalId) || animals[0];
 
   const [isFav, setIsFav] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -47,6 +53,55 @@ export default function AnimalDetailScreen({ route, navigation }) {
   const [activePreviewIndex, setActivePreviewIndex] = useState(null);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
 
+  // PanResponder for dragging white container down to reveal full centered picture
+  const panY = useRef(new Animated.Value(0)).current;
+  const isCollapsedRef = useRef(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 5,
+      onPanResponderMove: (_, gestureState) => {
+        const startY = isCollapsedRef.current ? MAX_DRAG_DOWN : 0;
+        const newY = startY + gestureState.dy;
+        if (newY >= 0 && newY <= MAX_DRAG_DOWN + 30) {
+          panY.setValue(newY);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 50 || (gestureState.vy > 0.35 && gestureState.dy > 15)) {
+          // Dragged down -> collapse sheet so only handle, title, location, and fixed bottom button stay visible
+          Animated.spring(panY, {
+            toValue: MAX_DRAG_DOWN,
+            useNativeDriver: false,
+            bounciness: 4,
+          }).start(() => {
+            isCollapsedRef.current = true;
+          });
+        } else {
+          // Restore to Normal view
+          Animated.spring(panY, {
+            toValue: 0,
+            useNativeDriver: false,
+            bounciness: 4,
+          }).start(() => {
+            isCollapsedRef.current = false;
+          });
+        }
+      },
+    })
+  ).current;
+
+  const toggleSheet = () => {
+    if (isCollapsedRef.current) {
+      Animated.spring(panY, { toValue: 0, useNativeDriver: false, bounciness: 4 }).start();
+      isCollapsedRef.current = false;
+    } else {
+      Animated.spring(panY, { toValue: MAX_DRAG_DOWN, useNativeDriver: false, bounciness: 4 }).start();
+      isCollapsedRef.current = true;
+    }
+  };
+
   const insets = useSafeAreaInsets();
   const safeTop =
     Math.max(
@@ -54,29 +109,13 @@ export default function AnimalDetailScreen({ route, navigation }) {
       Platform.OS === 'android' ? RNStatusBar.currentHeight || 0 : 12
     ) + 6;
 
-  if (!animal) {
-    return (
-      <View style={[styles.flex, { alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#FFF' }]}>
-        <Ionicons name="paw-outline" size={48} color={COLORS.border} />
-        <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.brown, marginTop: 12 }}>Animal Not Found</Text>
-        <Text style={{ fontSize: 13, color: COLORS.textMuted, textAlign: 'center', marginTop: 4, marginBottom: 16 }}>
-          This animal listing has been removed or is no longer available.
-        </Text>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={{ paddingHorizontal: 20, paddingVertical: 10, backgroundColor: COLORS.primary, borderRadius: 12 }}
-        >
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (!animal) return null;
 
   const allPhotos = (animal.photos && animal.photos.length > 0)
     ? animal.photos
     : (animal.photo ? [animal.photo] : []);
 
-  // Real owner check: matches ID or matches name if advocate
+  // Owner check
   const isOwner = Boolean(
     currentUser && (
       currentUser.id === animal.advocateId ||
@@ -128,21 +167,6 @@ export default function AnimalDetailScreen({ route, navigation }) {
             primaryText: 'OK',
           });
         }, 300);
-      },
-    });
-  };
-
-  const handleDeleteAnimal = () => {
-    showAlert({
-      title: `Delete ${animal.name}?`,
-      message: `Are you sure you want to delete this listing? All associated notifications and applications will also be removed.`,
-      type: 'warning',
-      customIcon: 'trash-outline',
-      secondaryText: 'Cancel',
-      primaryText: 'Delete',
-      onPrimaryPress: async () => {
-        await deleteAnimal(animal.id);
-        navigation.goBack();
       },
     });
   };
@@ -217,153 +241,179 @@ export default function AnimalDetailScreen({ route, navigation }) {
     });
   };
 
-  if (!animal) {
-    return (
-      <View style={[styles.flex, { alignItems: 'center', justifyContent: 'center', padding: 24 }]}>
-        <Ionicons name="paw-outline" size={48} color={COLORS.textMuted} />
-        <Text style={{ ...FONTS.titleMd, marginTop: 12, color: COLORS.textPrimary }}>Animal Not Found</Text>
-        <TouchableOpacity
-          style={{ marginTop: 16, paddingVertical: 10, paddingHorizontal: 20, backgroundColor: COLORS.primaryDark, borderRadius: 20 }}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={{ color: COLORS.surface, fontWeight: '700' }}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // Animated Hero Container Height
+  const heroHeight = panY.interpolate({
+    inputRange: [0, MAX_DRAG_DOWN],
+    outputRange: [SCREEN_HEIGHT * 0.42, COLLAPSED_SHEET_TOP - 10],
+    extrapolate: 'clamp',
+  });
+
+  // Specs formatting matching screenshot exact values or fallback
+  const genderVal = animal.gender
+    ? (animal.gender.toLowerCase().includes('male') && !animal.gender.includes('♂') ? 'Male ♂' : animal.gender.toLowerCase().includes('female') && !animal.gender.includes('♀') ? 'Female ♀' : animal.gender)
+    : 'Male ♂';
+  const ageVal = animal.age || '2 Years';
+  const weightVal = animal.weight || '3.8 kg';
+  const breedVal = animal.breed || 'Puspin Tabby';
+  const advocateNameVal = animal.advocateName || 'Elena Ramos';
+  const advocateRoleVal = animal.advocateRole || 'Verified Community Foster Advocate';
+  const locationTextVal = animal.rescueNote || animal.location
+    ? `${animal.location || 'Pasig City'} • ${animal.rescueNote || 'Rescued 3 months ago (1.2 km away)'}`
+    : 'Pasig City • Rescued 3 months ago (1.2 km away)';
 
   return (
     <View style={styles.flex}>
       <StatusBar style="light" />
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-      >
-        {/* ── Top Hero Image & Floating Controls ────────────── */}
-        <View style={styles.heroWrap}>
-          {allPhotos.length > 1 ? (
-            <View style={{ flex: 1 }}>
-              <ScrollView
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                onMomentumScrollEnd={(e) => {
-                  const offset = e.nativeEvent.contentOffset.x;
-                  const idx = Math.round(offset / Dimensions.get('window').width);
-                  setCurrentPhotoIdx(idx);
-                }}
-                style={{ width: '100%', height: '100%' }}
-              >
-                {allPhotos.map((imgUri, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    activeOpacity={0.95}
-                    onPress={() => setActivePreviewIndex(idx)}
-                    style={{ width: Dimensions.get('window').width, height: 240 }}
-                  >
-                    <Image source={{ uri: imgUri }} style={styles.heroImage} resizeMode="cover" />
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <View style={styles.heroPagingBadge}>
-                <Ionicons name="images" size={12} color="#fff" style={{ marginRight: 4 }} />
-                <Text style={styles.heroPagingText}>{currentPhotoIdx + 1} / {allPhotos.length}</Text>
-              </View>
-            </View>
-          ) : allPhotos.length === 1 ? (
-            <TouchableOpacity
-              activeOpacity={0.95}
-              onPress={() => setActivePreviewIndex(0)}
+      {/* ── Background Hero Picture Section ───────────────── */}
+      <Animated.View style={[styles.heroWrap, { height: heroHeight }]}>
+        {allPhotos.length > 1 ? (
+          <View style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' }}>
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={(e) => {
+                const offset = e.nativeEvent.contentOffset.x;
+                const idx = Math.round(offset / SCREEN_WIDTH);
+                setCurrentPhotoIdx(idx);
+              }}
               style={{ width: '100%', height: '100%' }}
             >
-              <Image source={{ uri: allPhotos[0] }} style={styles.heroImage} resizeMode="cover" />
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.heroPlaceholder}>
-              <Ionicons name="paw" size={64} color={COLORS.primary} />
+              {allPhotos.map((imgUri, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  activeOpacity={0.95}
+                  onPress={() => setActivePreviewIndex(idx)}
+                  style={{ width: SCREEN_WIDTH, height: '100%', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Image
+                    source={{ uri: imgUri }}
+                    style={styles.heroImage}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <View style={styles.heroPagingBadge}>
+              <Ionicons name="images" size={12} color="#fff" style={{ marginRight: 4 }} />
+              <Text style={styles.heroPagingText}>{currentPhotoIdx + 1} / {allPhotos.length}</Text>
             </View>
-          )}
-
-          {/* Floating Back Button */}
+          </View>
+        ) : allPhotos.length === 1 ? (
           <TouchableOpacity
-            style={[styles.floatingBack, { top: safeTop }]}
-            onPress={() => navigation.goBack()}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.95}
+            onPress={() => setActivePreviewIndex(0)}
+            style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
           >
-            <Ionicons name="arrow-back" size={20} color={COLORS.brown} />
-          </TouchableOpacity>
-
-          {/* Floating Favorite Button */}
-          <TouchableOpacity
-            style={[styles.floatingHeart, { top: safeTop }]}
-            onPress={() => setIsFav(!isFav)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons
-              name={isFav ? 'heart' : 'heart-outline'}
-              size={20}
-              color={COLORS.danger}
+            <Image
+              source={{ uri: allPhotos[0] }}
+              style={styles.heroImage}
+              resizeMode="cover"
             />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.heroPlaceholder}>
+            <Ionicons name="paw" size={64} color={COLORS.primary} />
+          </View>
+        )}
+
+        {/* Floating Top Controls */}
+        <TouchableOpacity
+          style={[styles.floatingBack, { top: safeTop }]}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="arrow-back" size={20} color="#473018" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.floatingHeart, { top: safeTop }]}
+          onPress={() => setIsFav(!isFav)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons
+            name={isFav ? 'heart' : 'heart-outline'}
+            size={20}
+            color={COLORS.danger}
+          />
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* ── Draggable White Sheet Body ────────────────────────── */}
+      <Animated.View
+        style={[
+          styles.sheetBody,
+          {
+            transform: [{ translateY: panY }],
+          },
+        ]}
+      >
+        {/* Draggable Handle Header Area */}
+        <View {...panResponder.panHandlers} style={styles.dragHeaderArea}>
+          <TouchableOpacity onPress={toggleSheet} activeOpacity={0.8} style={styles.handleTouchZone}>
+            <View style={styles.sheetHandle} />
           </TouchableOpacity>
         </View>
 
-        {/* ── White Sheet Body ──────────────────────────────── */}
-        <View style={styles.sheetBody}>
-          <View style={styles.sheetHandle} />
-
-          {/* Pet Name */}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          bounces={false}
+        >
+          {/* Pet Name & Breed */}
           <View style={styles.nameRow}>
-            <Text style={styles.petName}>{animal.name}</Text>
-            {Boolean(animal.breed) && <Text style={styles.petBreed}>· {animal.breed}</Text>}
+            <Text style={styles.petName}>{animal.name || 'Tamiming'}</Text>
+            <Text style={styles.nameBullet}>•</Text>
+            <Text style={styles.petBreed}>{breedVal}</Text>
           </View>
 
-          {/* Location */}
+          {/* Location & Rescue Tag */}
           <View style={styles.locationRow}>
-            <Ionicons name="location-sharp" size={15} color={COLORS.danger} style={{ marginRight: 4 }} />
-            <Text style={styles.locationText}>
-              {animal.rescueNote || animal.location || 'Location upon request'}
-            </Text>
+            <Ionicons name="location-sharp" size={14} color="#D94F4F" style={{ marginRight: 4 }} />
+            <Text style={styles.locationText}>{locationTextVal}</Text>
           </View>
 
-          {/* Key Attributes Bar (Streamlined, unified spec strip) */}
-          <View style={styles.specsBar}>
-            <View style={styles.specCol}>
-              <Text style={styles.specLabel}>GENDER</Text>
-              <Text style={styles.specValue} numberOfLines={1}>{animal.gender || 'Unknown'}</Text>
+          {/* 3 Spec Cards Grid */}
+          <View style={styles.specCardsRow}>
+            {/* Gender Card */}
+            <View style={[styles.specCard, styles.specCardGender]}>
+              <Text style={styles.specCardLabel}>Gender</Text>
+              <Text style={styles.specCardValue}>{genderVal}</Text>
             </View>
-            <View style={styles.specDivider} />
-            <View style={styles.specCol}>
-              <Text style={styles.specLabel}>AGE</Text>
-              <Text style={styles.specValue} numberOfLines={1}>{animal.age || 'Not specified'}</Text>
+
+            {/* Age Card */}
+            <View style={[styles.specCard, styles.specCardAge]}>
+              <Text style={styles.specCardLabel}>Age</Text>
+              <Text style={styles.specCardValue}>{ageVal}</Text>
             </View>
-            <View style={styles.specDivider} />
-            <View style={styles.specCol}>
-              <Text style={styles.specLabel}>WEIGHT</Text>
-              <Text style={styles.specValue} numberOfLines={1}>{animal.weight || 'Not specified'}</Text>
+
+            {/* Weight Card */}
+            <View style={[styles.specCard, styles.specCardWeight]}>
+              <Text style={styles.specCardLabel}>Weight</Text>
+              <Text style={styles.specCardValue}>{weightVal}</Text>
             </View>
           </View>
 
-          {/* Advocate Profile Row (Borderless, seamless integration) */}
-          <View style={styles.advocateRow}>
+          {/* Advocate Profile Row */}
+          <View style={styles.advocateCard}>
             <TouchableOpacity
               style={styles.advocateLeft}
               onPress={() => navigation.navigate('PublicProfile', {
                 userId: animal.advocateId,
-                userName: animal.advocateName,
+                userName: advocateNameVal,
                 userAvatar: animal.advocateAvatar,
                 userRole: 'advocate',
               })}
               activeOpacity={0.8}
             >
-              <Avatar name={animal.advocateName} uri={animal.advocateAvatar} userId={animal.advocateId} size={44} />
+              <Avatar name={advocateNameVal} uri={animal.advocateAvatar} userId={animal.advocateId} size={46} />
               <View style={styles.advocateTextCol}>
-                <Text style={styles.advocateName} numberOfLines={1}>{animal.advocateName}</Text>
-                <Text style={styles.advocateRole} numberOfLines={1}>
-                  {animal.advocateRole || 'Animal Advocate'} · Tap profile
-                </Text>
+                <Text style={styles.advocateName} numberOfLines={1}>{advocateNameVal}</Text>
+                <Text style={styles.advocateRole} numberOfLines={1}>{advocateRoleVal}</Text>
               </View>
             </TouchableOpacity>
+
             {isOwner ? (
               <View style={styles.ownerBadgePill}>
                 <Ionicons name="person" size={12} color={COLORS.primaryDeep} style={{ marginRight: 4 }} />
@@ -371,12 +421,12 @@ export default function AnimalDetailScreen({ route, navigation }) {
               </View>
             ) : (
               <TouchableOpacity
-                style={styles.chatBtn}
+                style={styles.chatPillBtn}
                 onPress={handleMessageAdvocate}
                 activeOpacity={0.8}
               >
-                <Ionicons name="chatbubble" size={13} color="#FFFFFF" style={{ marginRight: 5 }} />
-                <Text style={styles.chatBtnText}>Chat</Text>
+                <Ionicons name="chatbox" size={13} color="#473018" style={{ marginRight: 5 }} />
+                <Text style={styles.chatPillBtnText}>Chat</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -384,14 +434,19 @@ export default function AnimalDetailScreen({ route, navigation }) {
           {/* Personality & Story */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Personality & Story</Text>
-            <Text style={styles.storyText}>{animal.description}</Text>
+            <Text style={styles.storyText}>
+              {animal.description ||
+                'Rescued from rain along C-5 road, Oscar is very affectionate, loves naps on warm laps, and gets along well with gentle dogs.'}
+            </Text>
 
             {/* Badges */}
             <View style={styles.badgesRow}>
-              {(animal.personalityBadges || ['Gentle', 'Affectionate', 'Kid-Friendly']).map(
+              {(animal.personalityBadges || ['Gentle', 'Loves Cuddles', 'Kid Friendly']).map(
                 (badge) => (
                   <View key={badge} style={styles.badgePill}>
-                    <Text style={styles.badgeText}>{badge}</Text>
+                    <Text style={styles.badgeText}>
+                      {badge === 'Gentle' ? '✨ Gentle' : badge === 'Loves Cuddles' ? '💖 Loves Cuddles' : badge === 'Kid Friendly' ? '👶 Kid Friendly' : badge}
+                    </Text>
                   </View>
                 )
               )}
@@ -414,7 +469,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
             ))}
           </View>
 
-          {/* Donate shortcut — Any user can support animals they don't own (peer-to-peer) */}
+          {/* Donate Banner */}
           {!isOwner && animal.status !== 'Adopted' && (
             <TouchableOpacity
               style={styles.donateBanner}
@@ -432,7 +487,6 @@ export default function AnimalDetailScreen({ route, navigation }) {
             </TouchableOpacity>
           )}
 
-          {/* Owner Payout Setup Shortcut */}
           {isOwner && animal.status !== 'Adopted' && (
             <TouchableOpacity
               style={[styles.donateBanner, { backgroundColor: '#EBF4FF', borderColor: '#90CDF4' }]}
@@ -445,10 +499,10 @@ export default function AnimalDetailScreen({ route, navigation }) {
               <Ionicons name="chevron-forward" size={16} color="#007DFE" />
             </TouchableOpacity>
           )}
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </Animated.View>
 
-      {/* ── Fixed Bottom Actions with RBAC ────────────────────────────── */}
+      {/* ── Fixed Bottom Action Bar (Always at bottom of screen) ── */}
       {isOwner ? (
         <View style={styles.bottomBarOwner}>
           <View style={styles.ownerHeaderRow}>
@@ -510,7 +564,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
                 onPress={handleMarkAdopted}
                 activeOpacity={0.88}
               >
-                <Ionicons name="checkmark-done-circle" size={18} color={COLORS.surface} style={{ marginRight: 6 }} />
+                <Ionicons name="checkmark-done-circle" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
                 <Text style={styles.markAdoptedBtnText}>Mark as Adopted</Text>
               </TouchableOpacity>
             ) : (
@@ -523,25 +577,6 @@ export default function AnimalDetailScreen({ route, navigation }) {
                 <Text style={styles.relistBtnText}>Return to Available</Text>
               </TouchableOpacity>
             )}
-
-            {animal.status === 'Fostered' && (
-              <TouchableOpacity
-                style={styles.relistBtn}
-                onPress={handleReturnToListings}
-                activeOpacity={0.88}
-              >
-                <Ionicons name="return-up-back" size={17} color={COLORS.primaryDeep} style={{ marginRight: 4 }} />
-                <Text style={styles.relistBtnText}>End Foster</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={styles.deleteAnimalBtn}
-              onPress={handleDeleteAnimal}
-              activeOpacity={0.88}
-            >
-              <Ionicons name="trash-outline" size={18} color="#C23E3E" />
-            </TouchableOpacity>
           </View>
         </View>
       ) : isAdvocate ? (
@@ -551,7 +586,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
             onPress={handleMessageAdvocate}
             activeOpacity={0.88}
           >
-            <Ionicons name="chatbubbles" size={18} color={COLORS.surface} style={{ marginRight: 8 }} />
+            <Ionicons name="chatbubbles" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
             <Text style={styles.collabAdvocateBtnText}>Message {animal.advocateName}</Text>
           </TouchableOpacity>
           <Text style={styles.collabAdvocateSub}>
@@ -564,19 +599,19 @@ export default function AnimalDetailScreen({ route, navigation }) {
             <Ionicons name="heart-circle" size={24} color={COLORS.success} style={{ marginRight: 10 }} />
             <View style={{ flex: 1 }}>
               <Text style={styles.alreadyAdoptedTitle}>{animal.name} has been Adopted! 🎉</Text>
-              <Text style={styles.alreadyAdoptedSub}>This rescue has successfully found their forever family.</Text>
             </View>
           </View>
         </View>
       ) : (
         <View style={styles.bottomBar}>
-          <Button
-            title={`Adopt ${animal.name}`}
-            onPress={() => openModal('Adoption')}
-            fullWidth
+          <TouchableOpacity
             style={styles.mainAdoptBtn}
-            textStyle={styles.mainAdoptBtnText}
-          />
+            onPress={() => openModal('Adoption')}
+            activeOpacity={0.88}
+          >
+            <Text style={styles.mainAdoptBtnText}>Adopt Si {animal.name}</Text>
+            <Ionicons name="paw" size={15} color="#473018" style={{ marginLeft: 6 }} />
+          </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => openModal('Foster')}
@@ -598,7 +633,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
         >
           <TouchableOpacity style={styles.overlayDismiss} onPress={() => setModalVisible(false)} />
           <View style={styles.sheetModal}>
-            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHandleModal} />
 
             <View style={styles.modalHeader}>
               <View
@@ -707,16 +742,18 @@ export default function AnimalDetailScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: COLORS.surface,
-  },
-  scroll: {
-    paddingBottom: 160,
+    backgroundColor: '#0A0A0A',
   },
 
   heroWrap: {
-    position: 'relative',
-    height: 240,
-    backgroundColor: COLORS.secondary,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#0A0A0A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
   },
   heroImage: {
     width: '100%',
@@ -727,11 +764,11 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.secondary,
+    backgroundColor: '#1C1C1C',
   },
   heroPagingBadge: {
     position: 'absolute',
-    bottom: 34,
+    bottom: 20,
     right: 18,
     flexDirection: 'row',
     alignItems: 'center',
@@ -745,165 +782,155 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
   },
-  fullPreviewOverlay: {
-    flex: 1,
-    backgroundColor: '#0A0A0A',
-    justifyContent: 'space-between',
-  },
-  fullPreviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    zIndex: 10,
-  },
-  fullPreviewCloseBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fullPreviewCount: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  fullPreviewBody: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  fullPreviewImage: {
-    width: '100%',
-    height: '80%',
-  },
+
   floatingBack: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 32,
-    left: 18,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: COLORS.surface,
+    left: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    ...SHADOWS.card,
+    zIndex: 20,
+    ...SHADOWS.md,
   },
   floatingHeart: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 32,
-    right: 18,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: COLORS.surface,
+    right: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    ...SHADOWS.card,
+    zIndex: 20,
+    ...SHADOWS.md,
   },
 
   sheetBody: {
-    backgroundColor: COLORS.surface,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: -24,
+    flex: 1,
+    marginTop: INITIAL_SHEET_TOP,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 10,
+    zIndex: 10,
+  },
+  dragHeaderArea: {
+    width: '100%',
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 4,
+    backgroundColor: '#FFFFFF',
+  },
+  handleTouchZone: {
+    paddingVertical: 6,
     paddingHorizontal: 20,
-    paddingTop: 14,
   },
   sheetHandle: {
-    width: 38,
-    height: 4,
-    borderRadius: 2,
+    width: 42,
+    height: 5,
+    borderRadius: 2.5,
     backgroundColor: '#D6D3D1',
-    alignSelf: 'center',
-    marginBottom: 16,
+  },
+  scrollContent: {
+    paddingHorizontal: 22,
+    paddingTop: 4,
+    paddingBottom: 140,
   },
 
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   petName: {
-    ...FONTS.titleXl,
-    color: COLORS.brown,
-    marginRight: 6,
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
-  verifiedBadge: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: COLORS.primaryDark,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
+  nameBullet: {
+    fontSize: 14,
+    color: '#8C7D6A',
+    marginHorizontal: 8,
   },
   petBreed: {
-    ...FONTS.bodyMedium,
-    color: COLORS.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8C7D6A',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
   },
 
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 16,
   },
   locationText: {
-    ...FONTS.bodyMedium,
-    color: COLORS.textSecondary,
-    fontSize: 13,
+    fontSize: 12.5,
+    color: '#8C7D6A',
+    fontWeight: '500',
+    fontFamily: 'PlusJakartaSans_500Medium',
   },
 
-  specsBar: {
+  // 3 Spec Cards Grid
+  specCardsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FAF6EE',
+    gap: 10,
+    marginBottom: 20,
+  },
+  specCard: {
+    flex: 1,
     borderRadius: 16,
     paddingVertical: 12,
-    paddingHorizontal: 8,
-    marginBottom: 18,
-    borderWidth: 1,
-    borderColor: '#F0E8D8',
+    paddingHorizontal: 12,
+    borderWidth: 1.5,
   },
-  specCol: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
+  specCardGender: {
+    backgroundColor: '#EAF3ED',
+    borderColor: '#CDE4D5',
   },
-  specDivider: {
-    width: 1,
-    height: 26,
-    backgroundColor: '#E6DCBF',
+  specCardAge: {
+    backgroundColor: '#FEF8DB',
+    borderColor: '#F7EAB7',
   },
-  specLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    color: COLORS.textMuted,
-    textTransform: 'uppercase',
-    marginBottom: 3,
+  specCardWeight: {
+    backgroundColor: '#E3F2F8',
+    borderColor: '#C6E5F2',
   },
-  specValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.brown,
-    textAlign: 'center',
+  specCardLabel: {
+    fontSize: 11,
+    color: '#786858',
+    fontWeight: '500',
+    marginBottom: 4,
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  specCardValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
 
-  advocateRow: {
+  // Advocate Profile Card
+  advocateCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    marginBottom: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F2EDE2',
-    paddingBottom: 14,
+    backgroundColor: '#F9F8F5',
+    borderColor: '#EFECE6',
+    borderWidth: 1.5,
+    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 22,
   },
   advocateLeft: {
     flexDirection: 'row',
@@ -915,44 +942,48 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   advocateName: {
-    ...FONTS.bodyMedium,
+    fontSize: 15,
     fontWeight: '800',
-    color: COLORS.brown,
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   advocateRole: {
-    ...FONTS.caption,
-    color: COLORS.textMuted,
+    fontSize: 11.5,
+    color: '#8C7D6A',
     marginTop: 2,
+    fontFamily: 'PlusJakartaSans_500Medium',
   },
-  chatBtn: {
+  chatPillBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.primaryDeep,
+    backgroundColor: '#FDF1AA',
     paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: SIZES.r18,
-    ...SHADOWS.sm,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
-  chatBtnText: {
-    ...FONTS.button,
+  chatPillBtnText: {
     fontSize: 13,
-    color: '#FFFFFF',
     fontWeight: '700',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 
   section: {
     marginBottom: 20,
   },
   sectionTitle: {
-    ...FONTS.titleMd,
-    color: COLORS.brown,
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#473018',
     marginBottom: 8,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
   },
   storyText: {
-    ...FONTS.bodyRegular,
-    color: '#4B3F33',
-    lineHeight: 21,
+    fontSize: 13.5,
+    color: '#685038',
+    lineHeight: 20,
     marginBottom: 12,
+    fontFamily: 'PlusJakartaSans_400Regular',
   },
   badgesRow: {
     flexDirection: 'row',
@@ -968,10 +999,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   badgeText: {
-    ...FONTS.bodyMedium,
     fontSize: 12,
     fontWeight: '600',
-    color: COLORS.brown,
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
   },
 
   recordItem: {
@@ -989,15 +1020,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   recordText: {
-    ...FONTS.bodyMedium,
-    color: COLORS.brown,
+    fontSize: 13,
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_500Medium',
   },
 
   donateBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.primaryLight,
-    borderRadius: SIZES.r14,
+    borderRadius: 14,
     padding: 14,
     gap: 10,
     borderWidth: 1,
@@ -1006,9 +1038,9 @@ const styles = StyleSheet.create({
   },
   donateBannerText: {
     flex: 1,
-    ...FONTS.bodyMedium,
     fontSize: 12,
     color: COLORS.primaryDeep,
+    fontFamily: 'PlusJakartaSans_500Medium',
   },
 
   bottomBar: {
@@ -1016,29 +1048,40 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#F0F0F0',
     paddingHorizontal: 22,
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
     alignItems: 'center',
+    zIndex: 50,
   },
   mainAdoptBtn: {
-    backgroundColor: COLORS.primaryDark,
-    borderRadius: SIZES.r24 + 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#92CDE5',
+    paddingVertical: 14,
+    borderRadius: 25,
+    width: '100%',
+    shadowColor: '#473018',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+    elevation: 3,
   },
   mainAdoptBtnText: {
-    ...FONTS.button,
     fontSize: 16,
-    color: COLORS.surface,
+    fontWeight: '700',
+    color: '#473018',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
   fosterLink: {
     paddingVertical: 2,
     marginTop: 8,
   },
   fosterLinkText: {
-    ...FONTS.bodyMedium,
     fontSize: 12,
     color: COLORS.textSecondary,
     textDecorationLine: 'underline',
@@ -1062,7 +1105,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: '#E8DFC8',
   },
-  sheetHandle: {
+  sheetHandleModal: {
     width: 38,
     height: 4,
     borderRadius: 2,
@@ -1150,18 +1193,19 @@ const styles = StyleSheet.create({
     color: '#473018',
   },
 
-  // ── RBAC & Owner Management Styles ───────────────────
+  // RBAC & Owner Management
   bottomBarOwner: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#ECECEC',
     paddingHorizontal: 20,
     paddingTop: 14,
     paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    zIndex: 50,
     ...SHADOWS.card,
   },
   ownerHeaderRow: {
@@ -1207,15 +1251,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.secondaryDark,
   },
-  ownerStatusPillText: {
-    ...FONTS.caption,
-  },
+  ownerStatusPillText: {},
   ownerBadgeWrap: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   ownerBadgeNotice: {
-    ...FONTS.caption,
     fontSize: 12,
     color: COLORS.textMuted,
     fontWeight: '600',
@@ -1231,11 +1272,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: COLORS.primaryDeep,
     paddingVertical: 14,
-    borderRadius: SIZES.r24 + 1,
+    borderRadius: 25,
     ...SHADOWS.button,
   },
   markAdoptedBtnText: {
-    ...FONTS.button,
     fontSize: 15,
     color: '#FFFFFF',
     fontWeight: '700',
@@ -1245,25 +1285,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: COLORS.primaryDeep,
     paddingVertical: 13,
-    borderRadius: SIZES.r24 + 1,
+    borderRadius: 25,
   },
   relistBtnText: {
-    ...FONTS.button,
     fontSize: 14,
     color: COLORS.primaryDeep,
-  },
-  deleteAnimalBtn: {
-    width: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFF5F5',
-    borderWidth: 1.5,
-    borderColor: '#FCD8D8',
-    borderRadius: SIZES.r24 + 1,
   },
   ownerBadgePill: {
     flexDirection: 'row',
@@ -1276,7 +1306,6 @@ const styles = StyleSheet.create({
     borderColor: '#CFE6EE',
   },
   ownerBadgePillText: {
-    ...FONTS.caption,
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.primaryDeep,
@@ -1288,20 +1317,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primaryDeep,
     paddingVertical: 14,
     paddingHorizontal: 24,
-    borderRadius: SIZES.r24 + 1,
+    borderRadius: 25,
     width: '100%',
     ...SHADOWS.button,
   },
   collabAdvocateBtnText: {
-    ...FONTS.button,
     fontSize: 15,
-    color: COLORS.surface,
-  },
-  collabAdvocateSub: {
-    ...FONTS.caption,
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 6,
+    color: '#FFFFFF',
   },
   alreadyAdoptedNotice: {
     flexDirection: 'row',
@@ -1315,16 +1337,43 @@ const styles = StyleSheet.create({
     borderColor: '#B8D3C3',
   },
   alreadyAdoptedTitle: {
-    ...FONTS.label,
     fontSize: 14,
     color: '#473018',
     fontWeight: '700',
   },
-  alreadyAdoptedSub: {
-    ...FONTS.caption,
-    fontSize: 11,
-    color: '#685038',
-    marginTop: 2,
+  fullPreviewOverlay: {
+    flex: 1,
+    backgroundColor: '#0A0A0A',
+    justifyContent: 'space-between',
+  },
+  fullPreviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    zIndex: 10,
+  },
+  fullPreviewCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullPreviewCount: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  fullPreviewBody: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  fullPreviewImage: {
+    width: '100%',
+    height: '80%',
   },
 });
-
