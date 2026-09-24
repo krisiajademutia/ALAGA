@@ -50,7 +50,12 @@ export default function Input({
           onBlur={() => setFocused(false)}
         />
         {secureTextEntry ? (
-          <TouchableOpacity style={styles.iconRight} onPress={() => setShowPw((p) => !p)}>
+          <TouchableOpacity
+            style={styles.iconRight}
+            onPress={() => setShowPw((p) => !p)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            activeOpacity={0.7}
+          >
             <Ionicons
               name={showPw ? 'eye-off-outline' : 'eye-outline'}
               size={SIZES.lg}

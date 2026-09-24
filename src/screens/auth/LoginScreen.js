@@ -123,6 +123,14 @@ export default function LoginScreen({ navigation }) {
             icon={<Ionicons name="lock-closed-outline" size={18} color={COLORS.primary} />}
           />
 
+          <TouchableOpacity
+            style={styles.forgotBtn}
+            onPress={() => navigation.navigate('ResetPassword', { email: email.trim() })}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.forgotText}>Forgot Password?</Text>
+          </TouchableOpacity>
+
           <Button
             title="Sign In"
             onPress={submit}
@@ -208,8 +216,30 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
+  passwordFieldWrap: {
+    position: 'relative',
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: 14,
+    top: 38,
+    padding: 6,
+    zIndex: 2,
+  },
+  forgotBtn: {
+    alignSelf: 'flex-end',
+    marginTop: -8,
+    marginBottom: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  forgotText: {
+    ...FONTS.bodySmall,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
   signInBtn: {
-    marginTop: 8,
+    marginTop: 4,
     backgroundColor: COLORS.primary,
   },
 

@@ -15,6 +15,7 @@ import SplashScreen     from '../screens/onboarding/SplashScreen';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 import LoginScreen      from '../screens/auth/LoginScreen';
 import RegisterScreen   from '../screens/auth/RegisterScreen';
+import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 
 // ── Community screens ─────────────────────────────────────────────────────────
 import CommunityHomeScreen from '../screens/community/HomeScreen';
@@ -202,9 +203,10 @@ function AuthStack({ initialRoute = 'Login' }) {
       screenOptions={{ headerShown: false }}
       initialRouteName={initialRoute}
     >
-      <Stack.Screen name="Login"      component={LoginScreen} />
-      <Stack.Screen name="Register"   component={RegisterScreen} />
-      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+      <Stack.Screen name="Login"         component={LoginScreen} />
+      <Stack.Screen name="Register"      component={RegisterScreen} />
+      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+      <Stack.Screen name="Onboarding"    component={OnboardingScreen} />
     </Stack.Navigator>
   );
 }

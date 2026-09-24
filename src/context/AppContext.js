@@ -21,6 +21,9 @@ import {
   clearAllNotificationsFirebase,
   subscribeAuthState,
   getDefaultUserAvatar,
+  resetUserPasswordWithOtp,
+  updateUserPasswordLoggedIn,
+  checkUserExistsByEmail,
 } from '../services/authService';
 import {
   subscribeToRescueReports,
@@ -1282,6 +1285,34 @@ export function AppProvider({ children }) {
     }
   };
 
+  const resetPasswordWithOtp = async (arg1, arg2, arg3) => {
+    let targetEmail;
+    let targetPassword;
+    if (typeof arg3 !== 'undefined') {
+      targetEmail = arg1;
+      targetPassword = arg3;
+    } else if (typeof arg1 === 'object' && arg1 !== null) {
+      targetEmail = arg1.email;
+      targetPassword = arg1.newPassword;
+    } else {
+      targetEmail = arg1;
+      targetPassword = arg2;
+    }
+    return await resetUserPasswordWithOtp({ email: targetEmail, newPassword: targetPassword });
+  };
+
+  const updateUserPassword = async ({ newPassword, currentPassword }) => {
+    return await updateUserPasswordLoggedIn({
+      newPassword,
+      currentPassword,
+      userId: currentUser?.id,
+    });
+  };
+
+  const checkUserExists = async (email) => {
+    return await checkUserExistsByEmail(email);
+  };
+
   const getUserProfile = useCallback(async (userId) => {
     if (!userId) return null;
     if (currentUser?.id === userId) return currentUser;
@@ -2382,6 +2413,9 @@ export function AppProvider({ children }) {
         loginWithGoogle,
         logout,
         updateUser,
+        resetPasswordWithOtp,
+        updateUserPassword,
+        checkUserExists,
         isAuthLoading,
         isOnboardingCompleted,
         completeOnboarding,

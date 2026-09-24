@@ -213,7 +213,7 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
 
-    const verifyResult = verifyRegistrationOtp(form.email.trim(), trimmedOtp);
+    const verifyResult = await verifyRegistrationOtp(form.email.trim(), trimmedOtp);
     if (!verifyResult.success) {
       showDialog({
         type: 'error',
