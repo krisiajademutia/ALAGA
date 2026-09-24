@@ -17,6 +17,7 @@ import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import Avatar from '../../components/Avatar';
 import AnimalCard from '../../components/AnimalCard';
+import EmptyState from '../../components/EmptyState';
 
 const CATEGORIES = [
   { id: 'all', label: 'All Pets', icon: 'paw' },
@@ -39,6 +40,7 @@ export default function CommunityHomeScreen({ navigation }) {
     if (a.status !== 'Available') return false;
     if (activeCategory === 'cats' && a.species !== 'Cat') return false;
     if (activeCategory === 'dogs' && a.species !== 'Dog') return false;
+    if (activeCategory === 'birds' && (a.species === 'Cat' || a.species === 'Dog')) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       return (
@@ -101,8 +103,22 @@ export default function CommunityHomeScreen({ navigation }) {
             placeholderTextColor={COLORS.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
+            returnKeyType="search"
           />
-          <TouchableOpacity style={styles.filterBtn}>
+          {Boolean(searchQuery.trim()) && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={{ marginRight: 6 }}
+            >
+              <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.filterBtn}
+            onPress={() => navigation.navigate('Listings')}
+            activeOpacity={0.7}
+          >
             <Ionicons name="options-outline" size={20} color={COLORS.brown} />
           </TouchableOpacity>
         </View>
@@ -186,15 +202,43 @@ export default function CommunityHomeScreen({ navigation }) {
         </View>
 
         {/* Pet Cards Feed */}
-        <View style={styles.cardsFeed}>
-          {filteredAnimals.map((pet) => (
-            <AnimalCard
-              key={pet.id}
-              animal={pet}
-              onPress={() => navigation.navigate('AnimalDetail', { animalId: pet.id })}
+        {filteredAnimals.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <EmptyState
+              icon="search-outline"
+              title="No animals found"
+              subtitle={
+                searchQuery.trim()
+                  ? `No pets match "${searchQuery.trim()}". Try another keyword or reset filters.`
+                  : activeCategory !== 'all'
+                  ? 'No pets found in this category at the moment.'
+                  : 'Check back later for new pet listings.'
+              }
             />
-          ))}
-        </View>
+            {(Boolean(searchQuery.trim()) || activeCategory !== 'all') && (
+              <TouchableOpacity
+                style={styles.clearFilterBtn}
+                onPress={() => {
+                  setSearchQuery('');
+                  setActiveCategory('all');
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.clearFilterText}>Reset Filters</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <View style={styles.cardsFeed}>
+            {filteredAnimals.map((pet) => (
+              <AnimalCard
+                key={pet.id}
+                animal={pet}
+                onPress={() => navigation.navigate('AnimalDetail', { animalId: pet.id })}
+              />
+            ))}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -500,6 +544,27 @@ const styles = StyleSheet.create({
   // Cards Feed
   cardsFeed: {
     paddingHorizontal: 20,
+  },
+  emptyContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    alignItems: 'center',
+  },
+  clearFilterBtn: {
+    marginTop: -8,
+    marginBottom: 20,
+    backgroundColor: '#F0F8FB',
+    borderWidth: 1,
+    borderColor: '#B8E4E5',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: SIZES.r12,
+  },
+  clearFilterText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#2E7A99',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 });
 

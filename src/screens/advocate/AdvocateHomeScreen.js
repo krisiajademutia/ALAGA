@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,12 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import Avatar from '../../components/Avatar';
+import EmptyState from '../../components/EmptyState';
+import { getDistanceInKm } from '../../services/notificationService';
 
 const CATEGORIES = [
   { id: 'all', label: 'All Alerts', icon: 'paw' },
@@ -32,19 +35,85 @@ export default function AdvocateHomeScreen({ navigation }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [activeSegment, setActiveSegment] = useState('All Pets');
   const [favorites, setFavorites] = useState({});
+  const [userLocation, setUserLocation] = useState(null);
 
   const unreadNotifs = getUnreadCount();
   const insets = useSafeAreaInsets();
   const safeTopPadding = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
 
+  // Initialize or update user location coordinates
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      const uLat = currentUser?.latitude || currentUser?.locationCoordinates?.latitude;
+      const uLng = currentUser?.longitude || currentUser?.locationCoordinates?.longitude;
+      if (uLat && uLng) {
+        if (isMounted) setUserLocation({ latitude: Number(uLat), longitude: Number(uLng) });
+        return;
+      }
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          if (isMounted && pos?.coords) {
+            setUserLocation({
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+            });
+          }
+        }
+      } catch (err) {
+        // Fallback silently if device location unavailable
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser]);
+
+  const handleSelectSegment = async (seg) => {
+    setActiveSegment(seg);
+    if (seg === 'Nearby (<3km)' && !userLocation && !(currentUser?.latitude || currentUser?.locationCoordinates?.latitude)) {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          if (pos?.coords) {
+            setUserLocation({
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+            });
+          }
+        }
+      } catch (err) {
+        // Fallback silently
+      }
+    }
+  };
+
   const toggleFavorite = (id) => {
     setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const uLat = userLocation?.latitude || currentUser?.latitude || currentUser?.locationCoordinates?.latitude;
+  const uLng = userLocation?.longitude || currentUser?.longitude || currentUser?.locationCoordinates?.longitude;
+
   const filteredReports = rescueReports.filter((r) => {
     if (activeCategory === 'cats' && r.animalType !== 'Cat') return false;
     if (activeCategory === 'dogs' && r.animalType !== 'Dog') return false;
+    if (activeCategory === 'birds' && (r.animalType === 'Cat' || r.animalType === 'Dog')) return false;
+
     if (activeSegment === 'Urgent / Foster' && r.urgency !== 'High' && r.urgency !== 'Critical') return false;
+
+    if (activeSegment === 'Nearby (<3km)') {
+      if (!uLat || !uLng) return false;
+      const rLat = r.location?.latitude;
+      const rLng = r.location?.longitude;
+      if (!rLat || !rLng) return false;
+      const d = getDistanceInKm(uLat, uLng, rLat, rLng);
+      if (d === null || d > 3) return false;
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       return (
@@ -107,8 +176,22 @@ export default function AdvocateHomeScreen({ navigation }) {
             placeholderTextColor={COLORS.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
+            returnKeyType="search"
           />
-          <TouchableOpacity style={styles.filterBtn}>
+          {Boolean(searchQuery.trim()) && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={{ marginRight: 6 }}
+            >
+              <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.filterBtn}
+            onPress={() => navigation.navigate('RescueAlerts')}
+            activeOpacity={0.7}
+          >
             <Ionicons name="options-outline" size={20} color={COLORS.brown} />
           </TouchableOpacity>
         </View>
@@ -178,7 +261,24 @@ export default function AdvocateHomeScreen({ navigation }) {
           })}
         </ScrollView>
 
-
+        {/* ── Segment Control Tabs ─────────────────────────── */}
+        <View style={styles.segmentContainer}>
+          {SEGMENTS.map((seg) => {
+            const active = activeSegment === seg;
+            return (
+              <TouchableOpacity
+                key={seg}
+                style={[styles.segBtn, active && styles.segBtnActive]}
+                onPress={() => handleSelectSegment(seg)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.segText, active && styles.segTextActive]}>
+                  {seg}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
         {/* ── Rescue Alerts Header ──────────────────────────── */}
         <View style={styles.sectionHeader}>
@@ -194,123 +294,167 @@ export default function AdvocateHomeScreen({ navigation }) {
         </View>
 
         {/* Rescue Alerts Feed */}
-        <View style={styles.cardsFeed}>
-          {filteredReports.map((r) => {
-            const isFav = Boolean(favorites[r.id]);
-            const isUrgent = r.urgency === 'High' || r.urgency === 'Critical';
-            const petName = r.title || `${r.animalType} · ${r.condition || 'Rescue'}`;
-            const breedName = r.animalType === 'Dog' ? 'Aspin Mix' : 'Puspin Tabby';
-            const tags = r.tags || [r.animalType || 'Rescue', r.condition || 'Alert'];
-
-            return (
+        {filteredReports.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <EmptyState
+              icon="search-outline"
+              title="No rescue alerts found"
+              subtitle={
+                searchQuery.trim()
+                  ? `No alerts match "${searchQuery.trim()}". Try another keyword or reset filters.`
+                  : activeSegment === 'Nearby (<3km)'
+                  ? (!uLat || !uLng
+                      ? 'Location coordinates are needed to calculate nearby alerts within 3km. Please check location settings.'
+                      : 'No rescue alerts reported within 3km of your current location.')
+                  : activeSegment === 'Urgent / Foster'
+                  ? 'No critical or urgent rescue alerts right now.'
+                  : activeCategory !== 'all'
+                  ? 'No rescue alerts found for this animal category.'
+                  : 'No rescue alerts reported yet. Check back soon.'
+              }
+            />
+            {(Boolean(searchQuery.trim()) || activeCategory !== 'all' || activeSegment !== 'All Pets') && (
               <TouchableOpacity
-                key={r.id}
-                style={styles.alertCard}
-                onPress={() => navigation.navigate('RescueAlertDetail', { reportId: r.id })}
-                activeOpacity={0.9}
+                style={styles.clearFilterBtn}
+                onPress={() => {
+                  setSearchQuery('');
+                  setActiveCategory('all');
+                  setActiveSegment('All Pets');
+                }}
+                activeOpacity={0.8}
               >
-                {/* Visual Banner Container */}
-                <View style={styles.imageBannerWrap}>
-                  {r.photo ? (
-                    <Image
-                      source={{ uri: r.photo }}
-                      style={styles.cardImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={styles.imageFallbackWrap}>
-                      <Ionicons name="paw" size={46} color="#92CDE5" />
-                    </View>
-                  )}
+                <Text style={styles.clearFilterText}>Reset Filters</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <View style={styles.cardsFeed}>
+            {filteredReports.map((r) => {
+              const isFav = Boolean(favorites[r.id]);
+              const isUrgent = r.urgency === 'High' || r.urgency === 'Critical';
+              const petName = r.title || `${r.animalType} · ${r.condition || 'Rescue'}`;
+              const tags = r.tags || [r.animalType || 'Rescue', r.condition || 'Alert'];
 
-                  {/* Top-Left Floating Urgency Pill */}
-                  <View style={[styles.urgencyPill, isUrgent ? styles.urgencyHigh : styles.urgencyStandard]}>
-                    <Ionicons
-                      name={isUrgent ? 'alert-circle' : 'shield-checkmark'}
-                      size={12}
-                      color={isUrgent ? '#B91C1C' : '#15803D'}
-                      style={{ marginRight: 3 }}
-                    />
-                    <Text style={[styles.urgencyText, isUrgent ? styles.urgencyTextHigh : styles.urgencyTextStandard]}>
-                      {r.urgency || (isUrgent ? 'Urgent' : 'Standard')}
-                    </Text>
-                  </View>
+              const rLat = r.location?.latitude;
+              const rLng = r.location?.longitude;
+              let displayDistance = r.distance;
+              if (!displayDistance && uLat && uLng && rLat && rLng) {
+                const km = getDistanceInKm(uLat, uLng, rLat, rLng);
+                if (km !== null) {
+                  displayDistance = km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)} km`;
+                }
+              }
 
-                  {/* Top-Right Favorite & Optional Distance */}
-                  <View style={styles.topRightOverlay}>
-                    {Boolean(r.distance) && (
-                      <View style={styles.distancePill}>
-                        <Ionicons name="location-sharp" size={11} color="#206B82" style={{ marginRight: 2 }} />
-                        <Text style={styles.distancePillText}>{r.distance}</Text>
+              return (
+                <TouchableOpacity
+                  key={r.id}
+                  style={styles.alertCard}
+                  onPress={() => navigation.navigate('RescueAlertDetail', { reportId: r.id })}
+                  activeOpacity={0.9}
+                >
+                  {/* Visual Banner Container */}
+                  <View style={styles.imageBannerWrap}>
+                    {r.photo ? (
+                      <Image
+                        source={{ uri: r.photo }}
+                        style={styles.cardImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.imageFallbackWrap}>
+                        <Ionicons name="paw" size={46} color="#92CDE5" />
                       </View>
                     )}
-                    <TouchableOpacity
-                      style={styles.heartCircle}
-                      onPress={() => toggleFavorite(r.id)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
+
+                    {/* Top-Left Floating Urgency Pill */}
+                    <View style={[styles.urgencyPill, isUrgent ? styles.urgencyHigh : styles.urgencyStandard]}>
                       <Ionicons
-                        name={isFav ? 'heart' : 'heart-outline'}
-                        size={16}
-                        color={isFav ? '#D94F4F' : '#6B7280'}
+                        name={isUrgent ? 'alert-circle' : 'shield-checkmark'}
+                        size={12}
+                        color={isUrgent ? '#B91C1C' : '#15803D'}
+                        style={{ marginRight: 3 }}
                       />
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                      <Text style={[styles.urgencyText, isUrgent ? styles.urgencyTextHigh : styles.urgencyTextStandard]}>
+                        {r.urgency || (isUrgent ? 'Urgent' : 'Standard')}
+                      </Text>
+                    </View>
 
-                {/* Card Body */}
-                <View style={styles.cardBody}>
-                  <View style={styles.titleRow}>
-                    <Text style={styles.cardTitle} numberOfLines={1}>
-                      {petName}
-                    </Text>
-                  </View>
-
-                  {/* Location */}
-                  <View style={styles.cardMetaRow}>
-                    <Ionicons name="location-outline" size={13} color="#8C7D6A" style={{ marginRight: 4 }} />
-                    <Text style={styles.cardMetaText} numberOfLines={1}>
-                      {r.location?.address || 'Reported Location'}
-                    </Text>
-                  </View>
-
-                  {/* Description preview */}
-                  <Text style={styles.cardDescText} numberOfLines={2}>
-                    {r.description}
-                  </Text>
-
-                  {/* Tags Row */}
-                  <View style={styles.tagsContainer}>
-                    {tags.map((t) => {
-                      const isWarn = t === 'Injured' || t === 'Critical' || t === 'Urgent';
-                      return (
-                        <View
-                          key={t}
-                          style={[styles.tagPill, isWarn && styles.tagPillWarn]}
-                        >
-                          <Text style={[styles.tagPillText, isWarn && styles.tagPillTextWarn]}>
-                            {t}
-                          </Text>
+                    {/* Top-Right Favorite & Optional Distance */}
+                    <View style={styles.topRightOverlay}>
+                      {Boolean(displayDistance) && (
+                        <View style={styles.distancePill}>
+                          <Ionicons name="location-sharp" size={11} color="#206B82" style={{ marginRight: 2 }} />
+                          <Text style={styles.distancePillText}>{displayDistance}</Text>
                         </View>
-                      );
-                    })}
-                  </View>
-
-                  {/* Card Footer */}
-                  <View style={styles.cardFooter}>
-                    <Text style={styles.cardDateText}>
-                      {r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent'}
-                    </Text>
-                    <View style={styles.actionPill}>
-                      <Text style={styles.actionPillText}>View Details</Text>
-                      <Ionicons name="arrow-forward" size={13} color="#206B82" style={{ marginLeft: 4 }} />
+                      )}
+                      <TouchableOpacity
+                        style={styles.heartCircle}
+                        onPress={() => toggleFavorite(r.id)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons
+                          name={isFav ? 'heart' : 'heart-outline'}
+                          size={16}
+                          color={isFav ? '#D94F4F' : '#6B7280'}
+                        />
+                      </TouchableOpacity>
                     </View>
                   </View>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+
+                  {/* Card Body */}
+                  <View style={styles.cardBody}>
+                    <View style={styles.titleRow}>
+                      <Text style={styles.cardTitle} numberOfLines={1}>
+                        {petName}
+                      </Text>
+                    </View>
+
+                    {/* Location */}
+                    <View style={styles.cardMetaRow}>
+                      <Ionicons name="location-outline" size={13} color="#8C7D6A" style={{ marginRight: 4 }} />
+                      <Text style={styles.cardMetaText} numberOfLines={1}>
+                        {r.location?.address || 'Reported Location'}
+                      </Text>
+                    </View>
+
+                    {/* Description preview */}
+                    <Text style={styles.cardDescText} numberOfLines={2}>
+                      {r.description}
+                    </Text>
+
+                    {/* Tags Row */}
+                    <View style={styles.tagsContainer}>
+                      {tags.map((t) => {
+                        const isWarn = t === 'Injured' || t === 'Critical' || t === 'Urgent';
+                        return (
+                          <View
+                            key={t}
+                            style={[styles.tagPill, isWarn && styles.tagPillWarn]}
+                          >
+                            <Text style={[styles.tagPillText, isWarn && styles.tagPillTextWarn]}>
+                              {t}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+
+                    {/* Card Footer */}
+                    <View style={styles.cardFooter}>
+                      <Text style={styles.cardDateText}>
+                        {r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent'}
+                      </Text>
+                      <View style={styles.actionPill}>
+                        <Text style={styles.actionPillText}>View Details</Text>
+                        <Ionicons name="arrow-forward" size={13} color="#206B82" style={{ marginLeft: 4 }} />
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -609,6 +753,27 @@ const styles = StyleSheet.create({
 
   cardsFeed: {
     paddingHorizontal: 20,
+  },
+  emptyContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    alignItems: 'center',
+  },
+  clearFilterBtn: {
+    marginTop: -8,
+    marginBottom: 20,
+    backgroundColor: '#F0F8FB',
+    borderWidth: 1,
+    borderColor: '#B8E4E5',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: SIZES.r12,
+  },
+  clearFilterText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#206B82',
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
   alertCard: {
     backgroundColor: '#FFFFFF',
