@@ -38,6 +38,5 @@ scratch/
 Pitching*
 ALAGA_Pitch_Deck*
 ALAGA_Pitching_Script*
-
-
-
+# firebase
+.firebase/

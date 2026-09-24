@@ -512,8 +512,8 @@ export default function AnimalDetailScreen({ route, navigation }) {
                 animal.status === 'Adopted'
                   ? styles.statusAdoptedBg
                   : animal.status === 'Fostered'
-                  ? styles.statusFosteredBg
-                  : styles.statusAvailableBg,
+                    ? styles.statusFosteredBg
+                    : styles.statusAvailableBg,
               ]}
             >
               <Ionicons
@@ -521,16 +521,16 @@ export default function AnimalDetailScreen({ route, navigation }) {
                   animal.status === 'Adopted'
                     ? 'checkmark-circle'
                     : animal.status === 'Fostered'
-                    ? 'heart'
-                    : 'paw'
+                      ? 'heart'
+                      : 'paw'
                 }
                 size={13}
                 color={
                   animal.status === 'Adopted'
                     ? '#15803D'
                     : animal.status === 'Fostered'
-                    ? '#B45309'
-                    : COLORS.primaryDeep
+                      ? '#B45309'
+                      : COLORS.primaryDeep
                 }
                 style={{ marginRight: 4 }}
               />
@@ -540,15 +540,15 @@ export default function AnimalDetailScreen({ route, navigation }) {
                   animal.status === 'Adopted'
                     ? styles.statusAdoptedText
                     : animal.status === 'Fostered'
-                    ? styles.statusFosteredText
-                    : styles.statusAvailableText,
+                      ? styles.statusFosteredText
+                      : styles.statusAvailableText,
                 ]}
               >
                 {animal.status === 'Adopted'
                   ? 'Adopted'
                   : animal.status === 'Fostered'
-                  ? 'Currently Fostered'
-                  : 'Active Listing'}
+                    ? 'Currently Fostered'
+                    : 'Active Listing'}
               </Text>
             </View>
             <View style={styles.ownerBadgeWrap}>
@@ -609,7 +609,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
             onPress={() => openModal('Adoption')}
             activeOpacity={0.88}
           >
-            <Text style={styles.mainAdoptBtnText}>Adopt Si {animal.name}</Text>
+            <Text style={styles.mainAdoptBtnText}>Adopt {animal.name}</Text>
             <Ionicons name="paw" size={15} color="#473018" style={{ marginLeft: 6 }} />
           </TouchableOpacity>
 

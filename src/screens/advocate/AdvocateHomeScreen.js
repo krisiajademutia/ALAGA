@@ -28,13 +28,11 @@ const CATEGORIES = [
   { id: 'birds', label: 'Other Animals', icon: 'heart-outline' },
 ];
 
-const SEGMENTS = ['All Pets', 'Urgent / Foster', 'Nearby (<3km)'];
 
 export default function AdvocateHomeScreen({ navigation }) {
   const { currentUser, rescueReports, getUnreadCount } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
-  const [activeSegment, setActiveSegment] = useState('All Pets');
   const [favorites, setFavorites] = useState({});
   const [userLocation, setUserLocation] = useState(null);
 
@@ -72,26 +70,6 @@ export default function AdvocateHomeScreen({ navigation }) {
     };
   }, [currentUser]);
 
-  const handleSelectSegment = async (seg) => {
-    setActiveSegment(seg);
-    if (seg === 'Nearby (<3km)' && !userLocation && !(currentUser?.latitude || currentUser?.locationCoordinates?.latitude)) {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          if (pos?.coords) {
-            setUserLocation({
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-            });
-          }
-        }
-      } catch (err) {
-        // Fallback silently
-      }
-    }
-  };
-
   const toggleFavorite = (id) => {
     setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
   };
@@ -105,18 +83,6 @@ export default function AdvocateHomeScreen({ navigation }) {
       if (activeCategory === 'dogs' && r.animalType !== 'Dog') return false;
       if (activeCategory === 'birds' && (r.animalType === 'Cat' || r.animalType === 'Dog')) return false;
 
-      const isRescued = r.status === 'Rescued' || r.urgency === 'Closed' || Boolean(r.rescuedAt);
-      if (activeSegment === 'Urgent / Foster' && (isRescued || (r.urgency !== 'High' && r.urgency !== 'Critical'))) return false;
-
-      if (activeSegment === 'Nearby (<3km)') {
-        if (!uLat || !uLng) return false;
-        const rLat = r.location?.latitude;
-        const rLng = r.location?.longitude;
-        if (!rLat || !rLng) return false;
-        const d = getDistanceInKm(uLat, uLng, rLat, rLng);
-        if (d === null || d > 3) return false;
-      }
-
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
@@ -129,7 +95,7 @@ export default function AdvocateHomeScreen({ navigation }) {
     });
 
     return sortRescueReports(list);
-  }, [rescueReports, activeCategory, activeSegment, searchQuery, uLat, uLng]);
+  }, [rescueReports, activeCategory, searchQuery]);
 
   return (
     <View style={styles.root}>
@@ -267,25 +233,6 @@ export default function AdvocateHomeScreen({ navigation }) {
           })}
         </ScrollView>
 
-        {/* ── Segment Control Tabs ─────────────────────────── */}
-        <View style={styles.segmentContainer}>
-          {SEGMENTS.map((seg) => {
-            const active = activeSegment === seg;
-            return (
-              <TouchableOpacity
-                key={seg}
-                style={[styles.segBtn, active && styles.segBtnActive]}
-                onPress={() => handleSelectSegment(seg)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.segText, active && styles.segTextActive]}>
-                  {seg}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
         {/* ── Rescue Alerts Header ──────────────────────────── */}
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleRow}>
@@ -308,24 +255,17 @@ export default function AdvocateHomeScreen({ navigation }) {
               subtitle={
                 searchQuery.trim()
                   ? `No alerts match "${searchQuery.trim()}". Try another keyword or reset filters.`
-                  : activeSegment === 'Nearby (<3km)'
-                  ? (!uLat || !uLng
-                      ? 'Location coordinates are needed to calculate nearby alerts within 3km. Please check location settings.'
-                      : 'No rescue alerts reported within 3km of your current location.')
-                  : activeSegment === 'Urgent / Foster'
-                  ? 'No critical or urgent rescue alerts right now.'
                   : activeCategory !== 'all'
-                  ? 'No rescue alerts found for this animal category.'
-                  : 'No rescue alerts reported yet. Check back soon.'
+                    ? 'No rescue alerts found for this animal category.'
+                    : 'No rescue alerts reported yet. Check back soon.'
               }
             />
-            {(Boolean(searchQuery.trim()) || activeCategory !== 'all' || activeSegment !== 'All Pets') && (
+            {(Boolean(searchQuery.trim()) || activeCategory !== 'all') && (
               <TouchableOpacity
                 style={styles.clearFilterBtn}
                 onPress={() => {
                   setSearchQuery('');
                   setActiveCategory('all');
-                  setActiveSegment('All Pets');
                 }}
                 activeOpacity={0.8}
               >
@@ -699,49 +639,6 @@ const styles = StyleSheet.create({
     color: COLORS.brown,
   },
 
-  segmentContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E8DEC5',
-    borderRadius: 16,
-    marginHorizontal: 20,
-    padding: 4,
-    marginBottom: 18,
-    shadowColor: '#473018',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  segBtn: {
-    flex: 1,
-    paddingVertical: 9,
-    paddingHorizontal: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-  },
-  segBtnActive: {
-    backgroundColor: '#92CDE5',
-    shadowColor: '#2E7A99',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  segText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#685038',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    textAlign: 'center',
-  },
-  segTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontFamily: 'PlusJakartaSans_700Bold',
-  },
 
   sectionHeader: {
     flexDirection: 'row',
