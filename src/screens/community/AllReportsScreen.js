@@ -15,6 +15,7 @@ import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import EmptyState from '../../components/EmptyState';
 import Header from '../../components/Header';
+import { sortRescueReports } from '../../services/rescueService';
 
 const FILTERS = ['All', 'Open', 'Responded', 'Rescued'];
 
@@ -23,17 +24,20 @@ export default function AllReportsScreen({ navigation }) {
   const [filter, setFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filtered = rescueReports.filter((r) => {
-    if (filter !== 'All' && r.status !== filter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const title = (r.title || `${r.condition || 'Injured'} ${r.animalType.toLowerCase()}`).toLowerCase();
-      const loc = (r.location?.address || '').toLowerCase();
-      const desc = (r.description || '').toLowerCase();
-      return title.includes(q) || loc.includes(q) || desc.includes(q);
-    }
-    return true;
-  });
+  const filtered = React.useMemo(() => {
+    const list = rescueReports.filter((r) => {
+      if (filter !== 'All' && r.status !== filter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const title = (r.title || `${r.condition || 'Injured'} ${r.animalType.toLowerCase()}`).toLowerCase();
+        const loc = (r.location?.address || '').toLowerCase();
+        const desc = (r.description || '').toLowerCase();
+        return title.includes(q) || loc.includes(q) || desc.includes(q);
+      }
+      return true;
+    });
+    return sortRescueReports(list);
+  }, [rescueReports, filter, searchQuery]);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Recently';
@@ -92,7 +96,9 @@ export default function AllReportsScreen({ navigation }) {
           <EmptyState icon="paw-outline" title="No reports found" subtitle="Try adjusting your search or filters." />
         }
         renderItem={({ item }) => {
-          const isHigh = item.urgency === 'High' || item.urgency === 'Critical';
+          const isRescued = item.status === 'Rescued' || item.urgency === 'Closed' || Boolean(item.rescuedAt);
+          const isHigh = !isRescued && (item.urgency === 'High' || item.urgency === 'Critical');
+          const badgeText = isRescued ? 'Closed' : isHigh ? 'High' : 'Standard';
           const cardTitle = item.title || `${item.condition || 'Injured'} ${item.animalType.toLowerCase()}`;
 
           return (
@@ -109,9 +115,27 @@ export default function AllReportsScreen({ navigation }) {
                     <Ionicons name="paw" size={36} color="#85CCE5" />
                   </View>
                 )}
-                <View style={[styles.urgencyBadge, isHigh ? styles.badgeHigh : styles.badgeStandard]}>
-                  <Text style={[styles.badgeText, isHigh ? styles.badgeTextHigh : styles.badgeTextStandard]}>
-                    {isHigh ? 'High' : 'Standard'}
+                <View
+                  style={[
+                    styles.urgencyBadge,
+                    isRescued
+                      ? styles.badgeClosed
+                      : isHigh
+                      ? styles.badgeHigh
+                      : styles.badgeStandard,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.badgeText,
+                      isRescued
+                        ? styles.badgeTextClosed
+                        : isHigh
+                        ? styles.badgeTextHigh
+                        : styles.badgeTextStandard,
+                    ]}
+                  >
+                    {badgeText}
                   </Text>
                 </View>
               </View>
@@ -235,6 +259,9 @@ const styles = StyleSheet.create({
   badgeStandard: {
     backgroundColor: '#2E7D32',
   },
+  badgeClosed: {
+    backgroundColor: '#6B7280',
+  },
   badgeText: {
     fontSize: 10,
     fontWeight: '700',
@@ -244,6 +271,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   badgeTextStandard: {
+    color: '#FFFFFF',
+  },
+  badgeTextClosed: {
     color: '#FFFFFF',
   },
   cardBody: {

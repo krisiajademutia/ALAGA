@@ -145,17 +145,18 @@ export async function resetUserPasswordWithOtp({ email, newPassword }) {
     const snap = await getDocs(q);
 
     if (!snap.empty) {
-      const userDocSnap = snap.docs[0];
-
-      await updateDoc(userDocSnap.ref, {
-        passwordHash: hashedPassword,
-        passwordUpdatedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
+      for (const userDocSnap of snap.docs) {
+        await updateDoc(userDocSnap.ref, {
+          passwordHash: hashedPassword,
+          passwordUpdatedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }).catch(() => {});
+      }
     }
 
-    // Also trigger Firebase Auth password reset email in background so Firebase Auth is kept in sync if needed
+    // Sign out any active Firebase Auth session so old credentials are never cached
     if (auth) {
+      await fbSignOut(auth).catch(() => {});
       try {
         sendPasswordResetEmail(auth, cleanEmail).catch(() => {});
       } catch (e) {}
@@ -201,7 +202,7 @@ export async function updateUserPasswordLoggedIn({ newPassword, currentPassword,
       }
     }
 
-    // Update in Firestore
+    // Update in Firestore and local storage
     if (targetUid && db) {
       const hashed = await hashPassword(newPassword);
       const userRef = doc(db, 'users', targetUid);
@@ -210,6 +211,9 @@ export async function updateUserPasswordLoggedIn({ newPassword, currentPassword,
         passwordUpdatedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
+      if (currentUser?.email) {
+        await AsyncStorage.setItem('@alaga_pwd_hash_' + currentUser.email.trim().toLowerCase(), hashed).catch(() => {});
+      }
     }
 
     return { success: true };
@@ -227,17 +231,88 @@ export async function loginWithFirebase(email, password) {
     return { isMock: true };
   }
 
+  const cleanEmail = (email || '').trim().toLowerCase();
+  if (!cleanEmail || !password) {
+    return { success: false, error: 'Email and password are required.' };
+  }
+
+  const hashedInput = await hashPassword(password);
+
+  let localHash = null;
   try {
-    const cleanEmail = email.trim();
+    localHash = await AsyncStorage.getItem('@alaga_pwd_hash_' + cleanEmail);
+  } catch (e) {}
+
+  // 1. PRE-AUTHENTICATION GATEWAY:
+  // Query Firestore for this user by email FIRST to check their authoritative password hash.
+  // This strictly stops old/obsolete passwords from logging in or triggering Firebase Auth state changes.
+  let matchingDocs = [];
+  if (db) {
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', cleanEmail));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        matchingDocs = snap.docs;
+      }
+    } catch (fetchErr) {
+      console.warn('[authService] Pre-auth user query notice:', fetchErr);
+    }
+  }
+
+  const firestoreDoc = matchingDocs[0] || null;
+  const firestoreData = firestoreDoc ? firestoreDoc.data() : null;
+  const authoritativeHash = firestoreData?.passwordHash || localHash;
+
+  // STRICT REJECTION: If the user has an authoritative password hash registered
+  // and the entered password's hash does NOT match, REJECT IMMEDIATELY.
+  // Never call signInWithEmailAndPassword with an outdated or old password!
+  if (authoritativeHash && authoritativeHash !== hashedInput) {
+    await fbSignOut(auth).catch(() => {});
+    return {
+      success: false,
+      error: 'Incorrect password. Your password was recently changed, please use your newest password.',
+    };
+  }
+
+  // 2. If authoritativeHash is present and matches the entered password:
+  if (authoritativeHash && authoritativeHash === hashedInput) {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
+      const uid = userCredential.user.uid;
+      const avatar = extractUserAvatar(firestoreData, userCredential?.user);
+      const user = { id: uid, ...(firestoreData || {}), avatar };
+      cacheUserProfile(user);
+      return { success: true, user };
+    } catch (fbErr) {
+      // If Firebase Auth backend credentials have not synced (e.g., password reset via OTP when logged out),
+      // the Firestore passwordHash verification is authoritative and successful!
+      const uid = firestoreDoc?.id || 'user_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
+      const avatar = extractUserAvatar(firestoreData);
+      const user = { id: uid, ...(firestoreData || {}), avatar };
+      cacheUserProfile(user);
+      return { success: true, user };
+    }
+  }
+
+  // 3. For users without a passwordHash yet in Firestore (initial legacy login):
+  try {
     const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
     const uid = userCredential.user.uid;
 
-    // Fetch user profile from Firestore users/{uid}
     const userDocRef = doc(db, 'users', uid);
     const userDocSnap = await getDoc(userDocRef);
 
     if (userDocSnap.exists()) {
       const data = userDocSnap.data();
+
+      // Bind the password hash now so all future logins and resets strictly enforce it
+      await updateDoc(userDocRef, {
+        passwordHash: hashedInput,
+        passwordUpdatedAt: new Date().toISOString(),
+      }).catch(() => {});
+      await AsyncStorage.setItem('@alaga_pwd_hash_' + cleanEmail, hashedInput).catch(() => {});
+
       const avatar = extractUserAvatar(data, userCredential?.user);
       const user = { id: uid, ...data, avatar };
       cacheUserProfile(user);
@@ -251,6 +326,8 @@ export async function loginWithFirebase(email, password) {
         name: userCredential?.user?.displayName || derivedName,
         role: 'community',
         avatar,
+        passwordHash: hashedInput,
+        passwordUpdatedAt: new Date().toISOString(),
         location: '',
         organization: '',
         joinedAt: new Date().toISOString().split('T')[0],
@@ -258,52 +335,11 @@ export async function loginWithFirebase(email, password) {
         reportCount: 0,
       };
       await setDoc(userDocRef, newUserData);
+      await AsyncStorage.setItem('@alaga_pwd_hash_' + cleanEmail, hashedInput).catch(() => {});
       cacheUserProfile(newUserData);
       return { success: true, user: newUserData };
     }
   } catch (signErr) {
-    // If Firebase Auth rejected the password, check if user reset their password via Brevo OTP confirmation!
-    if (
-      signErr.code === 'auth/wrong-password' ||
-      signErr.code === 'auth/invalid-credential' ||
-      signErr.code === 'auth/invalid-login-credentials'
-    ) {
-      try {
-        const cleanEmail = (email || '').trim().toLowerCase();
-        const hashedInput = await hashPassword(password);
-
-        let localHash = null;
-        try {
-          localHash = await AsyncStorage.getItem('@alaga_pwd_hash_' + cleanEmail);
-        } catch (e) {}
-
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('email', '==', cleanEmail));
-        const snap = await getDocs(q);
-
-        if (!snap.empty) {
-          const userDoc = snap.docs[0];
-          const data = userDoc.data();
-          if ((data?.passwordHash && data.passwordHash === hashedInput) || (localHash && localHash === hashedInput)) {
-            const avatar = extractUserAvatar(data);
-            const user = { id: userDoc.id, ...data, avatar };
-            cacheUserProfile(user);
-            return { success: true, user };
-          }
-        } else if (localHash && localHash === hashedInput) {
-          const user = {
-            id: 'user_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_'),
-            email: cleanEmail,
-            name: cleanEmail.split('@')[0],
-          };
-          cacheUserProfile(user);
-          return { success: true, user };
-        }
-      } catch (checkErr) {
-        console.warn('[authService] Password hash verification fallback notice:', checkErr);
-      }
-    }
-
     let msg = 'Incorrect email or password.';
     if (signErr.code === 'auth/user-not-found' || signErr.code === 'auth/invalid-credential') {
       msg = 'No account found with this email or password. Please register first.';
@@ -328,6 +364,7 @@ export async function registerWithFirebase({ email, password, name, role, locati
     const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
     const uid = userCredential.user.uid;
     const defaultAvatar = getDefaultUserAvatar(name, uid);
+    const hashedPassword = await hashPassword(password);
 
     const newUserData = {
       id: uid,
@@ -337,6 +374,8 @@ export async function registerWithFirebase({ email, password, name, role, locati
       location: location?.trim() || '',
       organization: organization?.trim() || '',
       avatar: null,
+      passwordHash: hashedPassword,
+      passwordUpdatedAt: new Date().toISOString(),
       joinedAt: new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString(),
       ...(role === 'advocate' ? { rescueCount: 0, animalCount: 0 } : { reportCount: 0 }),
@@ -344,6 +383,7 @@ export async function registerWithFirebase({ email, password, name, role, locati
 
     // Save profile to Firestore users/{uid}
     await setDoc(doc(db, 'users', uid), newUserData);
+    await AsyncStorage.setItem('@alaga_pwd_hash_' + email.trim().toLowerCase(), hashedPassword).catch(() => {});
     cacheUserProfile(newUserData);
 
     return { success: true, user: newUserData };

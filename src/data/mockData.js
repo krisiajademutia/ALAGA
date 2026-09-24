@@ -12,6 +12,7 @@ export const URGENCY_LEVELS = [
   { label: 'High',   color: '#D93025', bg: '#FDE8E7' },
   { label: 'Medium', color: '#F5A623', bg: '#FEF3E2' },
   { label: 'Low',    color: '#27AE60', bg: '#E8F5EE' },
+  { label: 'Closed', color: '#6B7280', bg: '#F3F4F6' },
 ];
 
 export const ANIMAL_SPECIES    = ['Dog', 'Cat', 'Other'];

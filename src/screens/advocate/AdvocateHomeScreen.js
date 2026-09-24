@@ -19,6 +19,7 @@ import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import Avatar from '../../components/Avatar';
 import EmptyState from '../../components/EmptyState';
 import { getDistanceInKm } from '../../services/notificationService';
+import { sortRescueReports } from '../../services/rescueService';
 
 const CATEGORIES = [
   { id: 'all', label: 'All Alerts', icon: 'paw' },
@@ -98,32 +99,37 @@ export default function AdvocateHomeScreen({ navigation }) {
   const uLat = userLocation?.latitude || currentUser?.latitude || currentUser?.locationCoordinates?.latitude;
   const uLng = userLocation?.longitude || currentUser?.longitude || currentUser?.locationCoordinates?.longitude;
 
-  const filteredReports = rescueReports.filter((r) => {
-    if (activeCategory === 'cats' && r.animalType !== 'Cat') return false;
-    if (activeCategory === 'dogs' && r.animalType !== 'Dog') return false;
-    if (activeCategory === 'birds' && (r.animalType === 'Cat' || r.animalType === 'Dog')) return false;
+  const filteredReports = React.useMemo(() => {
+    const list = rescueReports.filter((r) => {
+      if (activeCategory === 'cats' && r.animalType !== 'Cat') return false;
+      if (activeCategory === 'dogs' && r.animalType !== 'Dog') return false;
+      if (activeCategory === 'birds' && (r.animalType === 'Cat' || r.animalType === 'Dog')) return false;
 
-    if (activeSegment === 'Urgent / Foster' && r.urgency !== 'High' && r.urgency !== 'Critical') return false;
+      const isRescued = r.status === 'Rescued' || r.urgency === 'Closed' || Boolean(r.rescuedAt);
+      if (activeSegment === 'Urgent / Foster' && (isRescued || (r.urgency !== 'High' && r.urgency !== 'Critical'))) return false;
 
-    if (activeSegment === 'Nearby (<3km)') {
-      if (!uLat || !uLng) return false;
-      const rLat = r.location?.latitude;
-      const rLng = r.location?.longitude;
-      if (!rLat || !rLng) return false;
-      const d = getDistanceInKm(uLat, uLng, rLat, rLng);
-      if (d === null || d > 3) return false;
-    }
+      if (activeSegment === 'Nearby (<3km)') {
+        if (!uLat || !uLng) return false;
+        const rLat = r.location?.latitude;
+        const rLng = r.location?.longitude;
+        if (!rLat || !rLng) return false;
+        const d = getDistanceInKm(uLat, uLng, rLat, rLng);
+        if (d === null || d > 3) return false;
+      }
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        r.title?.toLowerCase().includes(q) ||
-        r.animalType.toLowerCase().includes(q) ||
-        r.location?.address?.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          r.title?.toLowerCase().includes(q) ||
+          r.animalType?.toLowerCase().includes(q) ||
+          r.location?.address?.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+
+    return sortRescueReports(list);
+  }, [rescueReports, activeCategory, activeSegment, searchQuery, uLat, uLng]);
 
   return (
     <View style={styles.root}>
@@ -331,7 +337,9 @@ export default function AdvocateHomeScreen({ navigation }) {
           <View style={styles.cardsFeed}>
             {filteredReports.map((r) => {
               const isFav = Boolean(favorites[r.id]);
-              const isUrgent = r.urgency === 'High' || r.urgency === 'Critical';
+              const isRescued = r.status === 'Rescued' || r.urgency === 'Closed' || Boolean(r.rescuedAt);
+              const isUrgent = !isRescued && (r.urgency === 'High' || r.urgency === 'Critical');
+              const urgencyLabel = isRescued ? 'Closed' : (r.urgency || (isUrgent ? 'High' : 'Standard'));
               const petName = r.title || `${r.animalType} · ${r.condition || 'Rescue'}`;
               const tags = r.tags || [r.animalType || 'Rescue', r.condition || 'Alert'];
 
@@ -367,15 +375,33 @@ export default function AdvocateHomeScreen({ navigation }) {
                     )}
 
                     {/* Top-Left Floating Urgency Pill */}
-                    <View style={[styles.urgencyPill, isUrgent ? styles.urgencyHigh : styles.urgencyStandard]}>
+                    <View
+                      style={[
+                        styles.urgencyPill,
+                        isRescued
+                          ? styles.urgencyClosed
+                          : isUrgent
+                          ? styles.urgencyHigh
+                          : styles.urgencyStandard,
+                      ]}
+                    >
                       <Ionicons
-                        name={isUrgent ? 'alert-circle' : 'shield-checkmark'}
+                        name={isRescued ? 'checkmark-circle' : isUrgent ? 'alert-circle' : 'shield-checkmark'}
                         size={12}
-                        color={isUrgent ? '#B91C1C' : '#15803D'}
+                        color={isRescued ? '#4B5563' : isUrgent ? '#B91C1C' : '#15803D'}
                         style={{ marginRight: 3 }}
                       />
-                      <Text style={[styles.urgencyText, isUrgent ? styles.urgencyTextHigh : styles.urgencyTextStandard]}>
-                        {r.urgency || (isUrgent ? 'Urgent' : 'Standard')}
+                      <Text
+                        style={[
+                          styles.urgencyText,
+                          isRescued
+                            ? styles.urgencyTextClosed
+                            : isUrgent
+                            ? styles.urgencyTextHigh
+                            : styles.urgencyTextStandard,
+                        ]}
+                      >
+                        {urgencyLabel}
                       </Text>
                     </View>
 
@@ -820,6 +846,11 @@ const styles = StyleSheet.create({
   urgencyStandard: {
     backgroundColor: '#F0FDF4',
   },
+  urgencyClosed: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
   urgencyText: {
     fontSize: 11,
     fontWeight: '800',
@@ -830,6 +861,9 @@ const styles = StyleSheet.create({
   },
   urgencyTextStandard: {
     color: '#15803D',
+  },
+  urgencyTextClosed: {
+    color: '#4B5563',
   },
   topRightOverlay: {
     position: 'absolute',

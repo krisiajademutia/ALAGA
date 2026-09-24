@@ -27,6 +27,7 @@ import {
 } from '../services/authService';
 import {
   subscribeToRescueReports,
+  sortRescueReports,
   createRescueReportFirebase,
   claimRescueReportFirebase,
   markReportRescuedFirebase,
@@ -957,7 +958,7 @@ export function AppProvider({ children }) {
       const unsubRescues = subscribeToRescueReports((liveReports) => {
         const reportsList = Array.isArray(liveReports) ? liveReports : [];
         setRescueReports((prev) => {
-          return reportsList.map((remote) => {
+          const merged = reportsList.map((remote) => {
             const local = (prev || []).find((r) => r.id === remote.id);
             const remoteComments = Array.isArray(remote.comments) ? remote.comments : [];
             const localComments = Array.isArray(local?.comments) ? local.comments : [];
@@ -967,11 +968,16 @@ export function AppProvider({ children }) {
             localComments.forEach((c) => { if (c.id) map.set(c.id, c); });
             remoteComments.forEach((c) => { if (c.id) map.set(c.id, c); });
 
+            const isRescued = remote.status === 'Rescued' || remote.urgency === 'Closed' || Boolean(remote.rescuedAt);
+
             return {
               ...remote,
+              status: isRescued ? 'Rescued' : (remote.status || 'Open'),
+              urgency: isRescued ? 'Closed' : (remote.urgency || 'High'),
               comments: Array.from(map.values()),
             };
           });
+          return sortRescueReports(merged);
         });
 
         const activeUser = currentUserRef.current;
@@ -1430,8 +1436,12 @@ export function AppProvider({ children }) {
 
   const markRescued = (reportId) => {
     setRescueReports((prev) =>
-      prev.map((r) =>
-        r.id === reportId ? { ...r, status: 'Rescued' } : r
+      sortRescueReports(
+        prev.map((r) =>
+          r.id === reportId
+            ? { ...r, status: 'Rescued', urgency: 'Closed', rescuedAt: new Date().toISOString() }
+            : r
+        )
       )
     );
     markReportRescuedFirebase(reportId);

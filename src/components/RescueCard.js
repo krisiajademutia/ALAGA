@@ -10,10 +10,13 @@ const URGENCY_COLOR = {
   High:   COLORS.danger,
   Medium: COLORS.warning,
   Low:    COLORS.success,
+  Closed: '#6B7280',
 };
 
 export default function RescueCard({ report, onPress, style }) {
-  const uColor  = URGENCY_COLOR[report.urgency] || COLORS.success;
+  const isRescued = report.status === 'Rescued' || report.urgency === 'Closed' || Boolean(report.rescuedAt);
+  const effectiveUrgency = isRescued ? 'Closed' : (report.urgency || 'High');
+  const uColor  = URGENCY_COLOR[effectiveUrgency] || COLORS.success;
   const timeAgo = fmtAgo(report.createdAt);
 
   return (
@@ -32,7 +35,7 @@ export default function RescueCard({ report, onPress, style }) {
         {/* Urgency — bottom-left over photo */}
         <View style={[styles.urgencyChip, { backgroundColor: uColor }]}>
           <View style={styles.urgencyDot} />
-          <Text style={styles.urgencyLabel}>{report.urgency}</Text>
+          <Text style={styles.urgencyLabel}>{effectiveUrgency}</Text>
         </View>
 
         {/* Status — top-right over photo */}

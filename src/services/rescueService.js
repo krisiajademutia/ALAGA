@@ -17,6 +17,49 @@ import { isMockFirebase } from '../config/firebaseConfig';
 const RESCUES_COLLECTION = 'rescues';
 
 /**
+/**
+ * Prioritize rescue reports:
+ * 1. Status: Open (unhandled) first, then Responded (ongoing), then Rescued/Closed at the bottom
+ * 2. Urgency: Critical/High > Medium > Low > Closed
+ * 3. Recency: Newest createdAt first
+ */
+export function sortRescueReports(reports) {
+  if (!Array.isArray(reports)) return [];
+  return [...reports].sort((a, b) => {
+    // 1. Status Priority: Open (1) > Responded (2) > Rescued/Closed (3)
+    const getStatusRank = (r) => {
+      const isRescued = r.status === 'Rescued' || r.urgency === 'Closed' || Boolean(r.rescuedAt);
+      if (isRescued) return 3;
+      if (r.status === 'Responded') return 2;
+      return 1; // Open / unhandled
+    };
+
+    const statusDiff = getStatusRank(a) - getStatusRank(b);
+    if (statusDiff !== 0) return statusDiff;
+
+    // 2. Urgency Priority: Critical/High (1) > Medium (2) > Low (3) > Closed (4)
+    const getUrgencyRank = (r) => {
+      const isRescued = r.status === 'Rescued' || r.urgency === 'Closed' || Boolean(r.rescuedAt);
+      if (isRescued) return 4;
+      const u = (r.urgency || '').toLowerCase();
+      if (u === 'critical' || u === 'high') return 1;
+      if (u === 'medium') return 2;
+      if (u === 'low') return 3;
+      if (u === 'closed') return 4;
+      return 3;
+    };
+
+    const urgencyDiff = getUrgencyRank(a) - getUrgencyRank(b);
+    if (urgencyDiff !== 0) return urgencyDiff;
+
+    // 3. Recency: Newest first
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return timeB - timeA;
+  });
+}
+
+/**
  * Real-time listener for rescue alerts
  */
 export function subscribeToRescueReports(onUpdate, onError) {
@@ -34,13 +77,16 @@ export function subscribeToRescueReports(onUpdate, onError) {
         const reports = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data() || {};
+          const isRescued = data.status === 'Rescued' || Boolean(data.rescuedAt) || data.urgency === 'Closed';
           reports.push({
             id: docSnap.id,
             ...data,
+            urgency: isRescued ? 'Closed' : (data.urgency || 'High'),
+            status: isRescued ? 'Rescued' : (data.status || 'Open'),
             comments: Array.isArray(data.comments) ? data.comments : [],
           });
         });
-        onUpdate(reports);
+        onUpdate(sortRescueReports(reports));
       },
       (error) => {
         console.warn('[rescueService] Snapshot error:', error);
@@ -117,6 +163,7 @@ export async function markReportRescuedFirebase(reportId) {
     const reportRef = doc(db, RESCUES_COLLECTION, reportId);
     await updateDoc(reportRef, {
       status: 'Rescued',
+      urgency: 'Closed',
       rescuedAt: new Date().toISOString(),
     });
     return { success: true };

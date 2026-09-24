@@ -109,10 +109,13 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
     ? report.photos
     : (report?.photo ? [report.photo] : []);
 
+  const isRescued = report?.status === 'Rescued' || report?.urgency === 'Closed' || Boolean(report?.rescuedAt);
+  const effectiveUrgency = isRescued ? 'Closed' : (report?.urgency || 'High');
+
   const urgencyObj =
     URGENCY_LEVELS.find(
-      (u) => u.label.toLowerCase() === (report?.urgency || '').toLowerCase()
-    ) || { label: 'High', color: '#D94F4F', bg: '#FDEEEB' };
+      (u) => u.label.toLowerCase() === effectiveUrgency.toLowerCase()
+    ) || (isRescued ? { label: 'Closed', color: '#4B5563', bg: '#F3F4F6' } : { label: 'High', color: '#D94F4F', bg: '#FDEEEB' });
 
   const distanceKm = React.useMemo(() => {
     const rLat = report?.location?.latitude;
@@ -363,23 +366,21 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
 
           {/* Status, Urgency & Distance Pills */}
           <View style={styles.metaBadgeRow}>
-            <StatusPill status={report.status || 'Open'} />
-            {Boolean(report.urgency) && (
-              <TouchableOpacity
-                style={[styles.urgencyBadge, { backgroundColor: urgencyObj.bg }]}
-                onPress={() => isAdvocate && setUrgencyModalVisible(true)}
-                disabled={!isAdvocate}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.urgencyDot, { backgroundColor: urgencyObj.color }]} />
-                <Text style={[styles.urgencyText, { color: urgencyObj.color }]}>
-                  {report.urgency} Urgency
-                </Text>
-                {isAdvocate && (
-                  <Ionicons name="pencil" size={10} color={urgencyObj.color} style={{ marginLeft: 4 }} />
-                )}
-              </TouchableOpacity>
-            )}
+            <StatusPill status={isRescued ? 'Rescued' : (report.status || 'Open')} />
+            <TouchableOpacity
+              style={[styles.urgencyBadge, { backgroundColor: urgencyObj.bg }]}
+              onPress={() => isAdvocate && !isRescued && setUrgencyModalVisible(true)}
+              disabled={!isAdvocate || isRescued}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.urgencyDot, { backgroundColor: urgencyObj.color }]} />
+              <Text style={[styles.urgencyText, { color: urgencyObj.color }]}>
+                {effectiveUrgency} Urgency
+              </Text>
+              {isAdvocate && !isRescued && (
+                <Ionicons name="pencil" size={10} color={urgencyObj.color} style={{ marginLeft: 4 }} />
+              )}
+            </TouchableOpacity>
             {distanceKm !== null && (
               <View style={styles.distanceBadge}>
                 <Ionicons name="navigate-outline" size={11} color="#2E7A99" style={{ marginRight: 3 }} />

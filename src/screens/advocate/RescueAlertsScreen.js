@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import EmptyState from '../../components/EmptyState';
+import { sortRescueReports } from '../../services/rescueService';
 
 const FILTERS = ['Open', 'Responded', 'Rescued', 'All'];
 
@@ -33,18 +34,21 @@ export default function RescueAlertsScreen({ navigation }) {
     }, [markAlertsAsViewed])
   );
 
-  const filtered = rescueReports.filter((r) => {
-    if (filter !== 'All' && r.status !== filter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const title = (r.title || `${r.condition || 'Injured'} ${r.animalType.toLowerCase()}`).toLowerCase();
-      const reporter = (r.reporterName || '').toLowerCase();
-      const loc = (r.location?.address || '').toLowerCase();
-      const desc = (r.description || '').toLowerCase();
-      return title.includes(q) || reporter.includes(q) || loc.includes(q) || desc.includes(q);
-    }
-    return true;
-  });
+  const filtered = React.useMemo(() => {
+    const list = rescueReports.filter((r) => {
+      if (filter !== 'All' && r.status !== filter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const title = (r.title || `${r.condition || 'Injured'} ${r.animalType.toLowerCase()}`).toLowerCase();
+        const reporter = (r.reporterName || '').toLowerCase();
+        const loc = (r.location?.address || '').toLowerCase();
+        const desc = (r.description || '').toLowerCase();
+        return title.includes(q) || reporter.includes(q) || loc.includes(q) || desc.includes(q);
+      }
+      return true;
+    });
+    return sortRescueReports(list);
+  }, [rescueReports, filter, searchQuery]);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Recently';
@@ -143,7 +147,9 @@ export default function RescueAlertsScreen({ navigation }) {
           />
         }
         renderItem={({ item }) => {
-          const isHigh = item.urgency === 'High' || item.urgency === 'Critical';
+          const isRescued = item.status === 'Rescued' || item.urgency === 'Closed' || Boolean(item.rescuedAt);
+          const isHigh = !isRescued && (item.urgency === 'High' || item.urgency === 'Critical');
+          const badgeText = isRescued ? 'Closed' : isHigh ? 'High' : 'Standard';
           const cardTitle =
             item.title || `${item.condition || 'Injured'} ${item.animalType.toLowerCase()}`;
           const viaText = item.reporterName
@@ -172,16 +178,24 @@ export default function RescueAlertsScreen({ navigation }) {
                 <View
                   style={[
                     styles.urgencyBadge,
-                    isHigh ? styles.badgeHigh : styles.badgeStandard,
+                    isRescued
+                      ? styles.badgeClosed
+                      : isHigh
+                      ? styles.badgeHigh
+                      : styles.badgeStandard,
                   ]}
                 >
                   <Text
                     style={[
                       styles.badgeText,
-                      isHigh ? styles.badgeTextHigh : styles.badgeTextStandard,
+                      isRescued
+                        ? styles.badgeTextClosed
+                        : isHigh
+                        ? styles.badgeTextHigh
+                        : styles.badgeTextStandard,
                     ]}
                   >
-                    {isHigh ? 'High' : 'Standard'}
+                    {badgeText}
                   </Text>
                 </View>
               </View>
@@ -335,6 +349,11 @@ const styles = StyleSheet.create({
   badgeStandard: {
     backgroundColor: '#E2F4EE',
   },
+  badgeClosed: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
   badgeText: {
     fontSize: 11,
     fontWeight: '800',
@@ -344,6 +363,9 @@ const styles = StyleSheet.create({
   },
   badgeTextStandard: {
     color: '#2E7D32',
+  },
+  badgeTextClosed: {
+    color: '#4B5563',
   },
   cardBody: {
     padding: 16,
