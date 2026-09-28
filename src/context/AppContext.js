@@ -21,7 +21,6 @@ import {
   clearAllNotificationsFirebase,
   subscribeAuthState,
   getDefaultUserAvatar,
-  resetUserPasswordWithOtp,
   sendPasswordResetEmailFirebase,
   updateUserPasswordLoggedIn,
   checkUserExistsByEmail,
@@ -1427,22 +1426,6 @@ export function AppProvider({ children }) {
     return await sendPasswordResetEmailFirebase(email);
   };
 
-  const resetPasswordWithOtp = async (arg1, arg2, arg3) => {
-    let targetEmail;
-    let targetPassword;
-    if (typeof arg3 !== 'undefined') {
-      targetEmail = arg1;
-      targetPassword = arg3;
-    } else if (typeof arg1 === 'object' && arg1 !== null) {
-      targetEmail = arg1.email;
-      targetPassword = arg1.newPassword;
-    } else {
-      targetEmail = arg1;
-      targetPassword = arg2;
-    }
-    return await resetUserPasswordWithOtp({ email: targetEmail, newPassword: targetPassword });
-  };
-
   const updateUserPassword = async ({ newPassword, currentPassword }) => {
     return await updateUserPasswordLoggedIn({
       newPassword,
@@ -2645,7 +2628,6 @@ export function AppProvider({ children }) {
         loginWithGoogle,
         logout,
         updateUser,
-        resetPasswordWithOtp,
         sendPasswordReset,
         updateUserPassword,
         checkUserExists,

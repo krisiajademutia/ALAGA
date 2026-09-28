@@ -10,7 +10,6 @@ const OTP_VALIDITY_MS = 15 * 60 * 1000; // 15 minutes validity
 // In-memory fast cache (unified so registration and reset stores never miss each other)
 const otpMemoryStore = new Map();
 export const registrationOtpStore = otpMemoryStore;
-export const passwordResetOtpStore = otpMemoryStore;
 
 /**
  * Generate a 6-digit numeric OTP code
@@ -277,50 +276,6 @@ export async function requestRegistrationOtp(email, name) {
   };
 }
 
-/**
- * Request an OTP to be sent for password reset
- */
-export async function requestPasswordResetOtp(email, name) {
-  const cleanEmail = (email || '').trim().toLowerCase();
-  if (!cleanEmail || !cleanEmail.includes('@')) {
-    return { success: false, error: 'Please enter a valid email address.' };
-  }
-
-  const otp = generateOtp();
-  const expiresAt = Date.now() + OTP_VALIDITY_MS;
-
-  const record = {
-    otp,
-    expiresAt,
-    attempts: 0,
-    purpose: 'password_reset',
-  };
-
-  await saveOtpRecord(cleanEmail, record);
-
-  const sendResult = await sendOtpViaBrevo({
-    email: cleanEmail,
-    name,
-    otpCode: otp,
-    purpose: 'password_reset',
-  });
-
-  if (sendResult.success) {
-    return { success: true, sent: true };
-  }
-
-  console.warn(`[otpService] Brevo send failed (${sendResult.error}). Fallback OTP for ${cleanEmail}: ${otp}`);
-  return {
-    success: true,
-    sent: false,
-    needsConfig: true,
-    fallbackOtp: otp,
-    error: sendResult.error,
-    message: sendResult.needsConfig
-      ? 'Brevo is not configured yet. Paste your key in src/config/brevoConfig.js.'
-      : `Brevo Notice: ${sendResult.error}`,
-  };
-}
 
 /**
  * Internal robust OTP verification across Memory, AsyncStorage, and Firestore
@@ -381,9 +336,3 @@ export async function verifyRegistrationOtp(email, enteredCode) {
   return await verifyOtpInternal(email, enteredCode);
 }
 
-/**
- * Verify password reset OTP
- */
-export async function verifyPasswordResetOtp(email, enteredCode) {
-  return await verifyOtpInternal(email, enteredCode);
-}

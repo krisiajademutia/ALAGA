@@ -26,8 +26,6 @@ import {
   where,
   deleteField,
 } from 'firebase/firestore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Crypto from 'expo-crypto';
 import { auth, db } from './firebase';
 import { isMockFirebase } from '../config/firebaseConfig';
 
@@ -66,12 +64,6 @@ export function extractUserAvatar(data, firebaseAuthUser = null) {
 const userAvatarCache = new Map();
 const userProfileCache = new Map();
 
-async function hashPassword(password) {
-  return Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    `ALAGA_SALT_2026_${password}`
-  );
-}
 
 /**
  * Check if a registered user exists by email address in Firestore
@@ -100,35 +92,6 @@ export async function checkUserExistsByEmail(email) {
   }
 }
 
-/**
- * Reset a user's password after verifying their Brevo OTP confirmation
- */
-export async function resetUserPasswordWithOtp({ email, newPassword }) {
-  const cleanEmail = (email || '').trim().toLowerCase();
-  if (!cleanEmail) {
-    return { success: false, error: 'Email is required.' };
-  }
-  if (!newPassword || newPassword.length < 6) {
-    return { success: false, error: 'Password must be at least 6 characters.' };
-  }
-  const passwordHash = await hashPassword(newPassword);
-  await AsyncStorage.setItem(`@alaga_pwd_hash_${cleanEmail}`, passwordHash).catch(() => {});
-  if (isMockFirebase() || !db) return { success: true };
-
-  try {
-    const users = await getDocs(query(collection(db, 'users'), where('email', '==', cleanEmail)));
-    if (users.empty) return { success: false, error: 'No account found for that email.' };
-    await Promise.all(users.docs.map((userDoc) => updateDoc(userDoc.ref, {
-      passwordHash,
-      passwordUpdatedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    })));
-    await fbSignOut(auth).catch(() => {});
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: err.message || 'Could not update the password.' };
-  }
-}
 
 /**
  * Update password for an authenticated, logged-in user
