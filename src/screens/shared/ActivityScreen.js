@@ -17,6 +17,7 @@ import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import StatusPill from '../../components/StatusPill';
 import EmptyState from '../../components/EmptyState';
+import Avatar from '../../components/Avatar';
 
 const COMMUNITY_TABS = [
   { key: 'reports', label: 'My Reports' },
@@ -428,14 +429,20 @@ function ReportCard({ item, isAdvocate, navigation }) {
           </Text>
         ) : null}
         {item.status === 'Responded' && Boolean(item.responderName) && (
-          <Text style={styles.responderActivityTag} numberOfLines={1}>
-            <Ionicons name="shield-checkmark" size={11} color="#0284C7" /> Ongoing Responder: {item.responderName}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
+            <Avatar name={item.responderName} uri={item.responderAvatar} userId={item.responderId} size={16} style={{ marginRight: 5 }} />
+            <Text style={styles.responderActivityTag} numberOfLines={1}>
+              Ongoing Responder: {item.responderName}
+            </Text>
+          </View>
         )}
         {item.status === 'Rescued' && Boolean(item.responderName) && (
-          <Text style={[styles.responderActivityTag, { color: '#2E7D32' }]} numberOfLines={1}>
-            <Ionicons name="checkmark-circle" size={11} color="#2E7D32" /> Rescued by: {item.responderName}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
+            <Avatar name={item.responderName} uri={item.responderAvatar} userId={item.responderId} size={16} style={{ marginRight: 5 }} />
+            <Text style={[styles.responderActivityTag, { color: '#2E7D32' }]} numberOfLines={1}>
+              Rescued by: {item.responderName}
+            </Text>
+          </View>
         )}
         <View style={styles.cardFooter}>
           <Text style={styles.urgencyText}>{item.urgency || 'Normal'} Priority</Text>
@@ -476,9 +483,18 @@ function RequestCard({ item, isAdvocate, onPress, animals }) {
           <StatusPill status={item.status} />
         </View>
         <Text style={styles.typeTagText}>{item.type || 'Request'}</Text>
-        <Text style={styles.cardMeta} numberOfLines={1}>
-          {isAdvocate ? `From: ${item.requesterName || 'Community Member'}` : `To: ${item.advocateName || 'Advocate'}`}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+          <Avatar
+            name={isAdvocate ? (item.requesterName || 'Community Member') : (item.advocateName || 'Advocate')}
+            uri={isAdvocate ? item.requesterAvatar : item.advocateAvatar}
+            userId={isAdvocate ? item.requesterId : item.advocateId}
+            size={18}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={[styles.cardMeta, { marginTop: 0, flex: 1 }]} numberOfLines={1}>
+            {isAdvocate ? `From: ${item.requesterName || 'Community Member'}` : `To: ${item.advocateName || 'Advocate'}`}
+          </Text>
+        </View>
         {item.message ? (
           <Text style={styles.cardQuote} numberOfLines={1}>"{item.message}"</Text>
         ) : null}

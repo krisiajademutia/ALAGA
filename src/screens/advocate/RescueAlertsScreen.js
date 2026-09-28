@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import EmptyState from '../../components/EmptyState';
+import Avatar from '../../components/Avatar';
 import { sortRescueReports } from '../../services/rescueService';
 
 const FILTERS = ['Open', 'Responded', 'Rescued', 'All'];
@@ -203,7 +204,10 @@ export default function RescueAlertsScreen({ navigation }) {
               {/* Card Body */}
               <View style={styles.cardBody}>
                 <Text style={styles.cardTitle}>{cardTitle}</Text>
-                <Text style={styles.cardVia}>{viaText}</Text>
+                <View style={styles.cardViaRow}>
+                  <Avatar name={item.reporterName} uri={item.reporterAvatar} userId={item.reporterId} size={18} style={{ marginRight: 6 }} />
+                  <Text style={styles.cardVia}>{viaText}</Text>
+                </View>
                 <Text style={styles.cardDesc} numberOfLines={2}>
                   "{item.description}"
                 </Text>
@@ -374,9 +378,13 @@ const styles = StyleSheet.create({
     ...FONTS.titleMd,
     fontSize: 17,
   },
+  cardViaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
   cardVia: {
     ...FONTS.meta,
-    marginTop: 2,
   },
   cardDesc: {
     ...FONTS.bodyRegular,

@@ -1,23 +1,75 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { COLORS } from '../constants/theme';
 import { getCachedUserAvatar, resolveUserAvatar, cacheUserProfile, getDefaultUserAvatar } from '../services/authService';
+import { AppContext } from '../context/AppContext';
 
 /**
  * Avatar component.
  *
  * Behavior:
- *   1. If the user has a custom chosen/uploaded photo (via propUri, cache, or Firestore), display it.
- *   2. If no photo has been chosen/uploaded yet, cleanly render the user's initial letters (no random portraits).
+ *   1. If the user has a custom chosen/uploaded photo (via propUri, AppContext users, cache, or Firestore), display it.
+ *   2. Reactively updates whenever any profile/avatar in AppContext changes.
+ *   3. If no photo has been chosen/uploaded yet, cleanly render the user's initial letters (no random portraits).
  */
 export default function Avatar({ name, uri, avatar, photo, url, userId, size = 44, style }) {
   // Prop-supplied URI — custom uploaded photo
   const rawProp = uri || avatar || photo || url || null;
   const cleanPropUri = typeof rawProp === 'string' && rawProp.trim().length > 0 ? rawProp.trim() : null;
 
-  // Initial display: prefer live user avatar if userId is available, else prop URI
-  const cached = userId ? getCachedUserAvatar(userId) : null;
-  const [resolvedUri, setResolvedUri] = useState(cached || cleanPropUri || null);
+  // Reactively access AppContext if available
+  const appContext = useContext(AppContext);
+  const currentUser = appContext?.currentUser || null;
+  const users = appContext?.users || [];
+
+  // Synchronously compute the best candidate avatar URL
+  const resolvedCandidate = useMemo(() => {
+    // 1. Direct prop URI if valid
+    if (cleanPropUri) return cleanPropUri;
+
+    // 2. Current User match by ID or by name
+    if (userId && currentUser && (userId === currentUser.id || userId === currentUser.uid)) {
+      const uAv = currentUser.avatar || currentUser.photoURL || currentUser.avatarUrl;
+      if (typeof uAv === 'string' && uAv.trim().length > 0) return uAv.trim();
+    }
+    if (!userId && name && currentUser?.name && name.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) {
+      const uAv = currentUser.avatar || currentUser.photoURL || currentUser.avatarUrl;
+      if (typeof uAv === 'string' && uAv.trim().length > 0) return uAv.trim();
+    }
+
+    // 3. Match from live Firestore users list in AppContext
+    if (userId && Array.isArray(users) && users.length > 0) {
+      const cleanTargetId = String(userId).trim();
+      const match = users.find((u) => u && (String(u.id).trim() === cleanTargetId || String(u.uid).trim() === cleanTargetId));
+      if (match) {
+        const uAv = match.avatar || match.photoURL || match.avatarUrl;
+        if (typeof uAv === 'string' && uAv.trim().length > 0) return uAv.trim();
+      }
+    }
+
+    // 4. Match from live Firestore users list by name (if not generic placeholder name)
+    if (name && Array.isArray(users) && users.length > 0) {
+      const trimmed = name.trim().toLowerCase();
+      const genericNames = ['user', 'community member', 'advocate', 'animal advocate', 'anonymous', 'rescuer', 'applicant', 'member'];
+      if (!genericNames.includes(trimmed)) {
+        const matchByName = users.find((u) => u && u.name && u.name.trim().toLowerCase() === trimmed);
+        if (matchByName) {
+          const uAv = matchByName.avatar || matchByName.photoURL || matchByName.avatarUrl;
+          if (typeof uAv === 'string' && uAv.trim().length > 0) return uAv.trim();
+        }
+      }
+    }
+
+    // 5. In-memory profile & avatar cache
+    if (userId) {
+      const cached = getCachedUserAvatar(userId);
+      if (cached) return cached;
+    }
+
+    return null;
+  }, [cleanPropUri, userId, name, currentUser, users]);
+
+  const [resolvedUri, setResolvedUri] = useState(resolvedCandidate);
   const [hasError, setHasError] = useState(false);
   const isMounted = useRef(true);
 
@@ -26,24 +78,19 @@ export default function Avatar({ name, uri, avatar, photo, url, userId, size = 4
     return () => { isMounted.current = false; };
   }, []);
 
-  // Re-run when either userId, cleanPropUri, or name changes
+  // Update whenever candidate changes or props change
   useEffect(() => {
     setHasError(false);
+    if (resolvedCandidate) {
+      setResolvedUri(resolvedCandidate);
+      if (userId) {
+        cacheUserProfile({ id: userId, name, avatar: resolvedCandidate });
+      }
+      return;
+    }
 
-    // 1. If userId is provided, prioritize the live profile avatar
+    // Asynchronous resolution from Firestore if not yet found and userId is provided
     if (userId) {
-      const hit = getCachedUserAvatar(userId);
-      if (hit) {
-        setResolvedUri(hit);
-        return;
-      }
-      if (cleanPropUri) {
-        setResolvedUri(cleanPropUri);
-        cacheUserProfile({ id: userId, name, avatar: cleanPropUri });
-        return;
-      }
-
-      // Resolve from Firestore if not in cache
       resolveUserAvatar(userId, name).then((found) => {
         if (!isMounted.current) return;
         if (found) {
@@ -53,16 +100,10 @@ export default function Avatar({ name, uri, avatar, photo, url, userId, size = 4
           setResolvedUri(null);
         }
       });
-      return;
-    }
-
-    // 2. No userId, rely strictly on prop URI
-    if (cleanPropUri) {
-      setResolvedUri(cleanPropUri);
     } else {
       setResolvedUri(null);
     }
-  }, [userId, cleanPropUri, name]);
+  }, [resolvedCandidate, userId, name]);
 
   const initials = name
     ? name.split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase()

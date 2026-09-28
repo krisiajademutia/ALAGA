@@ -997,6 +997,20 @@ export function AppProvider({ children }) {
   // ── Firebase Real-Time Synchronization ─────────────────────────────────────
   useEffect(() => {
     if (!isMockFirebase()) {
+      // Prime users list immediately for instant avatar rendering
+      getAllUsersFirebase()
+        .then((initialUsers) => {
+          if (Array.isArray(initialUsers) && initialUsers.length > 0) {
+            setUsers((prev) => {
+              const map = new Map();
+              (prev || []).forEach((u) => { if (u?.id) map.set(u.id, u); });
+              initialUsers.forEach((u) => { if (u?.id) map.set(u.id, { ...(map.get(u.id) || {}), ...u }); });
+              return Array.from(map.values());
+            });
+          }
+        })
+        .catch(() => {});
+
       // Public feeds (Rescue alerts and Adoptable animals)
       const unsubRescues = subscribeToRescueReports((liveReports) => {
         const reportsList = Array.isArray(liveReports) ? liveReports : [];
@@ -1335,6 +1349,45 @@ export function AppProvider({ children }) {
     currentUserRef.current = updated;
     cacheUserProfile(updated);
     AsyncStorage.setItem('@alaga_saved_user_v1', JSON.stringify(updated)).catch(() => {});
+
+    // Reactively cascade avatar updates to local reports, animals, and conversations
+    if (updates.avatar && currentUser?.id) {
+      const newAv = updates.avatar;
+      setRescueReports((prev) =>
+        (prev || []).map((r) => {
+          let mod = false;
+          let rAv = r.reporterAvatar;
+          let respAv = r.responderAvatar;
+          if (r.reporterId === currentUser.id) {
+            rAv = newAv;
+            mod = true;
+          }
+          if (r.responderId === currentUser.id) {
+            respAv = newAv;
+            mod = true;
+          }
+          return mod ? { ...r, reporterAvatar: rAv, responderAvatar: respAv } : r;
+        })
+      );
+      setAnimals((prev) =>
+        (prev || []).map((a) => (a.advocateId === currentUser.id ? { ...a, advocateAvatar: newAv } : a))
+      );
+      setConversations((prev) =>
+        (prev || []).map((c) => {
+          if (c.participantAvatars && c.participantAvatars[currentUser.id] !== newAv) {
+            return {
+              ...c,
+              participantAvatars: {
+                ...c.participantAvatars,
+                [currentUser.id]: newAv,
+              },
+            };
+          }
+          return c;
+        })
+      );
+    }
+
     if (currentUser?.id) {
       userProfilesCacheRef.current.delete(currentUser.id);
       await updateUserProfile(currentUser.id, normalizedUpdates);

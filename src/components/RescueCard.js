@@ -72,6 +72,7 @@ export default function RescueCard({ report, onPress, style }) {
         {/* Ongoing Responder or Rescuer Tag */}
         {report.status === 'Responded' && Boolean(report.responderName) && (
           <View style={styles.responderRow}>
+            <Avatar name={report.responderName} uri={report.responderAvatar} userId={report.responderId} size={18} style={{ marginRight: 6 }} />
             <View style={styles.ongoingDot} />
             <Text style={styles.responderLabel}>Ongoing Responder: </Text>
             <Text style={styles.responderName} numberOfLines={1}>
@@ -81,6 +82,7 @@ export default function RescueCard({ report, onPress, style }) {
         )}
         {report.status === 'Rescued' && Boolean(report.responderName) && (
           <View style={[styles.responderRow, styles.rescuedRow]}>
+            <Avatar name={report.responderName} uri={report.responderAvatar} userId={report.responderId} size={18} style={{ marginRight: 6 }} />
             <Ionicons name="checkmark-circle" size={13} color={COLORS.success} style={{ marginRight: 4 }} />
             <Text style={[styles.responderLabel, { color: COLORS.success }]}>Rescued by: </Text>
             <Text style={[styles.responderName, { color: COLORS.textDark }]} numberOfLines={1}>

@@ -435,7 +435,12 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
               })}
               activeOpacity={0.8}
             >
-              <Avatar name={report.reporterName || 'Community Member'} uri={report.reporterAvatar} size={42} />
+              <Avatar
+                name={report.reporterName || 'Community Member'}
+                uri={report.reporterAvatar}
+                userId={report.reporterId || report.userId}
+                size={42}
+              />
               <View style={styles.reporterTextCol}>
                 <View style={styles.reporterNameRow}>
                   <Text style={styles.reporterName} numberOfLines={1}>

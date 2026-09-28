@@ -647,6 +647,17 @@ export default function ChatScreen({ route, navigation }) {
           }}
           activeOpacity={0.75}
         >
+          {isGroup ? (
+            groupPhoto ? (
+              <Image source={{ uri: groupPhoto }} style={[styles.navGroupAvatar, { marginRight: 10 }]} />
+            ) : (
+              <View style={[styles.navGroupAvatarPlaceholder, { marginRight: 10 }]}>
+                <Ionicons name="people" size={20} color="#2E7A99" />
+              </View>
+            )
+          ) : (
+            <Avatar name={name} userId={otherId} uri={otherAvatar} size={40} style={{ marginRight: 10 }} />
+          )}
           <View style={styles.navTextWrap}>
             <Text style={styles.navName} numberOfLines={1}>{name}</Text>
             <View style={styles.navSubRow}>
