@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import StatusPill from '../../components/StatusPill';
 const PRESET_AMOUNTS = ['100', '250', '500', '1,000', '2,500'];
 
 export default function DonateScreen({ route, navigation }) {
+  const didExitAfterSuccess = useRef(false);
   const {
     animalId: initialAnimalId,
     animalName: initialAnimalName,
@@ -92,6 +93,7 @@ export default function DonateScreen({ route, navigation }) {
   const [reference, setReference] = useState('');
   const [message, setMessage] = useState('');
   const [proof, setProof] = useState(null);
+  const [proofBase64, setProofBase64] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const [photoPickerVisible, setPhotoPickerVisible] = useState(false);
@@ -246,9 +248,10 @@ export default function DonateScreen({ route, navigation }) {
       });
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.8, base64: true });
     if (!result.canceled && result.assets?.[0]?.uri) {
       setProof(result.assets[0].uri);
+      setProofBase64(result.assets[0].base64 || null);
     }
   };
 
@@ -263,9 +266,10 @@ export default function DonateScreen({ route, navigation }) {
       });
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
+    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8, base64: true });
     if (!result.canceled && result.assets?.[0]?.uri) {
       setProof(result.assets[0].uri);
+      setProofBase64(result.assets[0].base64 || null);
     }
   };
 
@@ -299,7 +303,7 @@ export default function DonateScreen({ route, navigation }) {
         amountDisplay: `₱${numericAmount.toLocaleString()}`,
         method: activeMethod?.label || 'Cash',
         referenceNumber: reference.trim().toUpperCase() || (activeMethod?.id === 'Cash' ? 'CASH-IN-PERSON' : 'PENDING-VERIFY'),
-        proofPhoto: proof,
+        proofPhoto: proof ? { uri: proof, base64: proofBase64 } : null,
         message: message.trim(),
       });
 
@@ -312,10 +316,19 @@ export default function DonateScreen({ route, navigation }) {
         message: `Thank you, ${currentUser?.name || 'kind supporter'}! Your sponsorship of ₱${numericAmount.toLocaleString()} for ${targetDisplayName} has been submitted in real time and queued for caretaker verification.`,
         primaryText: 'View Activity Dashboard',
         onPrimaryPress: () => {
+          didExitAfterSuccess.current = true;
           setAlertConfig((prev) => ({ ...prev, visible: false }));
-          navigation.navigate('Activity', { tab: 'donations' });
+          if (navigation.canGoBack()) navigation.goBack();
+          else navigation.navigate('MainTabs', { screen: 'Activity', params: { tab: 'donations' } });
         },
       });
+      setTimeout(() => {
+        if (didExitAfterSuccess.current) return;
+        didExitAfterSuccess.current = true;
+        setAlertConfig((prev) => ({ ...prev, visible: false }));
+        if (navigation.canGoBack()) navigation.goBack();
+        else navigation.navigate('MainTabs', { screen: 'Activity', params: { tab: 'donations' } });
+      }, 1800);
     } catch (err) {
       setLoading(false);
       showAlert({
@@ -698,7 +711,7 @@ export default function DonateScreen({ route, navigation }) {
                     <Text style={styles.proofChangeLink}>Change Photo</Text>
                   </TouchableOpacity>
                   <Text style={styles.proofDot}>•</Text>
-                  <TouchableOpacity onPress={() => setProof(null)}>
+                  <TouchableOpacity onPress={() => { setProof(null); setProofBase64(null); }}>
                     <Text style={styles.proofRemoveLink}>Remove</Text>
                   </TouchableOpacity>
                 </View>

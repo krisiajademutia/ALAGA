@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../constants/theme';
+import { useApp } from '../context/AppContext';
 
 export default function AnimalCard({ animal, onPress, style, horizontal = false }) {
-  const [isFav, setIsFav] = useState(false);
+  const { favoriteAnimalIds = [], toggleFavoriteAnimal = () => {} } = useApp();
+  const isFav = favoriteAnimalIds.includes(String(animal.id));
 
   const toggleFavorite = (e) => {
     e.stopPropagation();
-    setIsFav(!isFav);
+    toggleFavoriteAnimal(animal.id);
   };
 
   if (horizontal) {

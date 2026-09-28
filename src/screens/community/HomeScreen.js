@@ -38,14 +38,15 @@ export default function CommunityHomeScreen({ navigation }) {
 
   const filteredAnimals = animals.filter((a) => {
     if (a.status !== 'Available') return false;
-    if (activeCategory === 'cats' && a.species !== 'Cat') return false;
-    if (activeCategory === 'dogs' && a.species !== 'Dog') return false;
-    if (activeCategory === 'birds' && (a.species === 'Cat' || a.species === 'Dog')) return false;
+    if (activeCategory === 'cats' && String(a.species || '').toLowerCase() !== 'cat') return false;
+    if (activeCategory === 'dogs' && String(a.species || '').toLowerCase() !== 'dog') return false;
+    if (activeCategory === 'birds' && ['cat', 'dog'].includes(String(a.species || '').toLowerCase())) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       return (
-        a.name.toLowerCase().includes(q) ||
-        a.breed.toLowerCase().includes(q) ||
+        (a.name || '').toLowerCase().includes(q) ||
+        (a.breed || '').toLowerCase().includes(q) ||
+        (a.species || '').toLowerCase().includes(q) ||
         a.location?.toLowerCase().includes(q)
       );
     }

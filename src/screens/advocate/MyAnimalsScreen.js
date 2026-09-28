@@ -28,6 +28,7 @@ export default function MyAnimalsScreen({ navigation }) {
     returnAnimalToListings,
     markAnimalAdopted,
     updateAnimal,
+    deleteAnimal,
     rescueReports,
     showAlert,
   } = useApp();
@@ -81,6 +82,13 @@ export default function MyAnimalsScreen({ navigation }) {
       },
     });
   };
+
+  const handleDeleteAnimal = (animal) => showAlert({
+    title: 'Delete animal listing?',
+    message: `Permanently delete ${animal.name}'s listing?`,
+    type: 'warning', customIcon: 'trash-outline', secondaryText: 'Cancel', primaryText: 'Delete',
+    onPrimaryPress: async () => { await deleteAnimal(animal.id); setActionAnimal(null); },
+  });
 
   const insets = useSafeAreaInsets();
   const safeTopPadding =
@@ -338,6 +346,12 @@ export default function MyAnimalsScreen({ navigation }) {
                   </View>
                 </TouchableOpacity>
               )}
+
+              <View style={styles.sheetDivider} />
+              <TouchableOpacity style={styles.actionBtn} onPress={() => handleDeleteAnimal(actionAnimal)} activeOpacity={0.85}>
+                <View style={[styles.actionIcon, { backgroundColor: '#FDECEC' }]}><Ionicons name="trash-outline" size={20} color={COLORS.danger} /></View>
+                <View style={styles.actionText}><Text style={[styles.actionTitle, { color: COLORS.danger }]}>Delete Listing</Text><Text style={styles.actionDesc}>Permanently remove this animal listing.</Text></View>
+              </TouchableOpacity>
 
               <TouchableOpacity style={styles.cancelSheetBtn} onPress={() => setActionAnimal(null)}>
                 <Text style={styles.cancelSheetText}>Close</Text>

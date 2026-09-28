@@ -8,7 +8,6 @@ import {
   updateUserProfile,
   getUserProfileFirebase,
   loginWithGoogleCredential,
-  loginWithGoogleProfile,
   cacheUserProfile,
   clearCachedUserProfile,
   getCachedUserProfile,
@@ -78,6 +77,8 @@ const defaultContext = {
   users: [],
   rescueReports: [],
   animals: [],
+  favoriteAnimalIds: [],
+  toggleFavoriteAnimal: () => {},
   requests: [],
   conversations: [],
   donations: [],
@@ -152,6 +153,7 @@ export function AppProvider({ children }) {
   const [users, setUsers] = useState([]);
   const [rescueReports, setRescueReports] = useState([]);
   const [animals, setAnimals] = useState([]);
+  const [favoriteAnimalIds, setFavoriteAnimalIds] = useState([]);
   const [requests, setRequests] = useState([]);
   const [conversations, setConversations] = useState([]);
   const [donations, setDonations] = useState([]);
@@ -171,6 +173,24 @@ export function AppProvider({ children }) {
   const setActiveConversationId = useCallback((id) => {
     activeConversationIdRef.current = id;
   }, []);
+
+  useEffect(() => {
+    const userId = currentUser?.id || currentUser?.uid;
+    if (!userId) { setFavoriteAnimalIds([]); return; }
+    AsyncStorage.getItem(`@alaga_favorites_${userId}`).then((raw) => {
+      if (raw) setFavoriteAnimalIds(JSON.parse(raw));
+    }).catch(() => {});
+  }, [currentUser?.id, currentUser?.uid]);
+
+  const toggleFavoriteAnimal = (animalId) => {
+    const userId = currentUser?.id || currentUser?.uid;
+    if (!userId || !animalId) return;
+    setFavoriteAnimalIds((prev) => {
+      const next = prev.includes(String(animalId)) ? prev.filter((id) => id !== String(animalId)) : [...prev, String(animalId)];
+      AsyncStorage.setItem(`@alaga_favorites_${userId}`, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  };
 
   useEffect(() => {
     currentUserRef.current = currentUser;
@@ -1303,12 +1323,10 @@ export function AppProvider({ children }) {
   };
 
   const loginWithGoogle = async (googleData) => {
-    let result;
-    if (typeof googleData === 'string') {
-      result = await loginWithGoogleCredential(googleData);
-    } else {
-      result = await loginWithGoogleProfile(googleData);
+    if (typeof googleData !== 'string' || !googleData) {
+      return { success: false, error: 'Google sign-in requires a verified Google ID token.' };
     }
+    const result = await loginWithGoogleCredential(googleData);
 
     if (result.success) {
       setCurrentUser(result.user);
@@ -1529,6 +1547,11 @@ export function AppProvider({ children }) {
   const deleteRescueReport = async (reportId) => {
     if (!reportId) return;
     const strId = String(reportId);
+    const report = rescueReports.find((r) => String(r.id) === strId);
+    const uid = currentUser?.id || currentUser?.uid;
+    const ownsReport = report && uid && [report.reporterId, report.userId, report.authorId].some((id) => id && String(id) === String(uid));
+    const ownsByEmail = report?.reporterEmail && currentUser?.email && report.reporterEmail.toLowerCase() === currentUser.email.toLowerCase();
+    if (!report || !uid || (!ownsReport && !ownsByEmail)) return;
     setRescueReports((prev) => prev.filter((r) => r.id !== strId));
     mySubmittedReportIds.current?.delete(strId);
     notifiedReportIdsRef.current?.delete(strId);
@@ -1553,8 +1576,14 @@ export function AppProvider({ children }) {
       })
     );
 
-    // Delete in Firestore
-    await deleteRescueReportFirebase(strId);
+    // Delete in Firestore; restore the report when the write is rejected.
+    const deleteResult = await deleteRescueReportFirebase(strId);
+    if (deleteResult?.success === false) {
+      setRescueReports((prev) => [report, ...prev.filter((r) => String(r.id) !== strId)]);
+      showAlert({ title: 'Could not delete report', message: 'The report could not be deleted. Check that you are the original reporter and try again.', type: 'error' });
+      return false;
+    }
+    return true;
   };
 
   const respondToReport = (reportId) => {
@@ -1721,6 +1750,9 @@ export function AppProvider({ children }) {
   const deleteAnimal = async (animalId) => {
     if (!animalId) return;
     const strId = String(animalId);
+    const animal = animals.find((a) => String(a.id) === strId);
+    const uid = currentUser?.id || currentUser?.uid;
+    if (!animal || !uid || ![animal.advocateId, animal.userId, animal.ownerId].some((id) => id && String(id) === String(uid))) return;
     setAnimals((prev) => prev.filter((a) => a.id !== strId));
 
     // Cascade delete any notifications referencing this animal
@@ -1740,8 +1772,14 @@ export function AppProvider({ children }) {
     // Remove any adoption / foster applications for this animal
     setRequests((prev) => prev.filter((r) => String(r.animalId) !== strId));
 
-    // Delete from Firestore
-    await deleteAnimalFirebase(strId);
+    // Delete from Firestore; restore the listing if the write fails.
+    const deleteResult = await deleteAnimalFirebase(strId);
+    if (deleteResult?.success === false) {
+      setAnimals((prev) => [animal, ...prev.filter((a) => String(a.id) !== strId)]);
+      showAlert({ title: 'Could not delete listing', message: 'The animal listing could not be deleted. Check your connection and try again.', type: 'error' });
+      return false;
+    }
+    return true;
   };
 
   // Return a fostered animal back to available listings
@@ -2215,12 +2253,13 @@ export function AppProvider({ children }) {
       : parseFloat(String(donationData.amount || '0').replace(/[^0-9.]/g, '')) || 0;
 
     let proofUrl = donationData.proofPhoto || null;
-    if (proofUrl && typeof proofUrl === 'string' && !proofUrl.startsWith('http') && !proofUrl.startsWith('data:')) {
+    if (proofUrl && (typeof proofUrl === 'object' || (typeof proofUrl === 'string' && !proofUrl.startsWith('http') && !proofUrl.startsWith('data:')))) {
       try {
         const uploaded = await uploadImageToStorage(proofUrl);
         if (uploaded) proofUrl = uploaded;
       } catch (e) {
         console.warn('[AppContext] Receipt upload warning:', e.message);
+        proofUrl = null;
       }
     }
 
@@ -2589,6 +2628,8 @@ export function AppProvider({ children }) {
         users,
         rescueReports,
         animals,
+        favoriteAnimalIds,
+        toggleFavoriteAnimal,
         requests,
         conversations,
         donations,

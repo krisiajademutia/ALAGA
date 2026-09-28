@@ -79,9 +79,9 @@ export default function AdvocateHomeScreen({ navigation }) {
 
   const filteredReports = React.useMemo(() => {
     const list = rescueReports.filter((r) => {
-      if (activeCategory === 'cats' && r.animalType !== 'Cat') return false;
-      if (activeCategory === 'dogs' && r.animalType !== 'Dog') return false;
-      if (activeCategory === 'birds' && (r.animalType === 'Cat' || r.animalType === 'Dog')) return false;
+      if (activeCategory === 'cats' && String(r.animalType || '').toLowerCase() !== 'cat') return false;
+      if (activeCategory === 'dogs' && String(r.animalType || '').toLowerCase() !== 'dog') return false;
+      if (activeCategory === 'birds' && ['cat', 'dog'].includes(String(r.animalType || '').toLowerCase())) return false;
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();

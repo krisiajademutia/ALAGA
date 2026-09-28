@@ -84,11 +84,11 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
 
   const isAuthor = Boolean(
     currentUser && (
-      currentUser.id === report?.reporterId ||
+      [report?.reporterId, report?.userId, report?.authorId].some((id) => id && String(id) === String(currentUser.id || currentUser.uid)) ||
       (currentUser.email && report?.reporterEmail && currentUser.email.toLowerCase() === report?.reporterEmail.toLowerCase())
     )
   );
-  const canDelete = isAuthor || isAdvocate;
+  const canDelete = isAuthor;
 
   const handleDeleteReport = () => {
     showAlert({

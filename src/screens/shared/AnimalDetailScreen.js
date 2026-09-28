@@ -42,10 +42,12 @@ export default function AnimalDetailScreen({ route, navigation }) {
     markAnimalAdopted,
     returnAnimalToListings,
     showAlert,
+    favoriteAnimalIds = [],
+    toggleFavoriteAnimal = () => {},
   } = useApp();
   const animal = animals.find((a) => a.id === animalId) || animals[0];
 
-  const [isFav, setIsFav] = useState(false);
+  const isFav = favoriteAnimalIds.includes(String(animal?.id));
   const [modalVisible, setModalVisible] = useState(false);
   const [requestType, setRequestType] = useState('Adoption');
   const [message, setMessage] = useState('');
@@ -250,16 +252,20 @@ export default function AnimalDetailScreen({ route, navigation }) {
 
   // Specs formatting matching screenshot exact values or fallback
   const genderVal = animal.gender
-    ? (animal.gender.toLowerCase().includes('male') && !animal.gender.includes('♂') ? 'Male ♂' : animal.gender.toLowerCase().includes('female') && !animal.gender.includes('♀') ? 'Female ♀' : animal.gender)
-    : 'Male ♂';
-  const ageVal = animal.age || '2 Years';
-  const weightVal = animal.weight || '3.8 kg';
-  const breedVal = animal.breed || 'Puspin Tabby';
-  const advocateNameVal = animal.advocateName || 'Elena Ramos';
-  const advocateRoleVal = animal.advocateRole || 'Verified Community Foster Advocate';
+    ? (animal.gender.toLowerCase().includes('female') && !animal.gender.includes('♀')
+      ? 'Female ♀'
+      : animal.gender.toLowerCase() === 'male' && !animal.gender.includes('♂')
+        ? 'Male ♂'
+        : animal.gender)
+    : null;
+  const ageVal = animal.age || animal.ageTag || null;
+  const sizeVal = animal.size || null;
+  const breedVal = animal.breed || null;
+  const advocateNameVal = animal.advocateName || null;
+  const advocateRoleVal = animal.advocateRole || null;
   const locationTextVal = animal.location && animal.rescueNote
     ? `${animal.location} • ${animal.rescueNote}`
-    : animal.location || animal.rescueNote || 'Pasig City';
+    : animal.location || animal.rescueNote || null;
 
   return (
     <View style={styles.flex}>
@@ -329,7 +335,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
 
         <TouchableOpacity
           style={[styles.floatingHeart, { top: safeTop }]}
-          onPress={() => setIsFav(!isFav)}
+          onPress={() => toggleFavoriteAnimal(animal.id)}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Ionicons
@@ -363,18 +369,17 @@ export default function AnimalDetailScreen({ route, navigation }) {
         >
           {/* Pet Name & Breed */}
           <View style={styles.nameRow}>
-            <Text style={styles.petName}>{animal.name || 'Tamiming'}</Text>
-            <Text style={styles.nameBullet}>•</Text>
-            <Text style={styles.petBreed}>{breedVal}</Text>
+            <Text style={styles.petName}>{animal.name || 'Animal'}</Text>
+            {breedVal ? <><Text style={styles.nameBullet}>•</Text><Text style={styles.petBreed}>{breedVal}</Text></> : null}
           </View>
 
           {/* Location & Rescue Tag */}
           <View style={styles.locationRow}>
             <Ionicons name="location-sharp" size={14} color="#D94F4F" style={{ marginRight: 4 }} />
-            <Text style={styles.locationText}>{locationTextVal}</Text>
+            <Text style={styles.locationText}>{locationTextVal || 'Location not provided'}</Text>
           </View>
 
-          {/* 3 Spec Cards Grid */}
+          {/* Key details */}
           <View style={styles.specCardsRow}>
             {/* Gender Card */}
             <View style={[styles.specCard, styles.specCardGender]}>
@@ -388,15 +393,15 @@ export default function AnimalDetailScreen({ route, navigation }) {
               <Text style={styles.specCardValue}>{ageVal}</Text>
             </View>
 
-            {/* Weight Card */}
+            {/* Size Card */}
             <View style={[styles.specCard, styles.specCardWeight]}>
-              <Text style={styles.specCardLabel}>Weight</Text>
-              <Text style={styles.specCardValue}>{weightVal}</Text>
+              <Text style={styles.specCardLabel}>Size</Text>
+              <Text style={styles.specCardValue}>{sizeVal}</Text>
             </View>
           </View>
 
           {/* Advocate Profile Row */}
-          <View style={styles.advocateCard}>
+          {advocateNameVal ? <View style={styles.advocateCard}>
             <TouchableOpacity
               style={styles.advocateLeft}
               onPress={() => navigation.navigate('PublicProfile', {
@@ -429,45 +434,41 @@ export default function AnimalDetailScreen({ route, navigation }) {
                 <Text style={styles.chatPillBtnText}>Chat</Text>
               </TouchableOpacity>
             )}
-          </View>
+          </View> : null}
 
-          {/* Personality & Story */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Personality & Story</Text>
-            <Text style={styles.storyText}>
-              {animal.description ||
-                'Rescued from rain along C-5 road, Oscar is very affectionate, loves naps on warm laps, and gets along well with gentle dogs.'}
-            </Text>
-
-            {/* Badges */}
-            <View style={styles.badgesRow}>
-              {(animal.personalityBadges || ['Gentle', 'Loves Cuddles', 'Kid Friendly']).map(
-                (badge) => (
+          {(animal.species || animal.color || animal.condition || animal.listingType || animal.fosterDuration || animal.description || animal.tags?.length || animal.specialNeeds || animal.vaccinated || animal.neutered) ? <View style={styles.section}>
+            <Text style={styles.sectionTitle}>About {animal.name || 'this animal'}</Text>
+            {[
+              animal.species && `Species: ${animal.species}`,
+              animal.color && `Color / markings: ${animal.color}`,
+              animal.condition && `Current condition: ${animal.condition}`,
+              animal.listingType && `Looking for: ${animal.listingType === 'Both' ? 'Adoption or foster' : animal.listingType}`,
+              animal.fosterDuration && `Foster duration: ${animal.fosterDuration}`,
+              animal.specialNeeds && `Special needs: ${animal.specialNeeds}`,
+            ].filter(Boolean).map((detail) => <Text key={detail} style={styles.storyText}>{detail}</Text>)}
+            {animal.description ? <Text style={styles.storyText}>{animal.description}</Text> : null}
+            {animal.tags?.length ? <View style={styles.badgesRow}>
+              {animal.tags.map((badge) => (
                   <View key={badge} style={styles.badgePill}>
-                    <Text style={styles.badgeText}>
-                      {badge === 'Gentle' ? '✨ Gentle' : badge === 'Loves Cuddles' ? '💖 Loves Cuddles' : badge === 'Kid Friendly' ? '👶 Kid Friendly' : badge}
-                    </Text>
+                    <Text style={styles.badgeText}>{badge}</Text>
                   </View>
-                )
-              )}
-            </View>
-          </View>
+              ))}
+            </View> : null}
+          </View> : null}
 
-          {/* Health & Medical Records */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Health & Medical Records</Text>
-            {(animal.healthRecords || [
-              'Rabies & 4-in-1 Vaccinated (Updated)',
-              'Spayed / Neutered & Dewormed',
-            ]).map((record) => (
+          {(animal.vaccinated || animal.neutered || animal.healthRecords?.length) ? <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Health & care</Text>
+            {[
+              animal.vaccinated && 'Vaccinated',
+              animal.neutered && 'Spayed / neutered',
+              ...(animal.healthRecords || []),
+            ].filter(Boolean).map((record) => (
               <View key={record} style={styles.recordItem}>
-                <View style={styles.recordCheck}>
-                  <Ionicons name="checkmark" size={13} color={COLORS.success} />
-                </View>
+                <View style={styles.recordCheck}><Ionicons name="checkmark" size={13} color={COLORS.success} /></View>
                 <Text style={styles.recordText}>{record}</Text>
               </View>
             ))}
-          </View>
+          </View> : null}
 
           {/* Donate Banner */}
           {!isOwner && animal.status !== 'Adopted' && (

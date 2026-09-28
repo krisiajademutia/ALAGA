@@ -20,6 +20,9 @@ pnpm-debug.log*
 # local env files
 .env*.local
 .env
+.secret.local
+functions/.env*
+functions/.secret.local
 src/config/brevoConfig.local.js
 brevoConfig.local.js
 

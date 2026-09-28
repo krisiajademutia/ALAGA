@@ -12,14 +12,31 @@ service cloud.firestore {
       }
     }
 
-    // ── OTPs Collection (Brevo verification codes) ────────
+    // ── OTP state is private to trusted Cloud Functions ──
     match /otps/{otpId} {
-      allow read, write, delete: if true;
+      allow read, write: if false;
+    }
+
+    match /otpChallenges/{challengeId} {
+      allow read, write: if false;
+    }
+
+    match /otpRateLimits/{rateLimitId} {
+      allow read, write: if false;
+    }
+
+    match /imageRateLimits/{userId} {
+      allow read, write: if false;
     }
 
     // ── Rescues (Rescue Alerts) Collection ────────────────
     match /rescues/{rescueId} {
-      allow read, write, delete: if true;
+      allow read, create, update: if true;
+      allow delete: if request.auth != null && (
+        resource.data.reporterId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.authorId == request.auth.uid
+      );
 
       // Subcollection: Comments
       match /comments/{commentId} {
@@ -29,7 +46,12 @@ service cloud.firestore {
 
     // ── Animals Collection ────────────────────────────────
     match /animals/{animalId} {
-      allow read, write, delete: if true;
+      allow read, create, update: if true;
+      allow delete: if request.auth != null && (
+        resource.data.advocateId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.ownerId == request.auth.uid
+      );
     }
 
     // ── Applications Collection (Adoption / Foster) ───────

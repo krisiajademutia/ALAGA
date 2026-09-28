@@ -30,7 +30,9 @@ export default function ListingsScreen({ navigation }) {
 
   const listed = animals.filter((a) => a.status === 'Available');
   const filtered = listed.filter((a) => {
-    const matchSpecies = species === 'All' || a.species === species;
+    const matchSpecies = species === 'All' || (species === 'Other'
+      ? !['dog', 'cat'].includes(String(a.species || '').toLowerCase())
+      : String(a.species || '').toLowerCase() === species.toLowerCase());
     const matchType =
       typeFilter === 'All' ||
       a.listingType === typeFilter ||

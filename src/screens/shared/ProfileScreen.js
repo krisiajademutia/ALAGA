@@ -70,11 +70,13 @@ export default function ProfileScreen({ route, navigation }) {
   const [gcashName, setGcashName] = useState('');
   const [gcashNumber, setGcashNumber] = useState('');
   const [gcashQr, setGcashQr] = useState(null);
+  const [gcashQrBase64, setGcashQrBase64] = useState(null);
 
   const [mayaEnabled, setMayaEnabled] = useState(false);
   const [mayaName, setMayaName] = useState('');
   const [mayaNumber, setMayaNumber] = useState('');
   const [mayaQr, setMayaQr] = useState(null);
+  const [mayaQrBase64, setMayaQrBase64] = useState(null);
 
   const [bankEnabled, setBankEnabled] = useState(false);
   const [bankName, setBankName] = useState('');
@@ -97,12 +99,14 @@ export default function ProfileScreen({ route, navigation }) {
         setGcashName(pm.gcash.accountName || '');
         setGcashNumber(pm.gcash.accountNumber || '');
         setGcashQr(pm.gcash.qrPhoto || null);
+        setGcashQrBase64(null);
       }
       if (pm.maya) {
         setMayaEnabled(pm.maya.enabled ?? Boolean(pm.maya.accountNumber));
         setMayaName(pm.maya.accountName || '');
         setMayaNumber(pm.maya.accountNumber || '');
         setMayaQr(pm.maya.qrPhoto || null);
+        setMayaQrBase64(null);
       }
       if (pm.bank) {
         setBankEnabled(pm.bank.enabled ?? Boolean(pm.bank.accountNumber));
@@ -123,10 +127,17 @@ export default function ProfileScreen({ route, navigation }) {
       const result = await ImagePicker.launchImageLibraryAsync({
         quality: 0.85,
         allowsEditing: false,
+        base64: true,
       });
       if (!result.canceled && result.assets?.[0]?.uri) {
-        if (target === 'gcash') setGcashQr(result.assets[0].uri);
-        if (target === 'maya') setMayaQr(result.assets[0].uri);
+        if (target === 'gcash') {
+          setGcashQr(result.assets[0].uri);
+          setGcashQrBase64(result.assets[0].base64 || null);
+        }
+        if (target === 'maya') {
+          setMayaQr(result.assets[0].uri);
+          setMayaQrBase64(result.assets[0].base64 || null);
+        }
       }
     } catch (e) {
       console.warn('[ProfileScreen] Pick QR error:', e);
@@ -138,13 +149,13 @@ export default function ProfileScreen({ route, navigation }) {
     try {
       let uploadedGcashQr = gcashQr;
       if (gcashQr && typeof gcashQr === 'string' && !gcashQr.startsWith('http') && !gcashQr.startsWith('data:')) {
-        const url = await uploadImageToImgBB(gcashQr);
+        const url = await uploadImageToImgBB({ uri: gcashQr, base64: gcashQrBase64 });
         if (url) uploadedGcashQr = url;
       }
 
       let uploadedMayaQr = mayaQr;
       if (mayaQr && typeof mayaQr === 'string' && !mayaQr.startsWith('http') && !mayaQr.startsWith('data:')) {
-        const url = await uploadImageToImgBB(mayaQr);
+        const url = await uploadImageToImgBB({ uri: mayaQr, base64: mayaQrBase64 });
         if (url) uploadedMayaQr = url;
       }
 
@@ -235,6 +246,14 @@ export default function ProfileScreen({ route, navigation }) {
       ];
 
   const menuItems = [
+    {
+      icon: 'heart-outline',
+      label: 'Favorites',
+      desc: 'View the animals you saved',
+      screen: 'Favorites',
+      color: '#D94F4F',
+      bg: '#FCE8E8',
+    },
     {
       icon: 'time-outline',
       label: 'Activity Dashboard',
@@ -732,7 +751,7 @@ export default function ProfileScreen({ route, navigation }) {
                             <TouchableOpacity onPress={() => handlePickQr('gcash')}>
                               <Text style={styles.qrChangeBtnText}>Change Photo</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={() => setGcashQr(null)}>
+                            <TouchableOpacity onPress={() => { setGcashQr(null); setGcashQrBase64(null); }}>
                               <Text style={styles.qrRemoveBtnText}>Remove</Text>
                             </TouchableOpacity>
                           </View>
@@ -798,7 +817,7 @@ export default function ProfileScreen({ route, navigation }) {
                             <TouchableOpacity onPress={() => handlePickQr('maya')}>
                               <Text style={styles.qrChangeBtnText}>Change Photo</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={() => setMayaQr(null)}>
+                            <TouchableOpacity onPress={() => { setMayaQr(null); setMayaQrBase64(null); }}>
                               <Text style={styles.qrRemoveBtnText}>Remove</Text>
                             </TouchableOpacity>
                           </View>

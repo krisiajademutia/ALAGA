@@ -33,6 +33,7 @@ import AdvocateRequestsScreen  from '../screens/advocate/AdvocateRequestsScreen'
 
 // ── Shared screens ────────────────────────────────────────────────────────────
 import ListingsScreen     from '../screens/shared/ListingsScreen';
+import FavoritesScreen from '../screens/shared/FavoritesScreen';
 import AnimalDetailScreen from '../screens/shared/AnimalDetailScreen';
 import MessagesScreen     from '../screens/shared/MessagesScreen';
 import ChatScreen         from '../screens/shared/ChatScreen';
@@ -184,6 +185,7 @@ function RootStack() {
       <Stack.Screen name="Chat"           component={ChatScreen} />
       <Stack.Screen name="Donate"         component={DonateScreen} />
       <Stack.Screen name="PublicProfile"  component={PublicProfileScreen} />
+      <Stack.Screen name="Favorites" component={FavoritesScreen} />
       <Stack.Screen name="Notifications"  component={NotificationScreen} />
 
       {isAdvocate && (

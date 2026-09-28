@@ -245,19 +245,15 @@ export default function RegisterScreen({ navigation }) {
       if (res.success) {
         setStep(3);
         setResendCooldown(60);
-        if (res.needsConfig) {
-          showDialog({
-            type: 'warning',
-            title: 'Brevo Notice (Test Code)',
-            message: `${res.message || 'Brevo API is not active'}\n\nYour test verification code is: ${res.fallbackOtp}`,
-          });
-        } else {
-          showDialog({
-            type: 'success',
-            title: 'Verification Code Sent',
-            message: `We have sent a 6-digit verification code to ${form.email.trim()}.\n\nPlease check your inbox and spam folder.`,
-          });
-        }
+        showDialog(res.needsConfig ? {
+          type: 'warning',
+          title: 'Brevo Notice (Test Code)',
+          message: `${res.message || 'Brevo email is unavailable.'}\n\nYour test verification code is: ${res.fallbackOtp}`,
+        } : {
+          type: 'success',
+          title: 'Verification Code Sent',
+          message: `We have sent a 6-digit verification code to ${form.email.trim()}. Please check your inbox and spam folder.`,
+        });
       } else {
         showDialog({
           type: 'warning',
@@ -284,19 +280,15 @@ export default function RegisterScreen({ navigation }) {
       const res = await requestRegistrationOtp(form.email.trim(), form.name.trim());
       if (res.success) {
         setResendCooldown(60);
-        if (res.needsConfig) {
-          showDialog({
-            type: 'warning',
-            title: 'Brevo Notice (Test Code)',
-            message: `Your new test verification code is: ${res.fallbackOtp}`,
-          });
-        } else {
-          showDialog({
-            type: 'success',
-            title: 'Code Resent',
-            message: `A new verification code has been sent to ${form.email.trim()}.`,
-          });
-        }
+        showDialog(res.needsConfig ? {
+          type: 'warning',
+          title: 'Brevo Notice (Test Code)',
+          message: `Your new test verification code is: ${res.fallbackOtp}`,
+        } : {
+          type: 'success',
+          title: 'Code Resent',
+          message: `A new verification code has been sent to ${form.email.trim()}.`,
+        });
       } else {
         showDialog({
           type: 'error',
