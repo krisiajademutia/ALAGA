@@ -353,7 +353,7 @@ export async function loginWithFirebase(email, password) {
 /**
  * Register user with email, password, and custom ALAGA profile fields
  */
-export async function registerWithFirebase({ email, password, name, role, location, organization }) {
+export async function registerWithFirebase({ email, password, name, role, location, organization, coords }) {
   if (isMockFirebase() || !auth) {
     return { isMock: true };
   }
@@ -371,6 +371,7 @@ export async function registerWithFirebase({ email, password, name, role, locati
       role: role || 'community',
       location: location?.trim() || '',
       organization: organization?.trim() || '',
+      coords: coords || null,
       avatar: null,
       passwordHash: hashedPassword,
       passwordUpdatedAt: new Date().toISOString(),
@@ -403,6 +404,7 @@ export async function registerWithFirebase({ email, password, name, role, locati
             role: role || 'community',
             location: location?.trim() || '',
             organization: organization?.trim() || '',
+            ...(coords ? { coords } : {}),
             ...(avatar ? { avatar } : {}),
             updatedAt: new Date().toISOString(),
           };
@@ -417,6 +419,7 @@ export async function registerWithFirebase({ email, password, name, role, locati
             role: role || 'community',
             location: location?.trim() || '',
             organization: organization?.trim() || '',
+            coords: coords || null,
             avatar,
             joinedAt: new Date().toISOString().split('T')[0],
             createdAt: new Date().toISOString(),

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -216,8 +216,16 @@ function AuthStack({ initialRoute = 'Login' }) {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AppNavigator() {
   const { currentUser, isAuthLoading, isOnboardingCompleted } = useApp();
+  const [showSplash, setShowSplash] = useState(true);
 
-  if (isAuthLoading) {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isAuthLoading || showSplash) {
     return <SplashScreen />;
   }
 

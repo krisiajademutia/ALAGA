@@ -18,6 +18,8 @@ export default function Input({
   inputStyle,
   editable = true,
   autoCapitalize = 'none',
+  onFocus,
+  onBlur,
 }) {
   const [showPw, setShowPw] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -46,8 +48,14 @@ export default function Input({
           numberOfLines={numberOfLines}
           editable={editable}
           autoCapitalize={autoCapitalize}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          onFocus={(e) => {
+            setFocused(true);
+            if (onFocus) onFocus(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            if (onBlur) onBlur(e);
+          }}
         />
         {secureTextEntry ? (
           <TouchableOpacity

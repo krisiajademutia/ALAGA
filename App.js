@@ -14,6 +14,8 @@ import {
 import { AppProvider } from './src/context/AppContext';
 import AppNavigator from './src/navigation/AppNavigator';
 
+import SplashScreen from './src/screens/onboarding/SplashScreen';
+
 LogBox.ignoreLogs([
   'Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go',
   '`expo-notifications` functionality is not fully supported in Expo Go',
@@ -37,9 +39,7 @@ export default function App() {
   if (!fontsLoaded && !fontError) {
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: '#FCF8E8', alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#92CDE5" />
-        </View>
+        <SplashScreen />
       </SafeAreaProvider>
     );
   }

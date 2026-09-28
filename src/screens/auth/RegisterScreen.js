@@ -10,9 +10,11 @@ import {
   Alert,
   ActivityIndicator,
   TextInput,
+  Keyboard,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { useApp } from '../../context/AppContext';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import Input from '../../components/Input';
@@ -53,6 +55,118 @@ export default function RegisterScreen({ navigation }) {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [errors, setErrors] = useState({});
   const timerRef = useRef(null);
+  const scrollViewRef = useRef(null);
+
+  // Keyboard avoidance state
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Real-time GPS Location state
+  const [locLoading, setLocLoading] = useState(false);
+  const [locCoords, setLocCoords] = useState(null);
+  const [locStatus, setLocStatus] = useState(null); // 'success' | 'error' | 'permission_denied' | null
+  const [locStatusMsg, setLocStatusMsg] = useState('');
+  const [locFocused, setLocFocused] = useState(false);
+
+  // Listen to keyboard show/hide events to expand bottom scroll clearance
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates ? e.endCoordinates.height : 280);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  // Helper to scroll active input into clear view above keyboard
+  const scrollToField = (yOffset) => {
+    if (scrollViewRef.current) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({ y: yOffset, animated: true });
+      }, 120);
+    }
+  };
+
+  // Direct GPS current location retrieval and reverse geocoding
+  const handleGetLocation = async () => {
+    Keyboard.dismiss();
+    setLocLoading(true);
+    setLocStatus(null);
+    setLocStatusMsg('');
+
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocStatus('permission_denied');
+        setLocStatusMsg('Location permission was denied. You can enter your location manually.');
+        showDialog({
+          type: 'warning',
+          title: 'Permission Denied',
+          message:
+            'Location access is required to automatically detect your current city. You can enter your address or area manually below.',
+        });
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const { latitude, longitude } = position.coords;
+      setLocCoords({ latitude, longitude });
+
+      let locationString = '';
+      try {
+        const reverseList = await Location.reverseGeocodeAsync({
+          latitude,
+          longitude,
+        });
+
+        if (reverseList && reverseList.length > 0) {
+          const item = reverseList[0];
+          const parts = [
+            item.district || item.subregion || item.neighborhood,
+            item.city || item.subregion,
+            item.region,
+          ].filter(Boolean);
+
+          const uniqueParts = [...new Set(parts.map((p) => p.trim()))];
+          locationString =
+            uniqueParts.length > 0
+              ? uniqueParts.join(', ')
+              : `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        } else {
+          locationString = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        }
+      } catch (geoErr) {
+        console.warn('Reverse geocoding warning:', geoErr);
+        locationString = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+      }
+
+      set('location', locationString);
+      setLocStatus('success');
+      setLocStatusMsg(`GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+    } catch (err) {
+      console.warn('Location retrieval error:', err);
+      setLocStatus('error');
+      setLocStatusMsg('Could not detect location. Please type manually.');
+      showDialog({
+        type: 'error',
+        title: 'Location Error',
+        message:
+          'Unable to acquire current GPS location. Please check your device location settings or enter your area manually.',
+      });
+    } finally {
+      setLocLoading(false);
+    }
+  };
 
   // Custom Blurred Dialog State
   const [modalConfig, setModalConfig] = useState({
@@ -232,6 +346,7 @@ export default function RegisterScreen({ navigation }) {
         password: form.password,
         role,
         location: form.location.trim(),
+        coords: locCoords || null,
         ...(role === 'advocate' ? { organization: form.organization.trim() } : {}),
       });
 
@@ -269,12 +384,26 @@ export default function RegisterScreen({ navigation }) {
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
     >
       <StatusBar style="dark" />
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        ref={scrollViewRef}
+        contentContainerStyle={[
+          styles.scroll,
+          {
+            paddingBottom:
+              Platform.OS === 'ios'
+                ? 60
+                : keyboardHeight > 0
+                ? keyboardHeight + 90
+                : 60,
+          },
+        ]}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={true}
+        nestedScrollEnabled={true}
       >
         {/* Back Button */}
         <TouchableOpacity
@@ -482,6 +611,7 @@ export default function RegisterScreen({ navigation }) {
               error={errors.password}
               secureTextEntry
               icon={<Ionicons name="lock-closed-outline" size={18} color={COLORS.primary} />}
+              onFocus={() => scrollToField(160)}
             />
 
             <Input
@@ -495,16 +625,106 @@ export default function RegisterScreen({ navigation }) {
               error={errors.confirm}
               secureTextEntry
               icon={<Ionicons name="lock-closed-outline" size={18} color={COLORS.primary} />}
+              onFocus={() => scrollToField(240)}
             />
 
-            <Input
-              label="LOCATION"
-              placeholder="City or area (e.g. Pasig City)"
-              value={form.location}
-              onChangeText={(v) => set('location', v)}
-              autoCapitalize="words"
-              icon={<Ionicons name="location-outline" size={18} color={COLORS.primary} />}
-            />
+            {/* LOCATION: Direct GPS Auto-Detect or Manual Entry */}
+            <View style={styles.locationSection}>
+              <View style={styles.locationHeaderRow}>
+                <Text style={styles.inputLabel}>LOCATION</Text>
+
+                <TouchableOpacity
+                  style={[styles.gpsAutoBtn, locLoading && styles.gpsAutoBtnLoading]}
+                  onPress={handleGetLocation}
+                  disabled={locLoading}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Use current GPS location"
+                >
+                  {locLoading ? (
+                    <ActivityIndicator size="small" color={COLORS.primaryDeep} style={{ marginRight: 6 }} />
+                  ) : (
+                    <Ionicons name="navigate" size={13} color={COLORS.primaryDeep} style={{ marginRight: 5 }} />
+                  )}
+                  <Text style={styles.gpsAutoBtnText}>
+                    {locLoading ? 'Locating...' : 'Use Current Location'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View
+                style={[
+                  styles.locInputRow,
+                  locFocused && styles.locInputRowFocused,
+                  locStatus === 'success' && styles.locInputRowSuccess,
+                ]}
+              >
+                <Ionicons
+                  name="location-outline"
+                  size={19}
+                  color={locStatus === 'success' ? COLORS.primaryDeep : COLORS.primary}
+                  style={styles.locIconLeft}
+                />
+
+                <TextInput
+                  style={styles.locTextInput}
+                  placeholder="City, Barangay, or Area"
+                  placeholderTextColor={COLORS.textMuted}
+                  value={form.location}
+                  onChangeText={(v) => {
+                    set('location', v);
+                    if (locStatus) setLocStatus(null);
+                  }}
+                  autoCapitalize="words"
+                  onFocus={() => {
+                    setLocFocused(true);
+                    scrollToField(340);
+                  }}
+                  onBlur={() => setLocFocused(false)}
+                />
+
+                {form.location ? (
+                  <TouchableOpacity
+                    style={styles.locClearBtn}
+                    onPress={() => {
+                      set('location', '');
+                      setLocCoords(null);
+                      setLocStatus(null);
+                      setLocStatusMsg('');
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+
+                <TouchableOpacity
+                  style={styles.locPinIconBtn}
+                  onPress={handleGetLocation}
+                  disabled={locLoading}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons
+                    name={locCoords ? 'locate' : 'locate-outline'}
+                    size={20}
+                    color={locCoords ? COLORS.primaryDeep : COLORS.textMuted}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Status / Coordinates pill if GPS captured */}
+              {locStatus === 'success' && locCoords && (
+                <View style={styles.gpsSuccessPill}>
+                  <Ionicons name="checkmark-circle" size={14} color="#1E7B55" />
+                  <Text style={styles.gpsSuccessText}>
+                    GPS: {locCoords.latitude.toFixed(4)}, {locCoords.longitude.toFixed(4)} (Auto-detected)
+                  </Text>
+                </View>
+              )}
+
+              {locStatusMsg && locStatus !== 'success' ? (
+                <Text style={styles.locWarningText}>{locStatusMsg}</Text>
+              ) : null}
+            </View>
 
             {role === 'advocate' && (
               <Input
@@ -514,6 +734,7 @@ export default function RegisterScreen({ navigation }) {
                 onChangeText={(v) => set('organization', v)}
                 autoCapitalize="words"
                 icon={<Ionicons name="business-outline" size={18} color={COLORS.primary} />}
+                onFocus={() => scrollToField(440)}
               />
             )}
 
@@ -940,6 +1161,98 @@ const styles = StyleSheet.create({
     ...FONTS.bodyMedium,
     fontWeight: '800',
     color: COLORS.primary,
+  },
+
+  // Location Section Styles
+  locationSection: {
+    marginBottom: SIZES.md16,
+  },
+  locationHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SIZES.xs4 + 2,
+  },
+  inputLabel: {
+    fontSize: SIZES.xs,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  gpsAutoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E7F4F9',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: SIZES.r14,
+    borderWidth: 1,
+    borderColor: '#C5E4F0',
+  },
+  gpsAutoBtnLoading: {
+    opacity: 0.7,
+  },
+  gpsAutoBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primaryDeep,
+  },
+  locInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.inputBg,
+    borderRadius: SIZES.r12,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    paddingHorizontal: SIZES.md16,
+    minHeight: 50,
+  },
+  locInputRowFocused: {
+    borderColor: COLORS.primaryDeep,
+  },
+  locInputRowSuccess: {
+    borderColor: '#78C49D',
+  },
+  locIconLeft: {
+    marginRight: 10,
+  },
+  locTextInput: {
+    flex: 1,
+    paddingVertical: SIZES.sm8 + 3,
+    fontSize: SIZES.body,
+    color: COLORS.textPrimary,
+  },
+  locClearBtn: {
+    padding: 4,
+    marginRight: 6,
+  },
+  locPinIconBtn: {
+    padding: 4,
+  },
+  gpsSuccessPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EDFAF1',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 6,
+    gap: 5,
+    borderWidth: 1,
+    borderColor: '#C2EAD2',
+  },
+  gpsSuccessText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1E7B55',
+  },
+  locWarningText: {
+    fontSize: 11,
+    color: COLORS.danger,
+    marginTop: 4,
   },
 });
 
