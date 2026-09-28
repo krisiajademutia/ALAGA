@@ -7,8 +7,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
-  TextInput,
   Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -18,10 +16,9 @@ import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import Input from '../../components/Input';
 import Button from '../../components/Button';
 import AlertModal from '../../components/AlertModal';
-import { requestPasswordResetOtp, verifyPasswordResetOtp } from '../../services/otpService';
 
 export default function ResetPasswordScreen({ navigation, route }) {
-  const { currentUser, checkUserExists, resetPasswordWithOtp } = useApp();
+  const { currentUser, checkUserExists, sendPasswordReset } = useApp();
 
   useEffect(() => {
     if (currentUser) {
@@ -38,16 +35,9 @@ export default function ResetPasswordScreen({ navigation, route }) {
 
   const prefilledEmail = route?.params?.email || '';
 
-  // Step 1: Email, Step 2: OTP, Step 3: New Password
-  const [step, setStep] = useState(1);
   const [email, setEmail] = useState(prefilledEmail);
-  const [otpCode, setOtpCode] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-
-  const [loading, setLoading] = useState(false);
-  const [sendingOtp, setSendingOtp] = useState(false);
-  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [isSent, setIsSent] = useState(false);
+  const [sending, setSending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [errors, setErrors] = useState({});
   const timerRef = useRef(null);
@@ -97,8 +87,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
     };
   }, [resendCooldown]);
 
-  // ── Step 1: Send Reset Code ───────────────────────────────────────────────
-  const handleRequestOtp = async () => {
+  const handleSendResetEmail = async () => {
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
       setErrors({ email: 'Email is required.' });
@@ -109,44 +98,30 @@ export default function ResetPasswordScreen({ navigation, route }) {
       return;
     }
     setErrors({});
-    setSendingOtp(true);
+    setSending(true);
 
     try {
-      // Check if user exists
-      const userCheck = await checkUserExists(trimmedEmail);
-      if (!userCheck.exists) {
-        showDialog({
-          type: 'error',
-          title: 'Account Not Found',
-          message: 'No ALAGA account is registered with this email address. Please check your spelling or sign up.',
-        });
-        setSendingOtp(false);
-        return;
+      if (checkUserExists) {
+        const userCheck = await checkUserExists(trimmedEmail);
+        if (!userCheck.exists) {
+          showDialog({
+            type: 'error',
+            title: 'Account Not Found',
+            message: 'No ALAGA account is registered with this email address. Please check your spelling or sign up.',
+          });
+          setSending(false);
+          return;
+        }
       }
 
-      const userName = userCheck.userData?.name || '';
-      const res = await requestPasswordResetOtp(trimmedEmail, userName);
-
+      const res = await sendPasswordReset(trimmedEmail);
       if (res.success) {
-        setStep(2);
+        setIsSent(true);
         setResendCooldown(60);
-        if (res.needsConfig) {
-          showDialog({
-            type: 'warning',
-            title: 'Brevo Notice (Test Code)',
-            message: `${res.message || 'Brevo API is running in fallback mode'}\n\nYour test verification code is: ${res.fallbackOtp}`,
-          });
-        } else {
-          showDialog({
-            type: 'success',
-            title: 'Verification Code Sent',
-            message: `A 6-digit password reset code has been sent to ${trimmedEmail}. Please check your inbox or spam folder.`,
-          });
-        }
       } else {
         showDialog({
           type: 'error',
-          title: 'Unable to Send Code',
+          title: 'Unable to Send Email',
           message: res.error || 'Please check your internet connection and try again.',
         });
       }
@@ -154,143 +129,16 @@ export default function ResetPasswordScreen({ navigation, route }) {
       showDialog({
         type: 'error',
         title: 'Error',
-        message: err.message || 'An unexpected error occurred while requesting reset code.',
+        message: err.message || 'An unexpected error occurred while requesting password reset.',
       });
     } finally {
-      setSendingOtp(false);
+      setSending(false);
     }
   };
 
-  // ── Step 2: Resend OTP ───────────────────────────────────────────────────
-  const handleResendOtp = async () => {
-    if (resendCooldown > 0 || sendingOtp) return;
-    setSendingOtp(true);
-    try {
-      const res = await requestPasswordResetOtp(email.trim());
-      if (res.success) {
-        setResendCooldown(60);
-        if (res.needsConfig) {
-          showDialog({
-            type: 'warning',
-            title: 'Brevo Notice (Test Code)',
-            message: `Your new test verification code is: ${res.fallbackOtp}`,
-          });
-        } else {
-          showDialog({
-            type: 'success',
-            title: 'Code Resent',
-            message: `A new 6-digit verification code has been sent to ${email.trim()}.`,
-          });
-        }
-      } else {
-        showDialog({
-          type: 'error',
-          title: 'Resend Failed',
-          message: res.error || 'Failed to resend code. Please try again.',
-        });
-      }
-    } catch (err) {
-      showDialog({
-        type: 'error',
-        title: 'Error',
-        message: err.message || 'Failed to resend code.',
-      });
-    } finally {
-      setSendingOtp(false);
-    }
-  };
-
-  // ── Step 2: Verify OTP ───────────────────────────────────────────────────
-  const handleVerifyOtp = async () => {
-    const trimmedOtp = otpCode.trim();
-    if (!trimmedOtp || trimmedOtp.length < 6) {
-      showDialog({
-        type: 'error',
-        title: 'Incomplete Code',
-        message: 'Please enter the complete 6-digit verification code.',
-      });
-      return;
-    }
-
-    setVerifyingOtp(true);
-    try {
-      const verifyResult = await verifyPasswordResetOtp(email.trim(), trimmedOtp);
-      if (!verifyResult.success) {
-        showDialog({
-          type: 'error',
-          title: 'Verification Failed',
-          message: verifyResult.error || 'Incorrect or expired verification code.',
-        });
-        return;
-      }
-
-      // OTP verified! Proceed to Step 3
-      setStep(3);
-    } catch (err) {
-      showDialog({
-        type: 'error',
-        title: 'Verification Error',
-        message: err.message || 'An error occurred during verification. Please try again.',
-      });
-    } finally {
-      setVerifyingOtp(false);
-    }
-  };
-
-  // ── Step 3: Update Password ──────────────────────────────────────────────
-  const handleUpdatePassword = async () => {
-    const errs = {};
-    if (!newPassword) {
-      errs.password = 'New password is required.';
-    } else if (newPassword.length < 6) {
-      errs.password = 'Password must be at least 6 characters.';
-    }
-
-    if (newPassword !== confirmPassword) {
-      errs.confirm = 'Passwords do not match.';
-    }
-
-    setErrors(errs);
-    if (Object.keys(errs).length > 0) return;
-
-    setLoading(true);
-    try {
-      const res = await resetPasswordWithOtp(email.trim(), newPassword);
-      if (res.success) {
-        showDialog({
-          type: 'success',
-          title: 'Password Updated!',
-          message: 'Your password has been reset successfully. You can now log in with your new password.',
-          primaryText: 'Sign In Now',
-          onPrimaryPress: () => {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Login' }],
-            });
-          },
-        });
-      } else {
-        showDialog({
-          type: 'error',
-          title: 'Reset Failed',
-          message: res.error || 'Failed to update password. Please try again.',
-        });
-      }
-    } catch (err) {
-      showDialog({
-        type: 'error',
-        title: 'Update Error',
-        message: err.message || 'An error occurred while updating your password.',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getSubtitle = () => {
-    if (step === 1) return 'Enter your email to receive a password reset code';
-    if (step === 2) return `We sent a 6-digit code to ${email || 'your email'}`;
-    return 'Enter your new secure password below';
+  const handleResend = async () => {
+    if (resendCooldown > 0 || sending) return;
+    await handleSendResetEmail();
   };
 
   return (
@@ -307,11 +155,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
         {/* Top Back Navigation */}
         <TouchableOpacity
           style={styles.backBtn}
-          onPress={() => {
-            if (step === 3) setStep(2);
-            else if (step === 2) setStep(1);
-            else navigation.goBack();
-          }}
+          onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: 'Login' }] }))}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
           <Ionicons name="arrow-back" size={22} color={COLORS.primary} />
@@ -329,56 +173,22 @@ export default function ResetPasswordScreen({ navigation, route }) {
         {/* Title & Subtitle */}
         <View style={styles.titleWrap}>
           <Text style={styles.title}>Reset Password</Text>
-          <Text style={styles.subtitle}>{getSubtitle()}</Text>
+          <Text style={styles.subtitle}>
+            {isSent
+              ? 'Check your inbox for the reset link'
+              : 'Enter your email to receive an official password reset link'}
+          </Text>
         </View>
 
-        {/* Stepper Progress (3 Steps) */}
-        <View style={styles.stepContainer}>
-          <View style={styles.stepRow}>
-            {/* Step 1: Email */}
-            <View style={[styles.stepCircle, step >= 1 ? styles.stepCircleActive : styles.stepCircleInactive]}>
-              {step > 1 ? (
-                <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-              ) : (
-                <Text style={[styles.stepNumber, step >= 1 ? styles.stepNumberActive : styles.stepNumberInactive]}>1</Text>
-              )}
-            </View>
-
-            <View style={[styles.stepLine, step >= 2 ? styles.stepLineActive : styles.stepLineInactive]} />
-
-            {/* Step 2: Code */}
-            <View style={[styles.stepCircle, step >= 2 ? styles.stepCircleActive : styles.stepCircleInactive]}>
-              {step > 2 ? (
-                <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-              ) : (
-                <Text style={[styles.stepNumber, step >= 2 ? styles.stepNumberActive : styles.stepNumberInactive]}>2</Text>
-              )}
-            </View>
-
-            <View style={[styles.stepLine, step >= 3 ? styles.stepLineActive : styles.stepLineInactive]} />
-
-            {/* Step 3: Password */}
-            <View style={[styles.stepCircle, step >= 3 ? styles.stepCircleActive : styles.stepCircleInactive]}>
-              <Text style={[styles.stepNumber, step >= 3 ? styles.stepNumberActive : styles.stepNumberInactive]}>3</Text>
-            </View>
-          </View>
-
-          <View style={styles.stepLabelsRow}>
-            <Text style={[styles.stepLabelText, step >= 1 && styles.stepLabelTextActive]}>Email</Text>
-            <Text style={[styles.stepLabelText, step >= 2 && styles.stepLabelTextActive]}>Verify</Text>
-            <Text style={[styles.stepLabelText, step >= 3 && styles.stepLabelTextActive]}>New Password</Text>
-          </View>
-        </View>
-
-        {/* ── STEP 1: Enter Email ────────────────────────────────────────── */}
-        {step === 1 && (
+        {!isSent ? (
+          /* ── STEP 1: Enter Email ────────────────────────────────────────── */
           <View style={styles.card}>
             <View style={styles.iconCircleHeader}>
               <Ionicons name="key-outline" size={24} color={COLORS.primary} />
             </View>
             <Text style={styles.cardTitle}>Find Your Account</Text>
             <Text style={styles.cardSubtitle}>
-              Enter the email address registered with your account. We'll send an official 6-digit OTP code to verify your identity.
+              Enter the email address registered with your account. We'll send an official, secure link from Firebase to reset your password.
             </Text>
 
             <Input
@@ -396,9 +206,9 @@ export default function ResetPasswordScreen({ navigation, route }) {
             />
 
             <Button
-              title={sendingOtp ? 'Sending Reset Code...' : 'Send Reset Code'}
-              onPress={handleRequestOtp}
-              loading={sendingOtp}
+              title={sending ? 'Sending Reset Link...' : 'Send Reset Link'}
+              onPress={handleSendResetEmail}
+              loading={sending}
               fullWidth
               style={styles.actionBtn}
             />
@@ -411,114 +221,64 @@ export default function ResetPasswordScreen({ navigation, route }) {
               <Text style={styles.cancelLinkText}>Back to Sign In</Text>
             </TouchableOpacity>
           </View>
-        )}
-
-        {/* ── STEP 2: Verify Code ────────────────────────────────────────── */}
-        {step === 2 && (
+        ) : (
+          /* ── STEP 2: Sent Confirmation ─────────────────────────────────── */
           <View style={styles.card}>
-            {/* Target Email Info Badge */}
+            <View style={[styles.iconCircleHeader, { backgroundColor: '#E8F5F1' }]}>
+              <Ionicons name="mail-open-outline" size={26} color={COLORS.primary} />
+            </View>
+            <Text style={styles.cardTitle}>Reset Link Sent!</Text>
+            <Text style={styles.cardSubtitle}>
+              We sent a secure password reset link to:
+            </Text>
+
             <View style={styles.targetEmailCard}>
               <View style={styles.targetEmailIconWrap}>
                 <Ionicons name="mail" size={20} color={COLORS.primary} />
               </View>
               <View style={styles.targetEmailInfo}>
-                <Text style={styles.targetEmailLabel}>Code sent to:</Text>
                 <Text style={styles.targetEmailText} numberOfLines={1}>{email}</Text>
               </View>
-              <TouchableOpacity onPress={() => setStep(1)} style={styles.editEmailBtn}>
-                <Text style={styles.editEmailText}>Edit</Text>
-              </TouchableOpacity>
             </View>
 
-            <Text style={styles.cardTitle}>Enter 6-Digit Code</Text>
-            <Text style={styles.cardSubtitle}>Check your email inbox or spam folder for the code.</Text>
+            <Text style={styles.instructionText}>
+              1. Open the email from ALAGA / Firebase.{'\n'}
+              2. Click the secure link to set your new password.{'\n'}
+              3. Return here and sign in with your new credentials!
+            </Text>
 
-            <TextInput
-              style={styles.otpInput}
-              value={otpCode}
-              onChangeText={(val) => setOtpCode(val.replace(/[^0-9]/g, '').slice(0, 6))}
-              placeholder="••••••"
-              placeholderTextColor="#A0B2AA"
-              keyboardType="number-pad"
-              maxLength={6}
-              autoFocus
+            <Button
+              title="Back to Sign In"
+              onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: 'Login' }] }))}
+              fullWidth
+              style={styles.actionBtn}
             />
 
             {/* Resend Action */}
             <View style={styles.resendContainer}>
               {resendCooldown > 0 ? (
                 <Text style={styles.cooldownText}>
-                  Resend code in <Text style={styles.cooldownSec}>{resendCooldown}s</Text>
+                  Resend email in <Text style={{ fontWeight: '700' }}>{resendCooldown}s</Text>
                 </Text>
               ) : (
-                <View style={styles.resendActionRow}>
-                  <Text style={styles.noCodeText}>Didn't receive the code? </Text>
-                  <TouchableOpacity onPress={handleResendOtp} disabled={sendingOtp}>
-                    {sendingOtp ? (
-                      <ActivityIndicator size="small" color={COLORS.primary} />
-                    ) : (
-                      <Text style={styles.resendBtnText}>Resend Code</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity onPress={handleResend} disabled={sending} activeOpacity={0.7}>
+                  <Text style={styles.resendBtnText}>
+                    {sending ? 'Sending...' : "Didn't receive the email? Resend"}
+                  </Text>
+                </TouchableOpacity>
               )}
             </View>
 
-            <Button
-              title={verifyingOtp ? 'Verifying Code...' : 'Verify Code'}
-              onPress={handleVerifyOtp}
-              loading={verifyingOtp}
-              disabled={otpCode.length !== 6 || verifyingOtp}
-              fullWidth
-              style={styles.actionBtn}
-            />
-          </View>
-        )}
-
-        {/* ── STEP 3: New Password ───────────────────────────────────────── */}
-        {step === 3 && (
-          <View style={styles.card}>
-            <View style={styles.iconCircleHeader}>
-              <Ionicons name="lock-closed-outline" size={24} color={COLORS.primary} />
-            </View>
-            <Text style={styles.cardTitle}>Create New Password</Text>
-            <Text style={styles.cardSubtitle}>
-              Please set a strong password with at least 6 characters to keep your account safe.
-            </Text>
-
-            <Input
-              label="NEW PASSWORD"
-              placeholder="Enter new password"
-              value={newPassword}
-              onChangeText={(t) => {
-                setNewPassword(t);
-                if (errors.password) setErrors((e) => ({ ...e, password: null }));
+            <TouchableOpacity
+              style={styles.cancelLink}
+              onPress={() => {
+                setIsSent(false);
+                setResendCooldown(0);
               }}
-              error={errors.password}
-              secureTextEntry
-              icon={<Ionicons name="lock-closed-outline" size={18} color={COLORS.primary} />}
-            />
-
-            <Input
-              label="CONFIRM NEW PASSWORD"
-              placeholder="Re-enter new password"
-              value={confirmPassword}
-              onChangeText={(t) => {
-                setConfirmPassword(t);
-                if (errors.confirm) setErrors((e) => ({ ...e, confirm: null }));
-              }}
-              error={errors.confirm}
-              secureTextEntry
-              icon={<Ionicons name="checkmark-circle-outline" size={18} color={COLORS.primary} />}
-            />
-
-            <Button
-              title="Update Password"
-              onPress={handleUpdatePassword}
-              loading={loading}
-              fullWidth
-              style={styles.actionBtn}
-            />
+              activeOpacity={0.7}
+            >
+              <Text style={styles.cancelLinkText}>Use a different email</Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
@@ -587,68 +347,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // Stepper
-  stepContainer: {
-    marginBottom: 24,
-    paddingHorizontal: 12,
-  },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepCircleActive: {
-    backgroundColor: COLORS.primary,
-  },
-  stepCircleInactive: {
-    backgroundColor: '#E5DFD5',
-  },
-  stepNumber: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  stepNumberActive: {
-    color: '#FFFFFF',
-  },
-  stepNumberInactive: {
-    color: '#947E68',
-  },
-  stepLine: {
-    flex: 1,
-    height: 3,
-    marginHorizontal: 8,
-    borderRadius: 2,
-  },
-  stepLineActive: {
-    backgroundColor: COLORS.primary,
-  },
-  stepLineInactive: {
-    backgroundColor: '#E5DFD5',
-  },
-  stepLabelsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  stepLabelText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#947E68',
-    width: 80,
-    textAlign: 'center',
-  },
-  stepLabelTextActive: {
-    color: COLORS.primary,
-    fontWeight: '700',
-  },
-
   // Card
   card: {
     backgroundColor: COLORS.surface,
@@ -683,12 +381,23 @@ const styles = StyleSheet.create({
   cardSubtitle: {
     ...FONTS.bodySmall,
     color: COLORS.textSecondary,
-    marginBottom: 20,
+    marginBottom: 16,
     textAlign: 'center',
     lineHeight: 18,
   },
+  instructionText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    lineHeight: 22,
+    marginBottom: 20,
+    backgroundColor: '#F8FAF9',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E8EFEA',
+  },
   actionBtn: {
-    marginTop: 12,
+    marginTop: 6,
     backgroundColor: COLORS.primary,
   },
   cancelLink: {
@@ -725,80 +434,23 @@ const styles = StyleSheet.create({
   targetEmailInfo: {
     flex: 1,
   },
-  targetEmailLabel: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
-    fontWeight: '600',
-  },
   targetEmailText: {
-    fontSize: 13,
+    fontSize: 14,
     color: COLORS.textPrimary,
     fontWeight: '700',
-  },
-  editEmailBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D4DDD8',
-  },
-  editEmailText: {
-    fontSize: 12,
-    color: COLORS.primary,
-    fontWeight: '700',
-  },
-
-  // OTP Input
-  otpInput: {
-    backgroundColor: '#F8F9F8',
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    borderRadius: 14,
-    height: 58,
-    fontSize: 28,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-    letterSpacing: 14,
-    marginBottom: 16,
   },
   resendContainer: {
+    marginTop: 16,
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'center',
   },
   cooldownText: {
     fontSize: 13,
-    color: COLORS.textSecondary,
-  },
-  cooldownSec: {
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  resendActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  noCodeText: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
+    color: COLORS.textMuted,
   },
   resendBtnText: {
     fontSize: 13,
-    fontWeight: '800',
     color: COLORS.primary,
-    textDecorationLine: 'underline',
-  },
-
-  // Password eye wrap
-  passwordFieldWrap: {
-    position: 'relative',
-  },
-  eyeBtn: {
-    position: 'absolute',
-    right: 14,
-    top: 36,
-    padding: 6,
-    zIndex: 2,
+    fontWeight: '700',
   },
 });

@@ -22,6 +22,7 @@ import {
   subscribeAuthState,
   getDefaultUserAvatar,
   resetUserPasswordWithOtp,
+  sendPasswordResetEmailFirebase,
   updateUserPasswordLoggedIn,
   checkUserExistsByEmail,
 } from '../services/authService';
@@ -1422,6 +1423,10 @@ export function AppProvider({ children }) {
     }
   };
 
+  const sendPasswordReset = async (email) => {
+    return await sendPasswordResetEmailFirebase(email);
+  };
+
   const resetPasswordWithOtp = async (arg1, arg2, arg3) => {
     let targetEmail;
     let targetPassword;
@@ -2641,6 +2646,7 @@ export function AppProvider({ children }) {
         logout,
         updateUser,
         resetPasswordWithOtp,
+        sendPasswordReset,
         updateUserPassword,
         checkUserExists,
         isAuthLoading,

@@ -8,6 +8,7 @@ import {
   updatePassword as fbUpdatePassword,
   EmailAuthProvider,
   reauthenticateWithCredential,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import {
   doc,
@@ -155,24 +156,43 @@ export async function updateUserPasswordLoggedIn({ newPassword, currentPassword 
 /**
  * Sign in user with email & password
  */
+/**
+ * Send an official, secure password reset link to user's email via Firebase Auth
+ */
+export async function sendPasswordResetEmailFirebase(email) {
+  const cleanEmail = (email || '').trim().toLowerCase();
+  if (!cleanEmail) {
+    return { success: false, error: 'Email is required.' };
+  }
+  if (isMockFirebase() || !auth) {
+    return { success: true, isMock: true };
+  }
+  try {
+    await sendPasswordResetEmail(auth, cleanEmail);
+    return { success: true };
+  } catch (err) {
+    console.warn('[authService] sendPasswordResetEmail error:', err);
+    let message = 'Failed to send password reset email. Please try again.';
+    if (err.code === 'auth/user-not-found') {
+      message = 'No account found with this email address. Please check your spelling or sign up.';
+    } else if (err.code === 'auth/invalid-email') {
+      message = 'Please enter a valid email address.';
+    } else if (err.code === 'auth/too-many-requests') {
+      message = 'Too many requests. Please wait a few moments before trying again.';
+    }
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Sign in user with email & password
+ */
 export async function loginWithFirebase(email, password) {
   if (isMockFirebase() || !auth) return { isMock: true };
   const cleanEmail = (email || '').trim().toLowerCase();
   if (!cleanEmail || !password) return { success: false, error: 'Email and password are required.' };
 
-  const enteredHash = await hashPassword(password);
-  let matchingProfile = null;
   try {
-    if (db) {
-      const users = await getDocs(query(collection(db, 'users'), where('email', '==', cleanEmail)));
-      if (!users.empty) {
-        const profileDoc = users.docs[0];
-        matchingProfile = { id: profileDoc.id, ...profileDoc.data() };
-        if (matchingProfile.passwordHash && matchingProfile.passwordHash !== enteredHash) {
-          return { success: false, error: 'Incorrect email or password.' };
-        }
-      }
-    }
     const credential = await signInWithEmailAndPassword(auth, cleanEmail, password);
     const userRef = doc(db, 'users', credential.user.uid);
     const snap = await getDoc(userRef);
@@ -187,14 +207,9 @@ export async function loginWithFirebase(email, password) {
     cacheUserProfile(user);
     return { success: true, user };
   } catch (err) {
-    if (matchingProfile?.passwordHash === enteredHash) {
-      const { passwordHash, passwordUpdatedAt, ...data } = matchingProfile;
-      const user = { id: matchingProfile.id, ...data, avatar: extractUserAvatar(data) };
-      cacheUserProfile(user);
-      return { success: true, user };
-    }
     let message = 'Incorrect email or password.';
-    if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') message = 'No account found with this email. Please register first.';
+    if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') message = 'Incorrect email or password.';
+    else if (err.code === 'auth/invalid-email') message = 'Please enter a valid email address.';
     else if (err.code === 'auth/too-many-requests') message = 'Too many failed attempts. Please try again later.';
     return { success: false, error: message };
   }

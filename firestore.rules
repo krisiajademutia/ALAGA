@@ -2,13 +2,25 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
     // ── Users Collection ──────────────────────────────────
     match /users/{userId} {
-      allow read, write: if true;
+      // Authenticated users can read member/advocate profiles
+      allow read: if isAuthenticated();
+      // Users can only create, update, or delete their own profile document
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update, delete: if isAuthenticated() && request.auth.uid == userId;
 
       // Subcollection: Notifications
       match /notifications/{notifId} {
-        allow read, write, delete: if true;
+        // Authenticated users can send a notification to a user
+        allow create: if isAuthenticated();
+        // Users can only read, update, or delete their own notifications
+        allow read, update, delete: if isAuthenticated() && request.auth.uid == userId;
       }
     }
 
@@ -31,8 +43,12 @@ service cloud.firestore {
 
     // ── Rescues (Rescue Alerts) Collection ────────────────
     match /rescues/{rescueId} {
-      allow read, create, update: if true;
-      allow delete: if request.auth != null && (
+      // Rescues are open for anyone in the community to view
+      allow read: if true;
+      // Must be logged in to report or update rescue alerts
+      allow create, update: if isAuthenticated();
+      // Only the original reporter can delete their rescue alert
+      allow delete: if isAuthenticated() && (
         resource.data.reporterId == request.auth.uid ||
         resource.data.userId == request.auth.uid ||
         resource.data.authorId == request.auth.uid
@@ -40,14 +56,23 @@ service cloud.firestore {
 
       // Subcollection: Comments
       match /comments/{commentId} {
-        allow read, write, delete: if true;
+        allow read: if true;
+        allow create: if isAuthenticated();
+        allow update, delete: if isAuthenticated() && (
+          resource.data.userId == request.auth.uid ||
+          resource.data.authorId == request.auth.uid
+        );
       }
     }
 
     // ── Animals Collection ────────────────────────────────
     match /animals/{animalId} {
-      allow read, create, update: if true;
-      allow delete: if request.auth != null && (
+      // Adoption catalog is publicly browsable
+      allow read: if true;
+      // Only logged-in advocates can create or update listings
+      allow create, update: if isAuthenticated();
+      // Only the listing owner/advocate can delete it
+      allow delete: if isAuthenticated() && (
         resource.data.advocateId == request.auth.uid ||
         resource.data.userId == request.auth.uid ||
         resource.data.ownerId == request.auth.uid
@@ -56,21 +81,34 @@ service cloud.firestore {
 
     // ── Applications Collection (Adoption / Foster) ───────
     match /applications/{applicationId} {
-      allow read, write, delete: if true;
+      // Private: only authenticated participants (applicant or advocate) can view
+      allow read: if isAuthenticated() && (
+        resource.data.advocateId == request.auth.uid ||
+        resource.data.requesterId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.applicantId == request.auth.uid
+      );
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (
+        resource.data.advocateId == request.auth.uid ||
+        resource.data.requesterId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.applicantId == request.auth.uid
+      );
     }
 
     // ── Conversations & Messages ──────────────────────────
     match /conversations/{convId} {
-      allow read, write, delete: if true;
+      allow read, write: if isAuthenticated();
 
       match /messages/{msgId} {
-        allow read, write, delete: if true;
+        allow read, write: if isAuthenticated();
       }
     }
 
     // ── Donations Collection ──────────────────────────────
     match /donations/{donationId} {
-      allow read, write, delete: if true;
+      allow read, write: if isAuthenticated();
     }
   }
 }
