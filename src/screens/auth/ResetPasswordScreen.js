@@ -101,19 +101,6 @@ export default function ResetPasswordScreen({ navigation, route }) {
     setSending(true);
 
     try {
-      if (checkUserExists) {
-        const userCheck = await checkUserExists(trimmedEmail);
-        if (!userCheck.exists) {
-          showDialog({
-            type: 'error',
-            title: 'Account Not Found',
-            message: 'No ALAGA account is registered with this email address. Please check your spelling or sign up.',
-          });
-          setSending(false);
-          return;
-        }
-      }
-
       const res = await sendPasswordReset(trimmedEmail);
       if (res.success) {
         setIsSent(true);
