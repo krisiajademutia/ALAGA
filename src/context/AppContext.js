@@ -143,7 +143,7 @@ const defaultContext = {
   hideAlert: () => {},
 };
 
-const AppContext = createContext(defaultContext);
+export const AppContext = createContext(defaultContext);
 
 export function AppProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);

@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { COLORS } from '../constants/theme';
 import { getCachedUserAvatar, resolveUserAvatar, cacheUserProfile, getDefaultUserAvatar } from '../services/authService';
-import { AppContext } from '../context/AppContext';
+import { useApp } from '../context/AppContext';
 
 /**
  * Avatar component.
@@ -17,10 +17,17 @@ export default function Avatar({ name, uri, avatar, photo, url, userId, size = 4
   const rawProp = uri || avatar || photo || url || null;
   const cleanPropUri = typeof rawProp === 'string' && rawProp.trim().length > 0 ? rawProp.trim() : null;
 
-  // Reactively access AppContext if available
-  const appContext = useContext(AppContext);
-  const currentUser = appContext?.currentUser || null;
-  const users = appContext?.users || [];
+  // Reactively access AppContext safely via useApp hook
+  let currentUser = null;
+  let users = [];
+  try {
+    const appContext = useApp();
+    currentUser = appContext?.currentUser || null;
+    users = appContext?.users || [];
+  } catch (e) {
+    currentUser = null;
+    users = [];
+  }
 
   // Synchronously compute the best candidate avatar URL
   const resolvedCandidate = useMemo(() => {
