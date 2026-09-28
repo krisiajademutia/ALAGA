@@ -154,6 +154,8 @@ export default function ResetPasswordScreen({ navigation, route }) {
     }
   };
 
+  const handleOpenMailApp = handleOpenSpamFolder;
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
