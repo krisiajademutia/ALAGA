@@ -76,7 +76,7 @@ export default function Avatar({ name, uri, avatar, photo, url, userId, size = 4
     return null;
   }, [cleanPropUri, userId, name, currentUser, users]);
 
-  const [resolvedUri, setResolvedUri] = useState(resolvedCandidate);
+  const [asyncUri, setAsyncUri] = useState(null);
   const [hasError, setHasError] = useState(false);
   const isMounted = useRef(true);
 
@@ -85,30 +85,20 @@ export default function Avatar({ name, uri, avatar, photo, url, userId, size = 4
     return () => { isMounted.current = false; };
   }, []);
 
-  // Update whenever candidate changes or props change
+  // Reset error state if image URI source changes
   useEffect(() => {
     setHasError(false);
-    if (resolvedCandidate) {
-      setResolvedUri(resolvedCandidate);
-      if (userId) {
-        cacheUserProfile({ id: userId, name, avatar: resolvedCandidate });
-      }
-      return;
-    }
+  }, [cleanPropUri, userId]);
 
-    // Asynchronous resolution from Firestore if not yet found and userId is provided
-    if (userId) {
+  // Asynchronous background resolution from Firestore ONLY if not yet cached/resolved
+  useEffect(() => {
+    if (!resolvedCandidate && userId) {
       resolveUserAvatar(userId, name).then((found) => {
-        if (!isMounted.current) return;
-        if (found) {
-          setResolvedUri(found);
+        if (isMounted.current && found) {
+          setAsyncUri(found);
           cacheUserProfile({ id: userId, name, avatar: found });
-        } else {
-          setResolvedUri(null);
         }
       });
-    } else {
-      setResolvedUri(null);
     }
   }, [resolvedCandidate, userId, name]);
 
@@ -118,17 +108,18 @@ export default function Avatar({ name, uri, avatar, photo, url, userId, size = 4
 
   const r = size / 2;
   const base = { width: size, height: size, borderRadius: r };
-  const showImage = !hasError && resolvedUri && typeof resolvedUri === 'string' && resolvedUri.trim().length > 0;
+  const activeUri = !hasError ? (cleanPropUri || resolvedCandidate || asyncUri) : null;
+  const showImage = Boolean(activeUri && typeof activeUri === 'string' && activeUri.trim().length > 0);
 
   const handleImageError = () => {
     setHasError(true);
-    setResolvedUri(null);
+    setAsyncUri(null);
   };
 
   if (showImage) {
     return (
       <Image
-        source={{ uri: resolvedUri }}
+        source={{ uri: activeUri }}
         style={[styles.img, base, style]}
         onError={handleImageError}
       />

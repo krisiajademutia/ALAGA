@@ -41,13 +41,21 @@ export default function AdvocateHomeScreen({ navigation }) {
   const safeTopPadding = Platform.OS === 'ios' ? Math.max(insets.top, 16) + 4 : (insets.top > 24 ? insets.top + 6 : 14);
 
   // Initialize or update user location coordinates
+  const userLatCoord = currentUser?.latitude || currentUser?.locationCoordinates?.latitude || null;
+  const userLngCoord = currentUser?.longitude || currentUser?.locationCoordinates?.longitude || null;
+
   useEffect(() => {
     let isMounted = true;
     (async () => {
-      const uLat = currentUser?.latitude || currentUser?.locationCoordinates?.latitude;
-      const uLng = currentUser?.longitude || currentUser?.locationCoordinates?.longitude;
-      if (uLat && uLng) {
-        if (isMounted) setUserLocation({ latitude: Number(uLat), longitude: Number(uLng) });
+      if (userLatCoord && userLngCoord) {
+        if (isMounted) {
+          setUserLocation((prev) => {
+            const nextLat = Number(userLatCoord);
+            const nextLng = Number(userLngCoord);
+            if (prev && prev.latitude === nextLat && prev.longitude === nextLng) return prev;
+            return { latitude: nextLat, longitude: nextLng };
+          });
+        }
         return;
       }
       try {
@@ -55,9 +63,12 @@ export default function AdvocateHomeScreen({ navigation }) {
         if (status === 'granted') {
           const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
           if (isMounted && pos?.coords) {
-            setUserLocation({
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
+            setUserLocation((prev) => {
+              if (prev && prev.latitude === pos.coords.latitude && prev.longitude === pos.coords.longitude) return prev;
+              return {
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+              };
             });
           }
         }
@@ -68,7 +79,7 @@ export default function AdvocateHomeScreen({ navigation }) {
     return () => {
       isMounted = false;
     };
-  }, [currentUser]);
+  }, [userLatCoord, userLngCoord]);
 
   const toggleFavorite = (id) => {
     setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));

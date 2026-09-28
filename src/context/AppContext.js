@@ -176,9 +176,17 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     const userId = currentUser?.id || currentUser?.uid;
-    if (!userId) { setFavoriteAnimalIds([]); return; }
+    if (!userId) {
+      setFavoriteAnimalIds((prev) => (prev.length === 0 ? prev : []));
+      return;
+    }
     AsyncStorage.getItem(`@alaga_favorites_${userId}`).then((raw) => {
-      if (raw) setFavoriteAnimalIds(JSON.parse(raw));
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) setFavoriteAnimalIds(parsed);
+        } catch (e) {}
+      }
     }).catch(() => {});
   }, [currentUser?.id, currentUser?.uid]);
 
@@ -896,9 +904,11 @@ export function AppProvider({ children }) {
     })();
 
     // Background Firebase Auth state listener to sync profile changes & keep token fresh
+    let authListenerInitialized = false;
     const unsubAuth = subscribeAuthState(async (fbUser) => {
       if (!isMounted) return;
       if (fbUser) {
+        authListenerInitialized = true;
         try {
           const profile = await getUserProfileFirebase(fbUser.uid, true);
           if (profile && isMounted) {
@@ -936,15 +946,16 @@ export function AppProvider({ children }) {
           console.warn('[AppContext] Auth sync notice:', e);
         }
       } else if (isMounted) {
-        // Firebase Auth has no active user (e.g. account deleted from Auth Console or signed out)
-        if (currentUserRef.current) {
+        // Only clear saved session if we already had a confirmed active session that ended
+        if (authListenerInitialized && currentUserRef.current) {
           const uId = currentUserRef.current.id || currentUserRef.current.uid;
-          console.log('[AppContext] Firebase Auth has no session. Clearing saved user session.');
+          console.log('[AppContext] Firebase Auth session ended. Clearing saved user session.');
           setCurrentUser(null);
           currentUserRef.current = null;
           clearCachedUserProfile(uId);
           AsyncStorage.removeItem('@alaga_saved_user_v1').catch(() => {});
         }
+        authListenerInitialized = true;
       }
     });
 
@@ -1284,7 +1295,7 @@ export function AppProvider({ children }) {
         unsubNotifs?.();
       };
     } else {
-      setRequests([]);
+      setRequests((prev) => (prev.length === 0 ? prev : []));
     }
   }, [currentUser?.id]);
 

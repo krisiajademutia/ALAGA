@@ -91,6 +91,7 @@ export default function ProfileScreen({ route, navigation }) {
   }, [route?.params?.openPayoutModal]);
 
   // Load payout methods when currentUser changes
+  const payoutMethodsJson = currentUser?.payoutMethods ? JSON.stringify(currentUser.payoutMethods) : null;
   React.useEffect(() => {
     if (currentUser?.payoutMethods) {
       const pm = currentUser.payoutMethods;
@@ -115,7 +116,7 @@ export default function ProfileScreen({ route, navigation }) {
         setBankAccountNumber(pm.bank.accountNumber || '');
       }
     }
-  }, [currentUser]);
+  }, [payoutMethodsJson]);
 
   const handlePickQr = async (target) => {
     try {

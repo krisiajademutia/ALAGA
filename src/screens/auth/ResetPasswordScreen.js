@@ -18,20 +18,7 @@ import Button from '../../components/Button';
 import AlertModal from '../../components/AlertModal';
 
 export default function ResetPasswordScreen({ navigation, route }) {
-  const { currentUser, sendPasswordReset } = useApp();
-
-  useEffect(() => {
-    if (currentUser) {
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      } else {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Login' }],
-        });
-      }
-    }
-  }, [currentUser]);
+  const { sendPasswordReset } = useApp();
 
   const prefilledEmail = route?.params?.email || '';
 
