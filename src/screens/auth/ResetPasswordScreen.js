@@ -129,18 +129,28 @@ export default function ResetPasswordScreen({ navigation, route }) {
     await handleSendResetEmail();
   };
 
-  const handleOpenMailApp = async () => {
+  const handleOpenSpamFolder = async () => {
+    const clean = (email || '').toLowerCase().trim();
+    let targetUrl = 'https://mail.google.com/mail/u/0/#spam';
+
+    if (clean.includes('yahoo')) {
+      targetUrl = 'https://mail.yahoo.com/d/folders/bulk';
+    } else if (clean.includes('outlook') || clean.includes('hotmail')) {
+      targetUrl = 'https://outlook.live.com/mail/0/junkemail';
+    }
+
     try {
-      if (Platform.OS === 'ios') {
-        const canOpen = await Linking.canOpenURL('message:');
-        if (canOpen) {
-          await Linking.openURL('message:');
+      await Linking.openURL(targetUrl);
+    } catch (err) {
+      console.warn('Could not open spam URL directly:', err);
+      // Fallback: try opening Gmail app without composing
+      try {
+        const canGmail = await Linking.canOpenURL('googlegmail:///');
+        if (canGmail) {
+          await Linking.openURL('googlegmail:///');
           return;
         }
-      }
-      await Linking.openURL('mailto:');
-    } catch (err) {
-      console.warn('Could not open mail client:', err);
+      } catch (e) {}
     }
   };
 
@@ -261,10 +271,10 @@ export default function ResetPasswordScreen({ navigation, route }) {
               3. Return here and sign in with your new password!
             </Text>
 
-            {/* Open Mail App Button */}
+            {/* Open Spam Folder Button */}
             <Button
-              title="Open Email App"
-              onPress={handleOpenMailApp}
+              title="Open Spam / Junk Folder"
+              onPress={handleOpenSpamFolder}
               fullWidth
               style={styles.openMailBtn}
             />
@@ -445,7 +455,7 @@ const styles = StyleSheet.create({
     borderColor: '#E8EFEA',
   },
   openMailBtn: {
-    backgroundColor: '#2E7A99',
+    backgroundColor: '#D97706',
     marginBottom: 10,
   },
   actionBtn: {
