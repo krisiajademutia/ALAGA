@@ -547,56 +547,58 @@ export default function ProfileScreen({ route, navigation }) {
       {/* ── Edit Profile Modal Sheet ─────────────────────────── */}
       <Modal visible={editModalVisible} transparent animationType="slide" onRequestClose={() => setEditModalVisible(false)}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, { maxHeight: '85%' }]}>
             <View style={styles.modalHandle} />
-            <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalTitle}>Edit Profile</Text>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.modalCloseBtn}>
-                <Ionicons name="close" size={20} color="#8C7D6A" />
-              </TouchableOpacity>
-            </View>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
+              <View style={styles.modalHeaderRow}>
+                <Text style={styles.modalTitle}>Edit Profile</Text>
+                <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.modalCloseBtn}>
+                  <Ionicons name="close" size={20} color="#8C7D6A" />
+                </TouchableOpacity>
+              </View>
 
-            <View style={styles.formItem}>
-              <Text style={styles.formLabel}>FULL NAME</Text>
-              <TextInput
-                style={styles.formTextInput}
-                value={editName}
-                onChangeText={setEditName}
-                placeholder="Your full name"
-                placeholderTextColor="#947E68"
-              />
-            </View>
-
-            {isAdvocate && (
               <View style={styles.formItem}>
-                <Text style={styles.formLabel}>ORGANIZATION / SHELTER</Text>
+                <Text style={styles.formLabel}>FULL NAME</Text>
                 <TextInput
                   style={styles.formTextInput}
-                  value={editOrg}
-                  onChangeText={setEditOrg}
-                  placeholder="e.g. PAWS Advocates / Independent Shelter"
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="Your full name"
                   placeholderTextColor="#947E68"
                 />
               </View>
-            )}
 
-            <View style={styles.formItem}>
-              <Text style={styles.formLabel}>LOCATION / CITY</Text>
-              <TextInput
-                style={styles.formTextInput}
-                value={editLocation}
-                onChangeText={setEditLocation}
-                placeholder="e.g. Quezon City, Metro Manila"
-                placeholderTextColor="#947E68"
-              />
-            </View>
+              {isAdvocate && (
+                <View style={styles.formItem}>
+                  <Text style={styles.formLabel}>ORGANIZATION / SHELTER</Text>
+                  <TextInput
+                    style={styles.formTextInput}
+                    value={editOrg}
+                    onChangeText={setEditOrg}
+                    placeholder="e.g. PAWS Advocates / Independent Shelter"
+                    placeholderTextColor="#947E68"
+                  />
+                </View>
+              )}
 
-            <TouchableOpacity style={styles.modalSaveBtn} onPress={handleSaveProfile} activeOpacity={0.85}>
-              <Text style={styles.modalSaveBtnText}>Save Changes</Text>
-            </TouchableOpacity>
+              <View style={styles.formItem}>
+                <Text style={styles.formLabel}>LOCATION / CITY</Text>
+                <TextInput
+                  style={styles.formTextInput}
+                  value={editLocation}
+                  onChangeText={setEditLocation}
+                  placeholder="e.g. Quezon City, Metro Manila"
+                  placeholderTextColor="#947E68"
+                />
+              </View>
+
+              <TouchableOpacity style={styles.modalSaveBtn} onPress={handleSaveProfile} activeOpacity={0.85}>
+                <Text style={styles.modalSaveBtnText}>Save Changes</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -661,7 +663,7 @@ export default function ProfileScreen({ route, navigation }) {
         onRequestClose={() => setPayoutModalVisible(false)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
           <View style={[styles.modalSheet, { maxHeight: '90%' }]}>
@@ -678,7 +680,12 @@ export default function ProfileScreen({ route, navigation }) {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ marginBottom: 12 }}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 60 }}
+              style={{ marginBottom: 12 }}
+            >
               {/* ── GCASH SECTION ───────────────────────── */}
               <View style={styles.payoutSectionCard}>
                 <View style={styles.payoutSectionHeader}>

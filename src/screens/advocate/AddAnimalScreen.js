@@ -791,7 +791,7 @@ const styles = StyleSheet.create({
     color: COLORS.brown,
   },
 
-  scroll: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 48 },
+  scroll: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 140 },
 
   photoHeaderRow: {
     flexDirection: 'row',

@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 22,
     paddingTop: Platform.OS === 'ios' ? 44 : 32,
-    paddingBottom: 36,
+    paddingBottom: 90,
     justifyContent: 'center',
   },
 

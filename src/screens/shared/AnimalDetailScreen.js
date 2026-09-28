@@ -629,75 +629,81 @@ export default function AnimalDetailScreen({ route, navigation }) {
       <Modal visible={modalVisible} animationType="slide" transparent>
         <KeyboardAvoidingView
           style={styles.overlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <TouchableOpacity style={styles.overlayDismiss} onPress={() => setModalVisible(false)} />
-          <View style={styles.sheetModal}>
+          <View style={[styles.sheetModal, { maxHeight: '85%' }]}>
             <View style={styles.sheetHandleModal} />
 
-            <View style={styles.modalHeader}>
-              <View
-                style={[
-                  styles.modalIconWrap,
-                  { backgroundColor: requestType === 'Adoption' ? '#EBF7FA' : '#FEF8DE' },
-                ]}
-              >
-                <Ionicons
-                  name={requestType === 'Adoption' ? 'home' : 'heart'}
-                  size={22}
-                  color={requestType === 'Adoption' ? '#2E7A99' : '#C9AB20'}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 10 }}
+            >
+              <View style={styles.modalHeader}>
+                <View
+                  style={[
+                    styles.modalIconWrap,
+                    { backgroundColor: requestType === 'Adoption' ? '#EBF7FA' : '#FEF8DE' },
+                  ]}
+                >
+                  <Ionicons
+                    name={requestType === 'Adoption' ? 'home' : 'heart'}
+                    size={22}
+                    color={requestType === 'Adoption' ? '#2E7A99' : '#C9AB20'}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle}>
+                    {requestType === 'Adoption' ? `Adopt ${animal.name}` : `Foster ${animal.name}`}
+                  </Text>
+                  <Text style={styles.modalSub}>
+                    {requestType === 'Adoption'
+                      ? `Adoption application for ${animal.advocateName}`
+                      : `Foster care application for ${animal.advocateName}`}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
+                  <Ionicons name="close" size={20} color="#8C7D6A" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalInputWrap}>
+                <Text style={styles.modalInputLabel}>MESSAGE / APPLICANT BACKGROUND</Text>
+                <TextInput
+                  style={styles.modalTextInput}
+                  placeholder={`Tell ${animal.advocateName} about your living setup, experience with pets, and readiness to care for ${animal.name}...`}
+                  placeholderTextColor="#947E68"
+                  value={message}
+                  onChangeText={setMessage}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
                 />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.modalTitle}>
-                  {requestType === 'Adoption' ? `Adopt ${animal.name}` : `Foster ${animal.name}`}
-                </Text>
-                <Text style={styles.modalSub}>
-                  {requestType === 'Adoption'
-                    ? `Adoption application for ${animal.advocateName}`
-                    : `Foster care application for ${animal.advocateName}`}
-                </Text>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => setModalVisible(false)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={styles.modalCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalSubmitBtn, submitting && { opacity: 0.7 }]}
+                  onPress={handleSubmit}
+                  disabled={submitting}
+                  activeOpacity={0.85}
+                >
+                  {submitting ? (
+                    <ActivityIndicator size="small" color="#473018" />
+                  ) : (
+                    <Text style={styles.modalSubmitBtnText}>Submit Application</Text>
+                  )}
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
-                <Ionicons name="close" size={20} color="#8C7D6A" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalInputWrap}>
-              <Text style={styles.modalInputLabel}>MESSAGE / APPLICANT BACKGROUND</Text>
-              <TextInput
-                style={styles.modalTextInput}
-                placeholder={`Tell ${animal.advocateName} about your living setup, experience with pets, and readiness to care for ${animal.name}...`}
-                placeholderTextColor="#947E68"
-                value={message}
-                onChangeText={setMessage}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setModalVisible(false)}
-                activeOpacity={0.75}
-              >
-                <Text style={styles.modalCancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSubmitBtn, submitting && { opacity: 0.7 }]}
-                onPress={handleSubmit}
-                disabled={submitting}
-                activeOpacity={0.85}
-              >
-                {submitting ? (
-                  <ActivityIndicator size="small" color="#473018" />
-                ) : (
-                  <Text style={styles.modalSubmitBtnText}>Submit Application</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>

@@ -173,9 +173,9 @@ function buildMapHtml({ latitude, longitude, title, address, interactive = true 
       attributionControl: false
     }).setView([${lat}, ${lng}], 15);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      subdomains: 'abcd',
-      maxZoom: 19
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
     var pinHtml = '<div class="custom-pin-wrap"><div class="pin-pulse"></div><div class="pin-marker"><div class="pin-dot"></div></div></div>';

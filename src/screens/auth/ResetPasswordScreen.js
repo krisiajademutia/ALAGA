@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 22,
     paddingTop: Platform.OS === 'ios' ? 52 : 36,
-    paddingBottom: 40,
+    paddingBottom: 90,
     justifyContent: 'center',
   },
   backBtn: {

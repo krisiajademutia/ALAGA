@@ -951,7 +951,7 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 48,
+    paddingBottom: 140,
   },
 
   heroSection: {
