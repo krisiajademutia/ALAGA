@@ -12,9 +12,9 @@ service cloud.firestore {
       }
     }
 
-    // ── OTP state is private to trusted Cloud Functions ──
+    // ── OTPs Collection (Brevo verification codes) ────────
     match /otps/{otpId} {
-      allow read, write: if false;
+      allow read, write, delete: if true;
     }
 
     match /otpChallenges/{challengeId} {
