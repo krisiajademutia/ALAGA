@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
-  Linking,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -129,33 +128,6 @@ export default function ResetPasswordScreen({ navigation, route }) {
     await handleSendResetEmail();
   };
 
-  const handleOpenSpamFolder = async () => {
-    const clean = (email || '').toLowerCase().trim();
-    let targetUrl = 'https://mail.google.com/mail/u/0/#spam';
-
-    if (clean.includes('yahoo')) {
-      targetUrl = 'https://mail.yahoo.com/d/folders/bulk';
-    } else if (clean.includes('outlook') || clean.includes('hotmail')) {
-      targetUrl = 'https://outlook.live.com/mail/0/junkemail';
-    }
-
-    try {
-      await Linking.openURL(targetUrl);
-    } catch (err) {
-      console.warn('Could not open spam URL directly:', err);
-      // Fallback: try opening Gmail app without composing
-      try {
-        const canGmail = await Linking.canOpenURL('googlegmail:///');
-        if (canGmail) {
-          await Linking.openURL('googlegmail:///');
-          return;
-        }
-      } catch (e) {}
-    }
-  };
-
-  const handleOpenMailApp = handleOpenSpamFolder;
-
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -272,14 +244,6 @@ export default function ResetPasswordScreen({ navigation, route }) {
               2. Click the secure link to set your new password.{'\n'}
               3. Return here and sign in with your new password!
             </Text>
-
-            {/* Open Spam Folder Button */}
-            <Button
-              title="Open Spam / Junk Folder"
-              onPress={handleOpenSpamFolder}
-              fullWidth
-              style={styles.openMailBtn}
-            />
 
             <Button
               title="Back to Sign In"
@@ -455,10 +419,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E8EFEA',
-  },
-  openMailBtn: {
-    backgroundColor: '#D97706',
-    marginBottom: 10,
   },
   actionBtn: {
     marginTop: 2,
