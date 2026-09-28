@@ -251,8 +251,10 @@ export function AppProvider({ children }) {
     setInAppBanner(null);
   };
 
-  const getOpenAlertsCount = () =>
-    rescueReports.filter((r) => {
+  const getOpenAlertsCount = () => {
+    const activeUser = currentUserRef.current || currentUser;
+    if (activeUser?.role !== 'advocate') return 0;
+    return rescueReports.filter((r) => {
       if (r.status !== 'Open') return false;
       if (lastViewedAlertsTime) {
         const rTime = r.createdAt ? new Date(r.createdAt).getTime() : 0;
@@ -260,6 +262,7 @@ export function AppProvider({ children }) {
       }
       return true;
     }).length;
+  };
 
   const markAlertsAsViewed = () => {
     setLastViewedAlertsTime(Date.now());
@@ -302,6 +305,10 @@ export function AppProvider({ children }) {
       cleanNotif.userId === activeUser?.uid;
 
     if (isForActiveUser) {
+      // Guard: Never push emergency rescue alert cards to community members
+      if (cleanNotif.type === 'rescue' && activeUser?.role !== 'advocate') {
+        return;
+      }
       setNotifications((prev) => {
         const existing = prev.find(
           (n) =>
@@ -329,7 +336,7 @@ export function AppProvider({ children }) {
     if (!report) return;
 
     const activeUser = currentUserRef.current;
-    if (!activeUser) return;
+    if (!activeUser || activeUser.role !== 'advocate') return;
     if (isOwnReport(report, activeUser)) {
       console.log('[AppContext] Suppressing notification: user is the author of this report');
       return;
@@ -359,12 +366,6 @@ export function AppProvider({ children }) {
         distance = getDistanceInKm(uLat, uLng, rLat, rLng);
         if (distance !== null) {
           distStr = distance < 1 ? ` (${Math.round(distance * 1000)}m away)` : ` (${distance.toFixed(1)} km away)`;
-          
-          // DO NOT NOTIFY if the rescue report is further than 50km away
-          if (distance > 50) {
-            console.log(`[AppContext] Suppressing notification: rescue alert is ${distance.toFixed(1)}km away (limit is 50km)`);
-            return;
-          }
         }
       }
     }
@@ -414,6 +415,8 @@ export function AppProvider({ children }) {
 
   const syncRescueAlertNotifications = async (user, reports) => {
     if (!user || !user.id || !Array.isArray(reports)) return;
+    // Strictly guard: Only animal advocates receive rescue alert broadcasts
+    if (user.role !== 'advocate') return;
     const uId = user.id || user.uid;
 
     const storageKey = `@alaga_notified_reports_${uId}`;
@@ -472,7 +475,11 @@ export function AppProvider({ children }) {
       // Check if this rescue alert has already been notified to this user
       const alreadyNotified =
         notifiedReportIdsRef.current.has(rep.id) ||
-        notifications.some((n) => n.id === notifId || (n.type === 'rescue' && n.reportId === rep.id));
+        notifications.some(
+          (n) =>
+            (n.userId === uId || n.userId === 'all') &&
+            (n.id === notifId || (n.type === 'rescue' && n.reportId === rep.id))
+        );
 
       if (alreadyNotified) {
         notifiedReportIdsRef.current.add(rep.id);
@@ -1126,14 +1133,16 @@ export function AppProvider({ children }) {
     const uId = currentUser?.id || currentUser?.uid;
     if (uId) {
       cacheUserProfile(currentUser);
-      // Pre-populate with existing notifications to avoid race conditions during login
+      notifiedReportIdsRef.current.clear();
+      notifiedMessageIdsRef.current.clear();
+      notifiedCommentIdsRef.current.clear();
+
+      // Pre-populate with existing notifications belonging to THIS user to avoid race conditions during login
       notifications.forEach((n) => {
-        if (n.type === 'rescue' && n.reportId) {
+        if ((n.userId === uId || n.userId === currentUser.id || n.userId === currentUser.uid) && n.type === 'rescue' && n.reportId) {
           notifiedReportIdsRef.current.add(n.reportId);
         }
       });
-      notifiedMessageIdsRef.current.clear();
-      notifiedCommentIdsRef.current.clear();
 
       const storageKey = `@alaga_notified_reports_${uId}`;
       AsyncStorage.getItem(storageKey)
@@ -1229,14 +1238,14 @@ export function AppProvider({ children }) {
           });
 
           setNotifications((prev) => {
-            // Keep notifications that belong to 'all' or other users
-            const otherUserNotifs = prev.filter(
-              (n) => n.userId && n.userId !== 'all' && n.userId !== currentUser.id && n.userId !== currentUser.uid
+            // Only keep notifications that belong to 'all' or currentUser (never retain other users' data)
+            const localPending = prev.filter(
+              (n) => n.userId === 'all' || n.userId === currentUser.id || n.userId === currentUser.uid
             );
             // Deduplicate remoteList
             const seenIds = new Set();
             const deduplicated = [];
-            [...remoteList, ...otherUserNotifs].forEach((n) => {
+            [...remoteList, ...localPending].forEach((n) => {
               if (n && n.id && !seenIds.has(n.id)) {
                 seenIds.add(n.id);
                 deduplicated.push(n);
@@ -1329,6 +1338,7 @@ export function AppProvider({ children }) {
     notifiedMessageIdsRef.current.clear();
     notifiedCommentIdsRef.current.clear();
     activeConversationIdRef.current = null;
+    setNotifications([]);
   };
 
   // ── Update current user profile ───────────────────────────────────────────
@@ -1483,6 +1493,36 @@ export function AppProvider({ children }) {
     }
     setRescueReports((prev) => [newReport, ...prev]);
     createRescueReportFirebase(newReport);
+
+    // Broadcast notification directly into each animal advocate's notification subcollection
+    const locationText = newReport.location?.address || 'Near your location';
+    const animalLabel = newReport.animalType || 'Animal';
+    const notifTitle = `Rescue Alert: ${animalLabel} Reported`;
+    const notifDesc = `${newReport.title || newReport.condition || 'Animal in need'} reported at ${locationText}. Tap to review details.`;
+
+    const advocateUsers = (users || []).filter(
+      (u) => u && (u.role === 'advocate' || u.role === 'rescuer') && u.id !== authorId && u.uid !== authorId
+    );
+    advocateUsers.forEach((adv) => {
+      const advId = adv.id || adv.uid;
+      if (advId) {
+        saveNotificationFirebase(advId, {
+          id: `rescue_notif_${newReport.id}`,
+          userId: advId,
+          title: notifTitle,
+          message: notifDesc,
+          body: notifDesc,
+          type: 'rescue',
+          reportId: newReport.id,
+          icon: 'shield-outline',
+          iconBg: '#FDF0ED',
+          iconColor: '#C23E3E',
+          createdAt: newReport.createdAt,
+          read: false,
+        });
+      }
+    });
+
     return newReport;
   };
 
@@ -1520,21 +1560,46 @@ export function AppProvider({ children }) {
   const respondToReport = (reportId) => {
     const responderAvatar = currentUser?.avatar || getDefaultUserAvatar(currentUser?.name, currentUser?.id);
     const respondedAt = new Date().toISOString();
+    let targetReporterId = null;
+    let targetAnimalType = 'the animal';
+
     setRescueReports((prev) =>
-      prev.map((r) =>
-        r.id === reportId
-          ? {
-              ...r,
-              status: 'Responded',
-              responderId: currentUser?.id,
-              responderName: currentUser?.name,
-              responderAvatar,
-              respondedAt,
-            }
-          : r
-      )
+      prev.map((r) => {
+        if (r.id === reportId) {
+          targetReporterId = r.reporterId;
+          targetAnimalType = r.animalType || 'the animal';
+          return {
+            ...r,
+            status: 'Responded',
+            responderId: currentUser?.id,
+            responderName: currentUser?.name,
+            responderAvatar,
+            respondedAt,
+          };
+        }
+        return r;
+      })
     );
     claimRescueReportFirebase(reportId, currentUser?.id, currentUser?.name, responderAvatar);
+
+    // Notify the community reporter that an animal advocate has claimed the rescue
+    if (targetReporterId && targetReporterId !== currentUser?.id && targetReporterId !== currentUser?.uid) {
+      const respNotif = {
+        id: `response_notif_${reportId}_${Date.now()}`,
+        userId: targetReporterId,
+        title: 'Rescue Response Update',
+        message: `${currentUser?.name || 'An animal advocate'} has responded to your rescue report for ${targetAnimalType} and is on the way!`,
+        body: `${currentUser?.name || 'An animal advocate'} has responded to your rescue report for ${targetAnimalType} and is on the way!`,
+        type: 'rescue_response',
+        reportId,
+        icon: 'checkmark-circle-outline',
+        iconBg: '#E8F5EE',
+        iconColor: '#2D9E5F',
+        createdAt: respondedAt,
+        read: false,
+      };
+      saveNotificationFirebase(targetReporterId, respNotif);
+    }
   };
 
   const markRescued = (reportId) => {
@@ -2425,19 +2490,27 @@ export function AppProvider({ children }) {
   const getUserNotifications = () => {
     const activeUser = currentUserRef.current || currentUser;
     const uId = activeUser?.id || activeUser?.uid;
+    const isAdvocate = activeUser?.role === 'advocate';
     return notifications
-      .filter((n) => !n.userId || n.userId === 'all' || (uId && (n.userId === uId || n.userId === activeUser?.id || n.userId === activeUser?.uid)))
+      .filter((n) => {
+        // Community users must NEVER see rescue alert notifications
+        if (n.type === 'rescue' && !isAdvocate) return false;
+        return !n.userId || n.userId === 'all' || (uId && (n.userId === uId || n.userId === activeUser?.id || n.userId === activeUser?.uid));
+      })
       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   };
 
   const getUnreadCount = () => {
     const activeUser = currentUserRef.current || currentUser;
     const uId = activeUser?.id || activeUser?.uid;
-    return notifications.filter(
-      (n) =>
+    const isAdvocate = activeUser?.role === 'advocate';
+    return notifications.filter((n) => {
+      if (n.type === 'rescue' && !isAdvocate) return false;
+      return (
         (!n.userId || n.userId === 'all' || (uId && (n.userId === uId || n.userId === activeUser?.id || n.userId === activeUser?.uid))) &&
         !n.read
-    ).length;
+      );
+    }).length;
   };
 
   const markNotificationRead = (notifId) => {
