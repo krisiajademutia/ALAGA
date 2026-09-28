@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Linking,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +19,7 @@ import Button from '../../components/Button';
 import AlertModal from '../../components/AlertModal';
 
 export default function ResetPasswordScreen({ navigation, route }) {
-  const { currentUser, checkUserExists, sendPasswordReset } = useApp();
+  const { currentUser, sendPasswordReset } = useApp();
 
   useEffect(() => {
     if (currentUser) {
@@ -128,6 +129,21 @@ export default function ResetPasswordScreen({ navigation, route }) {
     await handleSendResetEmail();
   };
 
+  const handleOpenMailApp = async () => {
+    try {
+      if (Platform.OS === 'ios') {
+        const canOpen = await Linking.canOpenURL('message:');
+        if (canOpen) {
+          await Linking.openURL('message:');
+          return;
+        }
+      }
+      await Linking.openURL('mailto:');
+    } catch (err) {
+      console.warn('Could not open mail client:', err);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -162,7 +178,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
           <Text style={styles.title}>Reset Password</Text>
           <Text style={styles.subtitle}>
             {isSent
-              ? 'Check your inbox for the reset link'
+              ? 'Check your inbox or spam folder for the link'
               : 'Enter your email to receive an official password reset link'}
           </Text>
         </View>
@@ -228,11 +244,30 @@ export default function ResetPasswordScreen({ navigation, route }) {
               </View>
             </View>
 
+            {/* Prominent High-Visibility Spam Notice Banner */}
+            <View style={styles.spamNoticeCard}>
+              <View style={styles.spamNoticeHeader}>
+                <Ionicons name="alert-circle" size={20} color="#D97706" style={{ marginRight: 6 }} />
+                <Text style={styles.spamNoticeTitle}>Didn't see it in your Inbox?</Text>
+              </View>
+              <Text style={styles.spamNoticeBody}>
+                Please check your <Text style={{ fontWeight: '800', color: '#92400E' }}>Spam</Text> or <Text style={{ fontWeight: '800', color: '#92400E' }}>Junk</Text> folder! Gmail and other mail providers often automatically sort first-time verification links there.
+              </Text>
+            </View>
+
             <Text style={styles.instructionText}>
-              1. Open the email from ALAGA / Firebase.{'\n'}
+              1. Open your email from ALAGA / Firebase.{'\n'}
               2. Click the secure link to set your new password.{'\n'}
-              3. Return here and sign in with your new credentials!
+              3. Return here and sign in with your new password!
             </Text>
+
+            {/* Open Mail App Button */}
+            <Button
+              title="Open Email App"
+              onPress={handleOpenMailApp}
+              fullWidth
+              style={styles.openMailBtn}
+            />
 
             <Button
               title="Back to Sign In"
@@ -372,19 +407,49 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
+
+  // Spam Notice Card
+  spamNoticeCard: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  spamNoticeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  spamNoticeTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  spamNoticeBody: {
+    fontSize: 13,
+    color: '#78350F',
+    lineHeight: 19,
+  },
+
   instructionText: {
     fontSize: 13,
     color: COLORS.textSecondary,
     lineHeight: 22,
-    marginBottom: 20,
+    marginBottom: 16,
     backgroundColor: '#F8FAF9',
     padding: 14,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E8EFEA',
   },
+  openMailBtn: {
+    backgroundColor: '#2E7A99',
+    marginBottom: 10,
+  },
   actionBtn: {
-    marginTop: 6,
+    marginTop: 2,
     backgroundColor: COLORS.primary,
   },
   cancelLink: {
@@ -405,7 +470,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F6F4',
     padding: 12,
     borderRadius: 12,
-    marginBottom: 16,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: '#E2EBE5',
   },
