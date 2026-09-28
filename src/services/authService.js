@@ -262,7 +262,8 @@ export async function loginWithFirebase(email, password) {
 
   const firestoreDoc = matchingDocs[0] || null;
   const firestoreData = firestoreDoc ? firestoreDoc.data() : null;
-  const authoritativeHash = firestoreData?.passwordHash || localHash;
+  // ONLY use localHash if the user actually exists in Firestore
+  const authoritativeHash = firestoreData?.passwordHash || (firestoreDoc ? localHash : null);
 
   // STRICT REJECTION: If the user has an authoritative password hash registered
   // and the entered password's hash does NOT match, REJECT IMMEDIATELY.
@@ -285,13 +286,21 @@ export async function loginWithFirebase(email, password) {
       cacheUserProfile(user);
       return { success: true, user };
     } catch (fbErr) {
-      // If Firebase Auth backend credentials have not synced (e.g., password reset via OTP when logged out),
-      // the Firestore passwordHash verification is authoritative and successful!
-      const uid = firestoreDoc?.id || 'user_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
-      const avatar = extractUserAvatar(firestoreData);
-      const user = { id: uid, ...(firestoreData || {}), avatar };
-      cacheUserProfile(user);
-      return { success: true, user };
+      // ONLY allow fallback if the user document ACTUALLY exists in Firestore!
+      if (firestoreDoc && firestoreData) {
+        const uid = firestoreDoc.id;
+        const avatar = extractUserAvatar(firestoreData);
+        const user = { id: uid, ...firestoreData, avatar };
+        cacheUserProfile(user);
+        return { success: true, user };
+      }
+      // If the account was deleted or not found in Firebase Auth:
+      await fbSignOut(auth).catch(() => {});
+      await AsyncStorage.removeItem('@alaga_pwd_hash_' + cleanEmail).catch(() => {});
+      return {
+        success: false,
+        error: 'No account found with this email. Please register first.',
+      };
     }
   }
 
@@ -318,31 +327,20 @@ export async function loginWithFirebase(email, password) {
       cacheUserProfile(user);
       return { success: true, user };
     } else {
-      const derivedName = cleanEmail.split('@')[0].replace(/[._]/g, ' ');
-      const avatar = userCredential?.user?.photoURL || null;
-      const newUserData = {
-        id: uid,
-        email: cleanEmail,
-        name: userCredential?.user?.displayName || derivedName,
-        role: 'community',
-        avatar,
-        passwordHash: hashedInput,
-        passwordUpdatedAt: new Date().toISOString(),
-        location: '',
-        organization: '',
-        joinedAt: new Date().toISOString().split('T')[0],
-        createdAt: new Date().toISOString(),
-        reportCount: 0,
+      // User exists in Firebase Auth but has no Firestore profile record (e.g. database was wiped)
+      await fbSignOut(auth).catch(() => {});
+      await AsyncStorage.removeItem('@alaga_pwd_hash_' + cleanEmail).catch(() => {});
+      return {
+        success: false,
+        error:
+          'No account profile found in the database. If you recently reset the database, please register again to create your account.',
       };
-      await setDoc(userDocRef, newUserData);
-      await AsyncStorage.setItem('@alaga_pwd_hash_' + cleanEmail, hashedInput).catch(() => {});
-      cacheUserProfile(newUserData);
-      return { success: true, user: newUserData };
     }
   } catch (signErr) {
     let msg = 'Incorrect email or password.';
     if (signErr.code === 'auth/user-not-found' || signErr.code === 'auth/invalid-credential') {
-      msg = 'No account found with this email or password. Please register first.';
+      msg = 'No account found with this email. Please register first.';
+      await AsyncStorage.removeItem('@alaga_pwd_hash_' + cleanEmail).catch(() => {});
     } else if (signErr.code === 'auth/wrong-password') {
       msg = 'Incorrect password. Please try again or tap "Forgot Password?".';
     } else if (signErr.code === 'auth/too-many-requests') {
@@ -658,6 +656,16 @@ export function getCachedUserProfile(userId) {
   return userProfileCache.get(userId) || null;
 }
 
+export function clearCachedUserProfile(userId) {
+  if (userId) {
+    userProfileCache.delete(userId);
+    userAvatarCache.delete(userId);
+  } else {
+    userProfileCache.clear();
+    userAvatarCache.clear();
+  }
+}
+
 /**
  * Fetch a specific user's profile from Firestore (including their real payoutMethods & avatar)
  */
@@ -678,9 +686,12 @@ export async function getUserProfileFirebase(userId, forceFresh = false) {
       cacheUserProfile(profile);
       return profile;
     }
-    return cached || null;
+    // Document confirmed not to exist in Firestore! Purge cache and return null
+    clearCachedUserProfile(userId);
+    return null;
   } catch (err) {
-    console.warn('[authService] Error fetching user profile:', err?.message || err);
+    console.warn('[authService] Error fetching user profile (network/offline):', err?.message || err);
+    // On network failure or offline mode, preserve cached profile so users aren't mistakenly logged out
     return cached || null;
   }
 }

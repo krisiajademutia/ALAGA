@@ -10,6 +10,7 @@ import {
   loginWithGoogleCredential,
   loginWithGoogleProfile,
   cacheUserProfile,
+  clearCachedUserProfile,
   getCachedUserProfile,
   getAllUsersFirebase,
   subscribeToAllUsersFirebase,
@@ -825,7 +826,9 @@ export function AppProvider({ children }) {
 
         if (savedUserStr) {
           const parsed = JSON.parse(savedUserStr);
-          if (parsed && (parsed.id || parsed.uid)) {
+          const uId = parsed?.id || parsed?.uid;
+          if (parsed && uId) {
+            // 1. Restore user session immediately so app opens instantly with zero delay
             if (!parsed.avatar) {
               parsed.avatar = getDefaultUserAvatar(parsed.name, parsed.id || parsed.uid);
             }
@@ -833,6 +836,27 @@ export function AppProvider({ children }) {
             currentUserRef.current = parsed;
             cacheUserProfile(parsed);
             setIsOnboardingCompleted(true);
+
+            // 2. In background, verify against Firestore that the account was not deleted
+            getUserProfileFirebase(uId, true)
+              .then((freshProfile) => {
+                if (freshProfile && isMounted) {
+                  const updated = { ...parsed, ...freshProfile };
+                  setCurrentUser(updated);
+                  currentUserRef.current = updated;
+                  cacheUserProfile(updated);
+                  AsyncStorage.setItem('@alaga_saved_user_v1', JSON.stringify(updated)).catch(() => {});
+                } else if (freshProfile === null && isMounted) {
+                  // Confirmed that the account was deleted from Firebase!
+                  console.log('[AppContext] Saved session account deleted from Firebase. Logging out automatically.');
+                  setCurrentUser(null);
+                  currentUserRef.current = null;
+                  clearCachedUserProfile(uId);
+                  AsyncStorage.removeItem('@alaga_saved_user_v1').catch(() => {});
+                  logoutFromFirebase().catch(() => {});
+                }
+              })
+              .catch(() => {});
           }
         }
       } catch (err) {
@@ -849,7 +873,7 @@ export function AppProvider({ children }) {
       if (!isMounted) return;
       if (fbUser) {
         try {
-          const profile = await getUserProfileFirebase(fbUser.uid);
+          const profile = await getUserProfileFirebase(fbUser.uid, true);
           if (profile && isMounted) {
             const resolvedAvatar =
               profile.avatar ||
@@ -871,9 +895,28 @@ export function AppProvider({ children }) {
             AsyncStorage.setItem('@alaga_saved_user_v1', JSON.stringify(updatedProfile)).catch(() => {});
             setIsOnboardingCompleted(true);
             AsyncStorage.setItem('@alaga_onboarding_completed_v1', 'true').catch(() => {});
+          } else if (!profile && isMounted) {
+            // Profile document was removed from Firestore (e.g. database wipe or user deleted)
+            // Immediately clear local state and sign out of Firebase Auth so stale/dummy sessions aren't kept
+            console.log('[AppContext] User document deleted from Firestore. Logging out automatically.');
+            setCurrentUser(null);
+            currentUserRef.current = null;
+            clearCachedUserProfile(fbUser.uid);
+            AsyncStorage.removeItem('@alaga_saved_user_v1').catch(() => {});
+            logoutFromFirebase().catch(() => {});
           }
         } catch (e) {
           console.warn('[AppContext] Auth sync notice:', e);
+        }
+      } else if (isMounted) {
+        // Firebase Auth has no active user (e.g. account deleted from Auth Console or signed out)
+        if (currentUserRef.current) {
+          const uId = currentUserRef.current.id || currentUserRef.current.uid;
+          console.log('[AppContext] Firebase Auth has no session. Clearing saved user session.');
+          setCurrentUser(null);
+          currentUserRef.current = null;
+          clearCachedUserProfile(uId);
+          AsyncStorage.removeItem('@alaga_saved_user_v1').catch(() => {});
         }
       }
     });
@@ -1024,26 +1067,33 @@ export function AppProvider({ children }) {
 
       // Real-time listener for all registered users to keep profiles 100% consistent across all screens
       const unsubUsers = subscribeToAllUsersFirebase((allUsers) => {
-        if (Array.isArray(allUsers) && allUsers.length > 0) {
-          setUsers(allUsers);
-          const activeUser = currentUserRef.current;
-          if (activeUser && (activeUser.id || activeUser.uid)) {
-            const myId = activeUser.id || activeUser.uid;
-            const updatedMe = allUsers.find((u) => u && (u.id === myId || u.uid === myId));
-            if (updatedMe) {
-              const merged = { ...activeUser, ...updatedMe };
-              if (
-                merged.name !== activeUser.name ||
-                merged.avatar !== activeUser.avatar ||
-                merged.location !== activeUser.location ||
-                merged.organization !== activeUser.organization ||
-                merged.role !== activeUser.role ||
-                merged.phone !== activeUser.phone
-              ) {
-                setCurrentUser(merged);
-                currentUserRef.current = merged;
-                cacheUserProfile(merged);
-              }
+        const usersList = Array.isArray(allUsers) ? allUsers : [];
+        setUsers(usersList);
+        const activeUser = currentUserRef.current;
+        if (activeUser && (activeUser.id || activeUser.uid)) {
+          const myId = activeUser.id || activeUser.uid;
+          const updatedMe = usersList.find((u) => u && (u.id === myId || u.uid === myId));
+          if (!updatedMe) {
+            // Active user no longer exists in Firestore (deleted by admin or collection reset)
+            console.log('[AppContext] Active user deleted from Firestore. Logging out automatically.');
+            setCurrentUser(null);
+            currentUserRef.current = null;
+            clearCachedUserProfile(myId);
+            AsyncStorage.removeItem('@alaga_saved_user_v1').catch(() => {});
+            logoutFromFirebase().catch(() => {});
+          } else {
+            const merged = { ...activeUser, ...updatedMe };
+            if (
+              merged.name !== activeUser.name ||
+              merged.avatar !== activeUser.avatar ||
+              merged.location !== activeUser.location ||
+              merged.organization !== activeUser.organization ||
+              merged.role !== activeUser.role ||
+              merged.phone !== activeUser.phone
+            ) {
+              setCurrentUser(merged);
+              currentUserRef.current = merged;
+              cacheUserProfile(merged);
             }
           }
         }
