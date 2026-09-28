@@ -91,7 +91,7 @@ export default function LoginScreen({ navigation }) {
 
         {/* Clean White Form Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Welcome back</Text>
+          <Text style={styles.cardTitle}>Welcome</Text>
           <Text style={styles.cardSubtitle}>
             Sign in with your email and password
           </Text>
@@ -209,11 +209,13 @@ const styles = StyleSheet.create({
     ...FONTS.titleXl,
     color: COLORS.textPrimary,
     marginBottom: 4,
+    textAlign: 'center',
   },
   cardSubtitle: {
     ...FONTS.subtitle,
     color: COLORS.textSecondary,
     marginBottom: 20,
+    textAlign: 'center',
   },
 
   passwordFieldWrap: {
@@ -259,5 +261,3 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
 });
-
-
