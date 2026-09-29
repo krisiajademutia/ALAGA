@@ -70,25 +70,6 @@ ALAGA is built following a decoupled, layered client-server architecture:
 
 ---
 
-## 🛠️ Technology Stack
-
-| Layer | Technology | Specification / Version | Purpose |
-| :--- | :--- | :--- | :--- |
-| **Mobile Framework** | [React Native](https://reactnative.dev/) | `v0.86.2` | Native cross-platform mobile compilation |
-| **Runtime & Toolchain** | [Expo SDK](https://expo.dev/) | `v57.0.16` | Native device APIs, managed workflow & dev tooling |
-| **UI Engine** | [React](https://react.dev/) | `v19.2.3` | Reactive components & concurrent state hooks |
-| **Navigation** | [React Navigation](https://reactnavigation.org/) | `v7.x` | Native stacks, modal overlays & persistent tab bars |
-| **Database & Auth** | [Google Firebase](https://firebase.google.com/) | `v12.19.0` | Cloud Firestore real-time NoSQL & Auth |
-| **Email Verification** | [Brevo API v3](https://www.brevo.com/) | REST API | Transactional 6-digit email OTP dispatch |
-| **Cloud Storage** | [ImgBB API](https://api.imgbb.com/) | REST API | Multi-part cloud image hosting for rescues & pets |
-| **Hardware APIs** | `expo-location`, `expo-image-picker` | SDK 57 | Native GPS geocoding and camera/gallery picker |
-| **Local Storage** | `@react-native-async-storage` | `v2.2.0` | Persistent session token & user preferences |
-| **Animations** | `react-native-reanimated` | `v4.5.1` | Native thread micro-interactions and transitions |
-| **Typography** | `@expo-google-fonts/plus-jakarta-sans` | `v0.4.2` | Clean, modern typography |
-| **Iconography** | `@expo/vector-icons` (Ionicons) | `v15.1.1` | Vector iconography |
-
----
-
 ```
 
 ---
@@ -132,12 +113,6 @@ Make sure you have the following installed on your development machine:
 
 ---
 
-## 🔒 Security & Data Integrity
-
-- **Deterministic Firestore Document IDs:** Animal listings, rescue reports, and donation records use deterministic IDs combined with `setDoc(..., { merge: true })`, preventing synchronization conflicts across varying mobile connectivity.
-- **Participant-Scoped Messaging:** Chat queries enforce security bounds (`where('participants', 'array-contains', currentUid)`), ensuring private peer-to-peer communication between responders and reporters.
-- **Role-Based Guards:** Status transitions (such as claiming a rescue, approving applications, or verifying donations) verify that the authenticated user possesses the advocate role before persisting changes.
-- **Secure Transactional OTPs:** 6-digit verification codes generated and verified server-side with strict 60-second request rate limiting.
 
 ---
 
