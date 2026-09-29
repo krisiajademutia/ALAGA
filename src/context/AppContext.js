@@ -167,6 +167,7 @@ export function AppProvider({ children }) {
   const notifiedReportIdsRef = useRef(new Set()); // Set of report IDs that have triggered phone alerts for active user
   const notifiedMessageIdsRef = useRef(new Set()); // Set of message IDs that have triggered alerts
   const notifiedCommentIdsRef = useRef(new Set()); // Set of comment/reply IDs that have triggered alerts for active user
+  const notifiedGeneralIdsRef = useRef(new Set()); // Set of general notification IDs (adoption, donation, status updates)
   const activeConversationIdRef = useRef(null); // ID of chat screen currently active/focused
   const userProfilesCacheRef = useRef(new Map()); // In-memory cache of fetched user profiles to prevent re-render loops
 
@@ -1168,6 +1169,7 @@ export function AppProvider({ children }) {
       notifiedReportIdsRef.current.clear();
       notifiedMessageIdsRef.current.clear();
       notifiedCommentIdsRef.current.clear();
+      notifiedGeneralIdsRef.current.clear();
 
       // Pre-populate with existing notifications belonging to THIS user to avoid race conditions during login
       notifications.forEach((n) => {
@@ -1256,6 +1258,7 @@ export function AppProvider({ children }) {
         }
       });
       // Gap 2 fix: Subscribe to user's Firestore notifications subcollection for cross-device sync
+      let isFirstNotifsSync = true;
       const unsubNotifs = subscribeToNotificationsFirebase(
         currentUser.id,
         (firestoreNotifs) => {
@@ -1268,6 +1271,33 @@ export function AppProvider({ children }) {
               notifiedReportIdsRef.current.add(n.reportId);
             }
           });
+
+          // Deliver native phone notifications ONLY to the intended recipient device
+          if (!isFirstNotifsSync) {
+            remoteList.forEach((n) => {
+              if (!n || !n.id) return;
+              const isTargetUser = n.userId === currentUser.id || n.userId === currentUser.uid;
+              if (isTargetUser && !notifiedGeneralIdsRef.current.has(n.id)) {
+                notifiedGeneralIdsRef.current.add(n.id);
+                const nTime = n.createdAt ? new Date(n.createdAt).getTime() : 0;
+                const isRecent = nTime > 0 && (Date.now() - nTime) < 24 * 60 * 60 * 1000;
+                if (isRecent && n.type !== 'rescue' && n.type !== 'chat') {
+                  notifyPhoneSystem({
+                    title: n.title,
+                    body: n.body || n.message,
+                    data: { type: n.type, requestId: n.requestId, donationId: n.donationId, animalId: n.animalId },
+                    channelId: 'default',
+                  }).catch(() => {});
+                }
+              }
+            });
+          } else {
+            // Initial load: pre-seed historical notification IDs so existing notifications do not trigger alerts
+            remoteList.forEach((n) => {
+              if (n?.id) notifiedGeneralIdsRef.current.add(n.id);
+            });
+            isFirstNotifsSync = false;
+          }
 
           setNotifications((prev) => {
             // Only keep notifications that belong to 'all' or currentUser (never retain other users' data)
@@ -1830,13 +1860,15 @@ export function AppProvider({ children }) {
     setRequests((prev) => [newRequest, ...prev]);
     submitApplicationFirebase(newRequest);
 
-    // Real-time alert for the animal's advocate
+    // Real-time alert for the animal's advocate (pet owner)
     const animal = animals.find((a) => a.id === requestData.animalId);
     const advocateId = animal?.advocateId;
-    if (advocateId) {
+    if (advocateId && advocateId !== currentUser?.id) {
       const reqType = requestData.type || 'Adoption';
       const title = `New ${reqType} Application`;
       const body = `${newRequest.requesterName} submitted an application for ${animal?.name || 'an animal'}.`;
+      // Save notification to Firestore under the advocate's subcollection
+      // The advocate's device will receive it in real-time and trigger the native alert!
       pushNotification({
         userId: advocateId,
         title,
@@ -1844,18 +1876,13 @@ export function AppProvider({ children }) {
         message: body,
         type: 'adoption',
         requestId: newRequest.id,
+        animalId: animal.id,
         icon: 'paw-outline',
         iconBg: '#EDF6F1',
         iconColor: '#2B8259',
       });
-      if (currentUser?.id !== advocateId) {
-        notifyPhoneSystem({
-          title,
-          body,
-          data: { type: 'adoption', requestId: newRequest.id },
-          channelId: 'default',
-        }).catch(() => {});
-      }
+      // NOTE: Do NOT call notifyPhoneSystem here. Calling it here triggers the popup
+      // on the requester's device instead of the pet owner's device.
     }
 
     return newRequest;
@@ -1874,26 +1901,22 @@ export function AppProvider({ children }) {
       const title = `Application ${status}`;
       const body = `Your ${reqType.toLowerCase()} application for ${animal?.name || 'the animal'} has been ${status.toLowerCase()}.`;
 
-      pushNotification({
-        userId: req.requesterId,
-        title,
-        body,
-        message: body,
-        type: 'adoption',
-        requestId: req.id,
-        icon: 'paw-outline',
-        iconBg: '#EDF6F1',
-        iconColor: '#2B8259',
-      });
-
-      if (currentUser?.id !== req.requesterId) {
-        notifyPhoneSystem({
+      if (req.requesterId && req.requesterId !== currentUser?.id) {
+        pushNotification({
+          userId: req.requesterId,
           title,
           body,
-          data: { type: 'adoption', requestId: req.id },
-          channelId: 'default',
-        }).catch(() => {});
+          message: body,
+          type: 'adoption',
+          requestId: req.id,
+          animalId: req.animalId,
+          icon: 'paw-outline',
+          iconBg: '#EDF6F1',
+          iconColor: '#2B8259',
+        });
       }
+      // NOTE: Do NOT call notifyPhoneSystem here. This code runs on the advocate's device.
+      // Calling notifyPhoneSystem here would pop up on the advocate's phone instead of the applicant.
     }
 
     // When approved: update the animal's status accordingly
@@ -2362,12 +2385,7 @@ export function AppProvider({ children }) {
         iconBg: '#FEF3DC',
         iconColor: '#B45309',
       });
-      notifyPhoneSystem({
-        title: notifTitle,
-        body: notifBody,
-        data: { type: 'donation', donationId: newDonation.id },
-        channelId: 'default',
-      }).catch(() => {});
+      // NOTE: Do NOT call notifyPhoneSystem here as it executes on the donor's phone.
     }
 
     // Donor confirmation notification
