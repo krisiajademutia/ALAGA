@@ -1927,18 +1927,35 @@ export function AppProvider({ children }) {
     if (!Array.isArray(liveConvos)) return;
     setConversations((prev) => {
       const merged = new Map();
-      // Cached snapshots may be incomplete while offline, so keep the local inbox
-      // until Firestore confirms a server snapshot. Preserve blank in-memory drafts
-      // during synchronization, but never promote them into the persisted inbox.
-      if (snapshotState.fromCache) {
-        (prev || []).forEach((c) => { if (c?.id) merged.set(c.id, c); });
-      } else {
-        (prev || []).filter((c) => !String(c?.lastMessage || '').trim()).forEach((c) => {
-          if (c?.id) merged.set(c.id, c);
-        });
-      }
-      liveConvos.forEach((c) => { if (c?.id) merged.set(c.id, c); });
-      return Array.from(merged.values());
+      // Keep all existing conversations in local state/cache so they never disappear
+      (prev || []).forEach((c) => {
+        if (c?.id) merged.set(c.id, c);
+      });
+      // Merge in remote conversations from Firestore
+      liveConvos.forEach((remote) => {
+        if (!remote?.id) return;
+        const local = merged.get(remote.id);
+        if (local) {
+          const localTime = new Date(local.lastMessageTime || 0).getTime();
+          const remoteTime = new Date(remote.lastMessageTime || 0).getTime();
+          if (localTime > remoteTime && local.lastMessage) {
+            merged.set(remote.id, {
+              ...remote,
+              lastMessage: local.lastMessage,
+              lastMessageTime: local.lastMessageTime,
+              lastSenderId: local.lastSenderId,
+              unread: local.unread,
+            });
+          } else {
+            merged.set(remote.id, { ...local, ...remote });
+          }
+        } else {
+          merged.set(remote.id, remote);
+        }
+      });
+      return Array.from(merged.values()).sort(
+        (a, b) => new Date(b.lastMessageTime || 0) - new Date(a.lastMessageTime || 0)
+      );
     });
 
     const activeUser = currentUserRef.current;
@@ -2079,8 +2096,18 @@ export function AppProvider({ children }) {
             : Boolean(String(newMsg.text || '').trim());
     if (!hasContent) return false;
 
-    const existing = conversations.find((c) => c.id === conversationId);
-    if (!existing) return false;
+    let existing = conversations.find((c) => c.id === conversationId);
+    if (!existing) {
+      existing = {
+        id: conversationId,
+        participants: [uId],
+        participantNames: { [uId]: activeUser.name || 'User' },
+        participantAvatars: { [uId]: activeUser.avatar || null },
+        unreadCounts: { [uId]: 0 },
+        lastMessage: '',
+        lastMessageTime: new Date().toISOString(),
+      };
+    }
 
     const lastSummary =
       newMsg.type === 'image'
@@ -2116,7 +2143,7 @@ export function AppProvider({ children }) {
       unreadCount: (nextUnreadCounts[uId] || 0),
       unread: false, // sender has already read their own message
     };
-    const messageResult = await saveConversationMessageFirebase(updatedConvoMeta, newMsg);
+    const messageResult = await saveConversationMessageFirebase(updatedConvoMeta, newMsg, uId);
     if (messageResult?.error) {
       console.warn('[AppContext] saveConversationMessageFirebase warning:', messageResult.error);
       showAlert({
@@ -2126,7 +2153,13 @@ export function AppProvider({ children }) {
       });
       return false;
     }
-    setConversations((prev) => prev.map((c) => (c.id === conversationId ? updatedConvoMeta : c)));
+    setConversations((prev) => {
+      const exists = prev.some((c) => c.id === conversationId);
+      if (exists) {
+        return prev.map((c) => (c.id === conversationId ? updatedConvoMeta : c));
+      }
+      return [updatedConvoMeta, ...prev];
+    });
     return true;
   };
 

@@ -98,14 +98,13 @@ export default function ChatScreen({ route, navigation }) {
         if (!active || !Array.isArray(firestoreMsgs)) return;
         setMessages((prev) => {
           const merged = new Map();
-          firestoreMsgs.forEach((message) => {
+          // Seed previously loaded / cached / optimistic messages so they never disappear
+          (prev || []).forEach((message) => {
             if (message?.id) merged.set(message.id, message);
           });
-          // Keep cached messages while Firestore is serving an offline snapshot;
-          // once the server responds, only unsaved optimistic messages are kept.
-          prev.forEach((message) => {
-            if (!message?.id || merged.has(message.id)) return;
-            if (snapshotState.fromCache || message._pending) merged.set(message.id, message);
+          // Merge in live messages from Firestore
+          firestoreMsgs.forEach((message) => {
+            if (message?.id) merged.set(message.id, message);
           });
           const next = Array.from(merged.values()).sort(
             (a, b) => new Date(a.time || 0) - new Date(b.time || 0)
@@ -137,11 +136,26 @@ export default function ChatScreen({ route, navigation }) {
     }
   }, [messages.length]);
 
-  const convo = conversations.find((c) => c.id === conversationId);
-  const isGroup = convo?.isGroup || false;
-  const detectedOtherId = convo?.participants?.find((p) => p !== currentUser?.id);
-  const otherId = isGroup ? null : (routeOtherId || detectedOtherId || null);
+  const foundConvo = conversations.find((c) => c.id === conversationId);
+  const detectedOtherId = foundConvo?.participants?.find((p) => p !== currentUser?.id);
+  const otherId = foundConvo?.isGroup ? null : (routeOtherId || detectedOtherId || null);
   const otherUser = otherId ? getUserById(otherId) : null;
+  const convo = foundConvo || {
+    id: conversationId,
+    participants: currentUser?.id && otherId ? [currentUser.id, otherId] : (currentUser?.id ? [currentUser.id] : []),
+    participantNames: {
+      ...(currentUser?.id ? { [currentUser.id]: currentUser.name || 'You' } : {}),
+      ...(otherId ? { [otherId]: resolvedOtherName || 'Chat' } : {}),
+    },
+    participantAvatars: {
+      ...(currentUser?.id ? { [currentUser.id]: currentUser.avatar || null } : {}),
+      ...(otherId ? { [otherId]: routeOtherAvatar || null } : {}),
+    },
+    lastMessage: '',
+    lastMessageTime: new Date().toISOString(),
+    unreadCounts: {},
+  };
+  const isGroup = convo?.isGroup || false;
   const otherAvatar =
     otherUser?.avatar ||
     routeOtherAvatar ||
