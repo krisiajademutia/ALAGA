@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { brevoConfig, isBrevoConfigured } from '../config/brevoConfig';
+import { checkUserExistsByEmail } from './authService';
 
 // Storage keys
 const OTP_STORAGE_PREFIX = '@alaga_otp_';
@@ -238,6 +239,20 @@ export async function requestRegistrationOtp(email, name) {
   const cleanEmail = (email || '').trim().toLowerCase();
   if (!cleanEmail || !cleanEmail.includes('@')) {
     return { success: false, error: 'Please enter a valid email address.' };
+  }
+
+  // Strictly enforce 1 account per Gmail / email before generating & sending OTP
+  try {
+    const existing = await checkUserExistsByEmail(cleanEmail);
+    if (existing?.exists) {
+      return {
+        success: false,
+        alreadyExists: true,
+        error: 'An account with this email address already exists. Each Gmail address is limited to one ALAGA account.',
+      };
+    }
+  } catch (err) {
+    console.warn('[otpService] checkUserExistsByEmail notice:', err?.message || err);
   }
 
   const otp = generateOtp();

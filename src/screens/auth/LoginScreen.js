@@ -18,9 +18,15 @@ import Input from '../../components/Input';
 import Button from '../../components/Button';
 import AlertModal from '../../components/AlertModal';
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen({ route, navigation }) {
   const { login } = useApp();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(route?.params?.prefillEmail || '');
+
+  React.useEffect(() => {
+    if (route?.params?.prefillEmail) {
+      setEmail(route.params.prefillEmail);
+    }
+  }, [route?.params?.prefillEmail]);
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});

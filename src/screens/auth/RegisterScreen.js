@@ -21,6 +21,7 @@ import Input from '../../components/Input';
 import Button from '../../components/Button';
 import AlertModal from '../../components/AlertModal';
 import { requestRegistrationOtp, verifyRegistrationOtp } from '../../services/otpService';
+import { checkUserExistsByEmail } from '../../services/authService';
 
 const ROLES = [
   {
@@ -241,7 +242,38 @@ export default function RegisterScreen({ navigation }) {
 
     setSendingOtp(true);
     try {
+      // 1. Strictly enforce one account per Gmail / email before sending OTP
+      const existsCheck = await checkUserExistsByEmail(form.email.trim());
+      if (existsCheck.exists) {
+        setSendingOtp(false);
+        showDialog({
+          type: 'warning',
+          title: 'Account Already Exists',
+          message:
+            'An account with this email address already exists. Each Gmail address is limited to one ALAGA account. Please sign in with your password, or reset your password if you forgot it.',
+          primaryText: 'Sign In',
+          onPrimaryPress: () => {
+            navigation.navigate('Login', { prefillEmail: form.email.trim().toLowerCase() });
+          },
+        });
+        return;
+      }
+
       const res = await requestRegistrationOtp(form.email.trim(), form.name.trim());
+      if (res.alreadyExists) {
+        showDialog({
+          type: 'warning',
+          title: 'Account Already Exists',
+          message:
+            'An account with this email address already exists. Each Gmail address is limited to one ALAGA account. Please sign in instead.',
+          primaryText: 'Sign In',
+          onPrimaryPress: () => {
+            navigation.navigate('Login', { prefillEmail: form.email.trim().toLowerCase() });
+          },
+        });
+        return;
+      }
+
       if (res.success) {
         setStep(3);
         setResendCooldown(60);

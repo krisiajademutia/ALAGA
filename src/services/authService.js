@@ -66,29 +66,90 @@ const userProfileCache = new Map();
 
 
 /**
- * Check if a registered user exists by email address in Firestore
+ * Normalize an email address.
+ * For Gmail/Googlemail:
+ * - Converts domain to 'gmail.com'
+ * - Lowercases everything
+ * - Strips all '.' (dots) from the local part (Gmail treats dots as identical)
+ * - Strips '+' (plus-addressing aliases) from the local part (e.g. user+tag@gmail.com -> user@gmail.com)
+ * For other domains:
+ * - Lowercases and strips '+' aliases
+ */
+export function normalizeEmail(email) {
+  if (!email || typeof email !== 'string') return '';
+  const trimmed = email.trim().toLowerCase();
+  const atIndex = trimmed.lastIndexOf('@');
+  if (atIndex <= 0 || atIndex === trimmed.length - 1) return trimmed;
+
+  let local = trimmed.slice(0, atIndex);
+  let domain = trimmed.slice(atIndex + 1);
+
+  if (domain === 'googlemail.com') {
+    domain = 'gmail.com';
+  }
+
+  // Remove plus addressing (e.g. name+tag -> name)
+  local = local.split('+')[0];
+
+  if (domain === 'gmail.com') {
+    // Remove all dots in Gmail local part (Gmail delivers all dot variations to the exact same inbox)
+    local = local.replace(/\./g, '');
+  }
+
+  return `${local}@${domain}`;
+}
+
+/**
+ * Check if a registered user exists by email address in Firestore.
+ * Supports Gmail alias/dot matching to ensure strictly 1 account per Gmail inbox.
  */
 export async function checkUserExistsByEmail(email) {
   const cleanEmail = (email || '').trim().toLowerCase();
   if (!cleanEmail) return { exists: false };
+  const normalized = normalizeEmail(cleanEmail);
 
   if (isMockFirebase() || !db) {
-    return { exists: true, user: { name: cleanEmail.split('@')[0], email: cleanEmail } };
+    return { exists: false };
   }
 
   try {
     const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('email', '==', cleanEmail));
-    const snap = await getDocs(q);
 
-    if (!snap.empty) {
-      const docData = snap.docs[0].data();
-      return { exists: true, user: { id: snap.docs[0].id, ...docData } };
+    // 1. Direct query by exact email
+    const q1 = query(usersRef, where('email', '==', cleanEmail));
+    const snap1 = await getDocs(q1);
+    if (!snap1.empty) {
+      const docData = snap1.docs[0].data();
+      return { exists: true, user: { id: snap1.docs[0].id, ...docData } };
     }
+
+    // 2. Direct query by normalizedEmail (covers Gmail dots, plus-aliases, etc.)
+    const q2 = query(usersRef, where('normalizedEmail', '==', normalized));
+    const snap2 = await getDocs(q2);
+    if (!snap2.empty) {
+      const docData = snap2.docs[0].data();
+      return { exists: true, user: { id: snap2.docs[0].id, ...docData } };
+    }
+
+    // 3. Fallback scan of existing users to guarantee no variations bypass the check
+    const allSnap = await getDocs(usersRef);
+    for (const d of allSnap.docs) {
+      const data = d.data();
+      const existingEmail = (data.email || '').trim().toLowerCase();
+      if (
+        existingEmail &&
+        (existingEmail === cleanEmail ||
+          normalizeEmail(existingEmail) === normalized ||
+          (data.normalizedEmail && data.normalizedEmail === normalized))
+      ) {
+        return { exists: true, user: { id: d.id, ...data } };
+      }
+    }
+
     return { exists: false };
   } catch (err) {
-    console.warn('[authService] checkUserExistsByEmail error:', err);
-    return { exists: true, user: { email: cleanEmail, name: cleanEmail.split('@')[0] } };
+    console.warn('[authService] checkUserExistsByEmail notice:', err);
+    return { exists: false, error: err.message };
   }
 }
 
@@ -185,14 +246,27 @@ export async function registerWithFirebase({ email, password, name, role, locati
     return { isMock: true };
   }
 
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const normalizedEmailVal = normalizeEmail(cleanEmail);
+
+  // 1. Strictly enforce one account per Gmail / email in Firestore before creating in Auth
+  const existingCheck = await checkUserExistsByEmail(cleanEmail);
+  if (existingCheck.exists) {
+    return {
+      success: false,
+      error: 'An account with this email address already exists. Each Gmail address is limited to one ALAGA account. Please sign in instead.',
+    };
+  }
+
   try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+    const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
     const uid = userCredential.user.uid;
 
     const newUserData = {
       id: uid,
       name: name.trim(),
-      email: email.trim(),
+      email: cleanEmail,
+      normalizedEmail: normalizedEmailVal,
       role: role || 'community',
       location: location?.trim() || '',
       organization: organization?.trim() || '',
@@ -210,54 +284,10 @@ export async function registerWithFirebase({ email, password, name, role, locati
     return { success: true, user: newUserData };
   } catch (error) {
     if (error.code === 'auth/email-already-in-use') {
-      // User verified email via Brevo OTP; attempt sign in with this password
-      try {
-        const signCred = await signInWithEmailAndPassword(auth, email.trim(), password);
-        const uid = signCred.user.uid;
-        const userDocRef = doc(db, 'users', uid);
-        const userDocSnap = await getDoc(userDocRef);
-
-        let userData;
-        if (userDocSnap.exists()) {
-          const data = userDocSnap.data();
-          const avatar = extractUserAvatar(data, signCred.user);
-          const updates = {
-            name: name.trim(),
-            role: role || 'community',
-            location: location?.trim() || '',
-            organization: organization?.trim() || '',
-            ...(coords ? { coords } : {}),
-            ...(avatar ? { avatar } : {}),
-            updatedAt: new Date().toISOString(),
-          };
-          await updateDoc(userDocRef, updates);
-          userData = { id: uid, ...data, ...updates, avatar };
-        } else {
-          const avatar = signCred.user?.photoURL || null;
-          userData = {
-            id: uid,
-            name: name.trim(),
-            email: email.trim(),
-            role: role || 'community',
-            location: location?.trim() || '',
-            organization: organization?.trim() || '',
-            coords: coords || null,
-            avatar,
-            joinedAt: new Date().toISOString().split('T')[0],
-            createdAt: new Date().toISOString(),
-            ...(role === 'advocate' ? { rescueCount: 0, animalCount: 0 } : { reportCount: 0 }),
-          };
-          await setDoc(userDocRef, userData);
-        }
-        cacheUserProfile(userData);
-        return { success: true, user: userData };
-      } catch (signErr) {
-        return {
-          success: false,
-          error:
-            'This account already exists in Firebase Auth. If you want a fresh registration with a new password, please remove this user from Firebase Console (Authentication > Users) or log in with your existing password.',
-        };
-      }
+      return {
+        success: false,
+        error: 'An account with this email address already exists. Each Gmail address is limited to one ALAGA account. Please sign in instead.',
+      };
     }
 
     let msg = error.message;
