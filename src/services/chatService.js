@@ -10,6 +10,7 @@ import {
   where,
   orderBy,
   serverTimestamp,
+  writeBatch,
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { isMockFirebase } from '../config/firebaseConfig';
@@ -26,10 +27,7 @@ export function subscribeToConversations(user, onUpdate, onError) {
 
   // Conversations are private: require authentication & participant membership
   const currentUid = auth?.currentUser?.uid || user?.id || user?.uid;
-  if (!currentUid || !auth?.currentUser) {
-    if (onUpdate) onUpdate([]);
-    return () => {};
-  }
+  if (!currentUid || !auth?.currentUser) return () => {};
 
   try {
     const q = query(
@@ -39,6 +37,7 @@ export function subscribeToConversations(user, onUpdate, onError) {
 
     return onSnapshot(
       q,
+      { includeMetadataChanges: true },
       (snapshot) => {
         const convos = [];
         snapshot.forEach((docSnap) => {
@@ -47,7 +46,7 @@ export function subscribeToConversations(user, onUpdate, onError) {
             ...docSnap.data(),
           });
         });
-        if (onUpdate) onUpdate(convos);
+        if (onUpdate) onUpdate(convos, { fromCache: snapshot.metadata?.fromCache === true });
       },
       (error) => {
         console.warn('[chatService] Conversations snapshot notice:', error?.message || error);
@@ -66,9 +65,12 @@ export function subscribeToConversations(user, onUpdate, onError) {
  * allow read, create: if isAuthenticated();
  */
 export function subscribeToMessages(conversationId, onUpdate, onError) {
-  if (isMockFirebase() || !db || !conversationId) return () => {};
+  if (isMockFirebase() || !db || !conversationId) {
+    onUpdate?.([], { fromCache: false });
+    return () => {};
+  }
   if (!auth?.currentUser) {
-    if (onUpdate) onUpdate([]);
+    onUpdate?.([], { fromCache: false });
     return () => {};
   }
 
@@ -80,12 +82,13 @@ export function subscribeToMessages(conversationId, onUpdate, onError) {
 
     return onSnapshot(
       q,
+      { includeMetadataChanges: true },
       (snapshot) => {
         const msgs = [];
         snapshot.forEach((docSnap) => {
           msgs.push({ id: docSnap.id, ...docSnap.data() });
         });
-        if (onUpdate) onUpdate(msgs);
+        if (onUpdate) onUpdate(msgs, { fromCache: snapshot.metadata?.fromCache === true });
       },
       (error) => {
         console.warn('[chatService] Messages snapshot notice:', error?.message || error);
@@ -94,6 +97,7 @@ export function subscribeToMessages(conversationId, onUpdate, onError) {
     );
   } catch (err) {
     console.warn('[chatService] Messages listener setup error:', err);
+    onUpdate?.([], { fromCache: false });
     return () => {};
   }
 }
@@ -105,6 +109,18 @@ export function subscribeToMessages(conversationId, onUpdate, onError) {
 export async function saveMessageFirebase(conversationId, message) {
   if (isMockFirebase() || !db || !conversationId || !message) return { isMock: true };
   if (!auth?.currentUser) return { error: 'Not authenticated' };
+
+  const type = message.type || 'text';
+  const hasContent = type === 'text'
+    ? Boolean(String(message.text || '').trim())
+    : type === 'image' || type === 'video'
+      ? Boolean(message.mediaUri)
+      : type === 'location'
+        ? Boolean(message.location)
+        : type === 'report_link'
+          ? Boolean(message.reportId && String(message.text || '').trim())
+          : Boolean(String(message.text || '').trim());
+  if (!hasContent) return { error: 'Message has no content' };
 
   try {
     const msgId = message.id || `m${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -149,6 +165,41 @@ export async function saveConversationFirebase(convoData) {
   }
 }
 
+/** Save the first message and its conversation metadata as one atomic operation. */
+export async function saveConversationMessageFirebase(convoData, message) {
+  if (isMockFirebase() || !db || !convoData?.id || !message) return { isMock: true };
+  if (!auth?.currentUser) return { error: 'Not authenticated' };
+
+  const type = message.type || 'text';
+  const hasContent = type === 'text'
+    ? Boolean(String(message.text || '').trim())
+    : type === 'image' || type === 'video'
+      ? Boolean(message.mediaUri)
+      : type === 'location'
+        ? Boolean(message.location)
+        : type === 'report_link'
+          ? Boolean(message.reportId && String(message.text || '').trim())
+          : Boolean(String(message.text || '').trim());
+  if (!hasContent) return { error: 'Message has no content' };
+
+  try {
+    const participants = Array.isArray(convoData.participants) ? [...convoData.participants] : [];
+    if (!participants.includes(auth.currentUser.uid)) participants.push(auth.currentUser.uid);
+    const { messages: _stripped, ...convoMeta } = convoData; // eslint-disable-line no-unused-vars
+    const msgId = message.id || `m${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const convoRef = doc(db, CONVERSATIONS_COLLECTION, convoData.id);
+    const msgRef = doc(db, CONVERSATIONS_COLLECTION, convoData.id, 'messages', msgId);
+    const batch = writeBatch(db);
+    batch.set(convoRef, { ...convoMeta, participants }, { merge: true });
+    batch.set(msgRef, { ...message, id: msgId, timestamp: serverTimestamp() });
+    await batch.commit();
+    return { success: true, id: msgId };
+  } catch (err) {
+    console.warn('[chatService] Failed to save conversation and message:', err?.message || err);
+    return { error: err.message };
+  }
+}
+
 /**
  * Mark a conversation as read for a specific user in Firestore
  */
@@ -162,7 +213,9 @@ export async function markConversationReadFirebase(conversationId, userId) {
     });
   } catch (err) {
     // If updateDoc fails (e.g. document doesn't exist yet in firestore), ignore
-    console.warn('[chatService] Failed to mark conversation read:', err);
+    if (err?.code !== 'not-found') {
+      console.warn('[chatService] Failed to mark conversation read:', err);
+    }
   }
 }
 

@@ -64,24 +64,6 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
   const [urgencyModalVisible, setUrgencyModalVisible] = useState(false);
   const isAdvocate = currentUser?.role === 'advocate';
 
-  if (!report) {
-    return (
-      <View style={[styles.flex, { alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#FFF' }]}>
-        <Ionicons name="shield-outline" size={48} color={COLORS.border} />
-        <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.brown, marginTop: 12 }}>Report Not Found</Text>
-        <Text style={{ fontSize: 13, color: COLORS.textMuted, textAlign: 'center', marginTop: 4, marginBottom: 16 }}>
-          This rescue alert has been resolved or removed.
-        </Text>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={{ paddingHorizontal: 20, paddingVertical: 10, backgroundColor: COLORS.primary, borderRadius: 12 }}
-        >
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   const isAuthor = Boolean(
     currentUser && (
       [report?.reporterId, report?.userId, report?.authorId].some((id) => id && String(id) === String(currentUser.id || currentUser.uid)) ||
@@ -203,7 +185,25 @@ export default function RescueAlertDetailScreen({ route, navigation }) {
       Platform.OS === 'android' ? RNStatusBar.currentHeight || 0 : 12
     ) + 6;
 
-  if (!report) return null;
+  // Keep this conditional below every hook. Deleting a report removes it from
+  // context immediately, so the detail screen can render once more without it.
+  if (!report) {
+    return (
+      <View style={[styles.flex, { alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#FFF' }]}>
+        <Ionicons name="shield-outline" size={48} color={COLORS.border} />
+        <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.brown, marginTop: 12 }}>Report Not Found</Text>
+        <Text style={{ fontSize: 13, color: COLORS.textMuted, textAlign: 'center', marginTop: 4, marginBottom: 16 }}>
+          This rescue alert has been resolved or removed.
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{ paddingHorizontal: 20, paddingVertical: 10, backgroundColor: COLORS.primary, borderRadius: 12 }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const isResponder = currentUser?.id === report?.responderId;
 

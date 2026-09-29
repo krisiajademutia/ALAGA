@@ -277,12 +277,20 @@ export default function NotificationScreen({ navigation }) {
   const handleTap = (item) => {
     markNotificationRead(item.id);
 
-    if (item.navTarget?.screen) {
-      navigation.navigate(item.navTarget.screen, item.navTarget.params || {});
-    } else if (item.type === 'donation' || item.donationId) {
-      navigation.navigate('Activity', { tab: 'donations' });
+    if (item.type === 'donation' || item.donationId) {
+      if (currentUser?.role === 'advocate') {
+        navigation.navigate('Activity', { tab: 'donations' });
+      } else {
+        navigation.navigate('MainTabs', { screen: 'Activity', params: { tab: 'donations' } });
+      }
     } else if (item.type === 'adoption' || item.requestId) {
-      navigation.navigate('Activity', { tab: 'requests' });
+      if (currentUser?.role === 'advocate') {
+        navigation.navigate('Activity', { tab: 'requests' });
+      } else {
+        navigation.navigate('MainTabs', { screen: 'Activity', params: { tab: 'requests' } });
+      }
+    } else if (item.navTarget?.screen) {
+      navigation.navigate(item.navTarget.screen, item.navTarget.params || {});
     } else if (item.reportId) {
       const exists = (rescueReports || []).some((r) => r.id === item.reportId);
       if (!exists) {

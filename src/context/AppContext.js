@@ -47,7 +47,7 @@ import {
 import {
   subscribeToConversations,
   saveConversationFirebase,
-  saveMessageFirebase,
+  saveConversationMessageFirebase,
   markConversationReadFirebase,
   deleteConversationFirebase,
   clearConversationMessagesFirebase,
@@ -998,7 +998,7 @@ export function AppProvider({ children }) {
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed)) {
-            setConversations(parsed);
+            setConversations(parsed.filter((c) => String(c?.lastMessage || '').trim()));
           }
         }
       } catch (e) {}
@@ -1027,8 +1027,9 @@ export function AppProvider({ children }) {
   }, [donations]);
 
   useEffect(() => {
-    if (Array.isArray(conversations) && conversations.length > 0) {
-      AsyncStorage.setItem('@alaga_conversations_v2', JSON.stringify(conversations)).catch(() => {});
+    if (Array.isArray(conversations)) {
+      const activeConversations = conversations.filter((c) => String(c?.lastMessage || '').trim());
+      AsyncStorage.setItem('@alaga_conversations_v2', JSON.stringify(activeConversations)).catch(() => {});
     }
   }, [conversations]);
 
@@ -1246,8 +1247,8 @@ export function AppProvider({ children }) {
       const unsubApps = subscribeToApplications(currentUser, (liveApps) => {
         setRequests(liveApps || []);
       });
-      const unsubConvos = subscribeToConversations(currentUser, (liveConvos) => {
-        handleLiveConversations(liveConvos);
+      const unsubConvos = subscribeToConversations(currentUser, (liveConvos, snapshotState) => {
+        handleLiveConversations(liveConvos, snapshotState);
       });
       const unsubDonations = subscribeToDonations((liveDonations) => {
         if (Array.isArray(liveDonations)) {
@@ -1922,9 +1923,23 @@ export function AppProvider({ children }) {
   };
 
   // ── Messaging ─────────────────────────────────────────────────────────────
-  const handleLiveConversations = (liveConvos) => {
+  const handleLiveConversations = (liveConvos, snapshotState = {}) => {
     if (!Array.isArray(liveConvos)) return;
-    setConversations(liveConvos);
+    setConversations((prev) => {
+      const merged = new Map();
+      // Cached snapshots may be incomplete while offline, so keep the local inbox
+      // until Firestore confirms a server snapshot. Preserve blank in-memory drafts
+      // during synchronization, but never promote them into the persisted inbox.
+      if (snapshotState.fromCache) {
+        (prev || []).forEach((c) => { if (c?.id) merged.set(c.id, c); });
+      } else {
+        (prev || []).filter((c) => !String(c?.lastMessage || '').trim()).forEach((c) => {
+          if (c?.id) merged.set(c.id, c);
+        });
+      }
+      liveConvos.forEach((c) => { if (c?.id) merged.set(c.id, c); });
+      return Array.from(merged.values());
+    });
 
     const activeUser = currentUserRef.current;
     if (!activeUser || !activeUser.id) return;
@@ -2012,7 +2027,7 @@ export function AppProvider({ children }) {
     });
   };
 
-  const sendMessage = (conversationId, messageData) => {
+  const sendMessage = async (conversationId, messageData) => {
     if (!conversationId || !messageData) return;
     const activeUser = currentUserRef.current;
     if (!activeUser || !activeUser.id) return;
@@ -2053,6 +2068,20 @@ export function AppProvider({ children }) {
       };
     }
 
+    const hasContent = newMsg.type === 'text'
+      ? Boolean(String(newMsg.text || '').trim())
+      : newMsg.type === 'image' || newMsg.type === 'video'
+        ? Boolean(newMsg.mediaUri)
+        : newMsg.type === 'location'
+          ? Boolean(newMsg.location)
+          : newMsg.type === 'report_link'
+            ? Boolean(newMsg.reportId && String(newMsg.text || '').trim())
+            : Boolean(String(newMsg.text || '').trim());
+    if (!hasContent) return false;
+
+    const existing = conversations.find((c) => c.id === conversationId);
+    if (!existing) return false;
+
     const lastSummary =
       newMsg.type === 'image'
         ? '📷 Photo'
@@ -2062,55 +2091,52 @@ export function AppProvider({ children }) {
         ? '📍 Location'
         : newMsg.text;
 
-    // Gap 1 fix: Write message to subcollection, NOT to the conversation doc array
-    saveMessageFirebase(conversationId, newMsg).catch((err) => {
-      console.warn('[AppContext] saveMessageFirebase warning:', err?.message);
+    // Save both documents atomically so failures cannot leave a blank preview or
+    // a message whose conversation metadata was never created.
+    const nextUnreadCounts = { ...(existing.unreadCounts || {}) };
+    // For all other participants, increment their unread count
+    (existing.participants || []).forEach((pId) => {
+      if (pId !== uId) {
+        nextUnreadCounts[pId] = (nextUnreadCounts[pId] || 0) + 1;
+      } else {
+        nextUnreadCounts[pId] = 0;
+      }
     });
 
-    // Update conversation metadata only (lastMessage, unreadCounts, etc.) — no messages array
-    let updatedConvoMeta = null;
-
-    setConversations((prev) => {
-      const existing = prev.find((c) => c.id === conversationId);
-      if (!existing) return prev;
-
-      const nextUnreadCounts = { ...(existing.unreadCounts || {}) };
-      // For all other participants, increment their unread count
-      (existing.participants || []).forEach((pId) => {
-        if (pId !== uId) {
-          nextUnreadCounts[pId] = (nextUnreadCounts[pId] || 0) + 1;
-        } else {
-          nextUnreadCounts[pId] = 0;
-        }
+    const updatedConvoMeta = {
+      ...existing,
+      lastMessage: lastSummary,
+      lastMessageTime: newMsg.time,
+      lastSenderId: newMsg.senderId,
+      participantAvatars: {
+        ...(existing.participantAvatars || {}),
+        [uId]: activeUser.avatar || null,
+      },
+      unreadCounts: nextUnreadCounts,
+      unreadCount: (nextUnreadCounts[uId] || 0),
+      unread: false, // sender has already read their own message
+    };
+    const messageResult = await saveConversationMessageFirebase(updatedConvoMeta, newMsg);
+    if (messageResult?.error) {
+      console.warn('[AppContext] saveConversationMessageFirebase warning:', messageResult.error);
+      showAlert({
+        type: 'error',
+        title: 'Message Not Sent',
+        message: 'The message could not be saved. Please check your connection and try again.',
       });
-
-      updatedConvoMeta = {
-        ...existing,
-        lastMessage: lastSummary,
-        lastMessageTime: newMsg.time,
-        lastSenderId: newMsg.senderId,
-        participantAvatars: {
-          ...(existing.participantAvatars || {}),
-          [uId]: activeUser.avatar || null,
-        },
-        unreadCounts: nextUnreadCounts,
-        unreadCount: (nextUnreadCounts[uId] || 0),
-        unread: false, // sender has already read their own message
-      };
-
-      return prev.map((c) => (c.id === conversationId ? updatedConvoMeta : c));
-    });
-
-    if (updatedConvoMeta) {
-      saveConversationFirebase(updatedConvoMeta);
+      return false;
     }
+    setConversations((prev) => prev.map((c) => (c.id === conversationId ? updatedConvoMeta : c)));
+    return true;
   };
 
   const startConversation = (otherUserId, otherUserName, otherUserAvatar) => {
     if (!otherUserId || !currentUser?.id) return '';
     const existing = conversations.find(
       (c) =>
+        !c.isGroup &&
         c.participants &&
+        c.participants.length === 2 &&
         c.participants.includes(currentUser.id) &&
         c.participants.includes(otherUserId)
     );
@@ -2130,7 +2156,7 @@ export function AppProvider({ children }) {
       return existing.id;
     }
     const newConv = {
-      id: `conv${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: `dm_${[currentUser.id, otherUserId].sort().join('_')}`,
       participants: [currentUser.id, otherUserId],
       participantNames: {
         [currentUser.id]: currentUser.name || 'Community Member',
@@ -2150,7 +2176,6 @@ export function AppProvider({ children }) {
       unread: false,
     };
     setConversations((prev) => [newConv, ...prev]);
-    saveConversationFirebase(newConv);
     return newConv.id;
   };
 
@@ -2185,7 +2210,6 @@ export function AppProvider({ children }) {
       unread: false,
     };
     setConversations((prev) => [newConv, ...prev]);
-    saveConversationFirebase(newConv);
     return newConv.id;
   };
 
@@ -2361,7 +2385,7 @@ export function AppProvider({ children }) {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const getUserConversations = () =>
-    conversations.filter((c) => Array.isArray(c.participants) && c.participants.includes(currentUser?.id));
+    conversations.filter((c) => Array.isArray(c.participants) && c.participants.includes(currentUser?.id) && String(c?.lastMessage || '').trim());
 
   const getUnreadMessagesCount = () => {
     const activeUser = currentUserRef.current || currentUser;
@@ -2382,6 +2406,9 @@ export function AppProvider({ children }) {
 
   const markConversationRead = useCallback((conversationId) => {
     if (!conversationId) return;
+    const targetConversation = conversations.find((c) => c.id === conversationId);
+    // New chats exist only in memory until their first message is sent.
+    if (!targetConversation || !String(targetConversation.lastMessage || '').trim()) return;
     const activeUser = currentUserRef.current || currentUser;
     if (!activeUser?.id) return;
     const uId = activeUser.id;
@@ -2409,7 +2436,7 @@ export function AppProvider({ children }) {
     });
 
     markConversationReadFirebase(conversationId, uId);
-  }, []);
+  }, [conversations]);
 
   const getAllKnownUsers = () => {
     const map = new Map();

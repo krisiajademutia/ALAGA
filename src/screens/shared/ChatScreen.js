@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,8 @@ import { subscribeToMessages } from '../../services/chatService';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import Avatar from '../../components/Avatar';
 
+const chatMessagesCache = new Map();
+
 const QUICK_PROMPTS = [
   { icon: 'paw-outline', text: 'How is the animal doing right now?' },
   { icon: 'location-outline', text: 'Can you share the exact landmarks or street address?' },
@@ -48,8 +50,10 @@ export default function ChatScreen({ route, navigation }) {
   const resolvedOtherName = otherName || routeUserName;
   const { conversations, currentUser, sendMessage, clearConversation, markConversationRead,
     setActiveConversationId, showAlert, updateGroupInfo, getAllKnownUsers, getUserById } = useApp();
+  const messagesCacheKey = `@alaga_chat_messages_v1_${currentUser?.id || 'guest'}_${conversationId || 'none'}`;
   const [text, setText] = useState(initialDraft || '');
   const [messages, setMessages] = useState([]);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [attachModalVisible, setAttachModalVisible] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
@@ -72,6 +76,12 @@ export default function ChatScreen({ route, navigation }) {
   const isSendingTextRef = useRef(false);
 
   const insets = useSafeAreaInsets();
+  useLayoutEffect(() => {
+    const cachedMessages = chatMessagesCache.get(messagesCacheKey) || [];
+    setMessages(cachedMessages);
+    setIsLoadingMessages(cachedMessages.length === 0);
+  }, [conversationId, messagesCacheKey]);
+
   const safeTopPadding =
     Platform.OS === 'ios'
       ? Math.max(insets.top, 16) + 4
@@ -81,49 +91,45 @@ export default function ChatScreen({ route, navigation }) {
 
   useEffect(() => {
     if (!conversationId) return;
-    const unsub = subscribeToMessages(
+    let active = true;
+    const unsubscribe = subscribeToMessages(
       conversationId,
-      (firestoreMsgs) => {
-        if (Array.isArray(firestoreMsgs)) {
-          setMessages((prev) => {
-            const map = new Map();
-            // 1. First add all ground truth messages confirmed by Firestore
-            firestoreMsgs.forEach((f) => {
-              if (f && f.id) map.set(f.id, f);
-            });
-            // 2. Only keep pending local optimistic messages if they have NOT landed in firestoreMsgs yet
-            prev.forEach((p) => {
-              if (!p || !p.id) return;
-              if (map.has(p.id)) return; // Already in map by ID
-              const isDuplicate = firestoreMsgs.some((f) => {
-                if (f.id === p.id) return true;
-                // De-duplicate rescue report links: same reportId is NEVER duplicated
-                if (p.type === 'report_link' && f.type === 'report_link' && f.reportId === p.reportId) {
-                  return true;
-                }
-                // De-duplicate text messages: same sender, same type, same text within 5 seconds
-                if (f.senderId === p.senderId && f.type === p.type && f.text === p.text) {
-                  const diff = Math.abs(new Date(f.time || 0) - new Date(p.time || 0));
-                  if (diff < 5000) return true;
-                }
-                return false;
-              });
-              if (!isDuplicate) {
-                map.set(p.id, p);
-              }
-            });
-            return Array.from(map.values()).sort(
-              (a, b) => new Date(a.time || 0) - new Date(b.time || 0)
-            );
+      (firestoreMsgs, snapshotState = {}) => {
+        if (!active || !Array.isArray(firestoreMsgs)) return;
+        setMessages((prev) => {
+          const merged = new Map();
+          firestoreMsgs.forEach((message) => {
+            if (message?.id) merged.set(message.id, message);
           });
+          // Keep cached messages while Firestore is serving an offline snapshot;
+          // once the server responds, only unsaved optimistic messages are kept.
+          prev.forEach((message) => {
+            if (!message?.id || merged.has(message.id)) return;
+            if (snapshotState.fromCache || message._pending) merged.set(message.id, message);
+          });
+          const next = Array.from(merged.values()).sort(
+            (a, b) => new Date(a.time || 0) - new Date(b.time || 0)
+          );
+          return next;
+        });
+        if (!snapshotState.fromCache) {
+          chatMessagesCache.set(messagesCacheKey, firestoreMsgs.slice(-200));
+        }
+        if (firestoreMsgs.length > 0 || !snapshotState.fromCache) {
+          setIsLoadingMessages(false);
         }
       },
       (err) => {
+        if (!active) return;
         console.warn('[ChatScreen] Messages listener error:', err?.message);
+        setIsLoadingMessages(false);
       }
     );
-    return () => unsub?.();
-  }, [conversationId]);
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
+  }, [conversationId, messagesCacheKey]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -233,6 +239,7 @@ export default function ChatScreen({ route, navigation }) {
     const reportMsgId = `m_rep_${linkedReport.id}_${Date.now()}`;
     const reportMsg = {
       id: reportMsgId,
+      _pending: true,
       senderId: currentUser?.id,
       senderName: currentUser?.name || 'User',
       senderAvatar: currentUser?.avatar || null,
@@ -254,7 +261,12 @@ export default function ChatScreen({ route, navigation }) {
       return [...prev, reportMsg];
     });
 
-    sendMessage(convo.id, reportMsg);
+    sendMessage(convo.id, reportMsg).then((saved) => {
+      if (!saved) {
+        setMessages((prev) => prev.filter((m) => m.id !== reportMsg.id));
+        setShowLinkedReportBanner(true);
+      }
+    });
     setTimeout(() => {
       isSendingReportRef.current = false;
       flatRef.current?.scrollToEnd({ animated: true });
@@ -270,6 +282,7 @@ export default function ChatScreen({ route, navigation }) {
 
     const userMsg = {
       id: `m_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      _pending: true,
       senderId: currentUser?.id,
       senderName: currentUser?.name || 'User',
       senderAvatar: currentUser?.avatar || null,
@@ -279,7 +292,9 @@ export default function ChatScreen({ route, navigation }) {
     };
     setText('');
     setMessages((prev) => [...prev, userMsg]);
-    sendMessage(convo.id, userMsg);
+    sendMessage(convo.id, userMsg).then((saved) => {
+      if (!saved) setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
+    });
     setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
@@ -490,6 +505,7 @@ export default function ChatScreen({ route, navigation }) {
             onPrimaryPress: () => {
               const targetId = convo?.id || conversationId;
               setMessages([]);
+              chatMessagesCache.delete(messagesCacheKey);
               if (targetId) clearConversation(targetId);
               navigation.goBack();
             },
@@ -712,7 +728,9 @@ export default function ChatScreen({ route, navigation }) {
           messages.length === 0 && { flexGrow: 1, justifyContent: 'center' },
         ]}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={renderEmptyState}
+        ListEmptyComponent={isLoadingMessages
+          ? <ActivityIndicator size="small" color="#2E7A99" />
+          : renderEmptyState}
         ListHeaderComponent={
           messages.length > 0 ? (
             <View style={styles.datePillWrap}>
@@ -1261,6 +1279,7 @@ export default function ChatScreen({ route, navigation }) {
                     onPrimaryPress: () => {
                       const targetId = convo?.id || conversationId;
                       setMessages([]);
+                      chatMessagesCache.delete(messagesCacheKey);
                       if (targetId) clearConversation(targetId);
                       navigation.goBack();
                     },
