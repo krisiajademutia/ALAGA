@@ -17,6 +17,16 @@ import { isMockFirebase } from '../config/firebaseConfig';
 
 const CONVERSATIONS_COLLECTION = 'conversations';
 
+async function getAuthenticatedFirebaseUser() {
+  if (!auth) return null;
+  // Native Firebase Auth restores its AsyncStorage session asynchronously. Wait
+  // for that first restore before treating the user as signed out.
+  if (typeof auth.authStateReady === 'function') {
+    await auth.authStateReady();
+  }
+  return auth.currentUser || null;
+}
+
 /**
  * Real-time listener for active user's conversations in Firestore
  * Complies with Firestore security rules by querying only conversations
@@ -24,39 +34,43 @@ const CONVERSATIONS_COLLECTION = 'conversations';
  */
 export function subscribeToConversations(user, onUpdate, onError) {
   if (isMockFirebase() || !db) return () => {};
+  let cancelled = false;
+  let unsubscribeSnapshot = null;
 
-  // Conversations are private: require authentication & participant membership
-  const currentUid = auth?.currentUser?.uid || user?.id || user?.uid;
-  if (!currentUid || !auth?.currentUser) return () => {};
+  getAuthenticatedFirebaseUser().then((firebaseUser) => {
+    if (cancelled) return;
+    if (!firebaseUser) {
+      onUpdate?.([], { fromCache: false });
+      return;
+    }
 
-  try {
     const q = query(
       collection(db, CONVERSATIONS_COLLECTION),
-      where('participants', 'array-contains', currentUid)
+      where('participants', 'array-contains', firebaseUser.uid)
     );
-
-    return onSnapshot(
+    unsubscribeSnapshot = onSnapshot(
       q,
       { includeMetadataChanges: true },
       (snapshot) => {
         const convos = [];
         snapshot.forEach((docSnap) => {
-          convos.push({
-            id: docSnap.id,
-            ...docSnap.data(),
-          });
+          convos.push({ id: docSnap.id, ...docSnap.data() });
         });
-        if (onUpdate) onUpdate(convos, { fromCache: snapshot.metadata?.fromCache === true });
+        onUpdate?.(convos, { fromCache: snapshot.metadata?.fromCache === true });
       },
       (error) => {
-        console.warn('[chatService] Conversations snapshot notice:', error?.message || error);
-        if (onError) onError(error);
+        console.warn('[chatService] Conversations snapshot notice:', error?.code, error?.message || error);
+        onError?.(error);
       }
     );
-  } catch (err) {
-    console.warn('[chatService] Setup error:', err);
-    return () => {};
-  }
+  }).catch((error) => {
+    if (!cancelled) onError?.(error);
+  });
+
+  return () => {
+    cancelled = true;
+    unsubscribeSnapshot?.();
+  };
 }
 
 /**
@@ -69,37 +83,40 @@ export function subscribeToMessages(conversationId, onUpdate, onError) {
     onUpdate?.([], { fromCache: false });
     return () => {};
   }
-  if (!auth?.currentUser) {
-    onUpdate?.([], { fromCache: false });
-    return () => {};
-  }
+  let cancelled = false;
+  let unsubscribeSnapshot = null;
+  getAuthenticatedFirebaseUser().then((firebaseUser) => {
+    if (cancelled) return;
+    if (!firebaseUser) {
+      onUpdate?.([], { fromCache: false });
+      return;
+    }
 
-  try {
     const q = query(
       collection(db, CONVERSATIONS_COLLECTION, conversationId, 'messages'),
       orderBy('time', 'asc')
     );
-
-    return onSnapshot(
+    unsubscribeSnapshot = onSnapshot(
       q,
       { includeMetadataChanges: true },
       (snapshot) => {
         const msgs = [];
-        snapshot.forEach((docSnap) => {
-          msgs.push({ id: docSnap.id, ...docSnap.data() });
-        });
-        if (onUpdate) onUpdate(msgs, { fromCache: snapshot.metadata?.fromCache === true });
+        snapshot.forEach((docSnap) => msgs.push({ id: docSnap.id, ...docSnap.data() }));
+        onUpdate?.(msgs, { fromCache: snapshot.metadata?.fromCache === true });
       },
       (error) => {
-        console.warn('[chatService] Messages snapshot notice:', error?.message || error);
-        if (onError) onError(error);
+        console.warn('[chatService] Messages snapshot notice:', error?.code, error?.message || error);
+        onError?.(error);
       }
     );
-  } catch (err) {
-    console.warn('[chatService] Messages listener setup error:', err);
-    onUpdate?.([], { fromCache: false });
-    return () => {};
-  }
+  }).catch((error) => {
+    if (!cancelled) onError?.(error);
+  });
+
+  return () => {
+    cancelled = true;
+    unsubscribeSnapshot?.();
+  };
 }
 
 /**
@@ -108,7 +125,8 @@ export function subscribeToMessages(conversationId, onUpdate, onError) {
  */
 export async function saveMessageFirebase(conversationId, message) {
   if (isMockFirebase() || !db || !conversationId || !message) return { isMock: true };
-  if (!auth?.currentUser) return { error: 'Not authenticated' };
+  const firebaseUser = await getAuthenticatedFirebaseUser();
+  if (!firebaseUser) return { error: 'Not authenticated' };
 
   const type = message.type || 'text';
   const hasContent = type === 'text'
@@ -146,7 +164,8 @@ export async function saveConversationFirebase(convoData) {
     return { isMock: true };
   }
 
-  const currentUid = auth?.currentUser?.uid;
+  const firebaseUser = await getAuthenticatedFirebaseUser();
+  const currentUid = firebaseUser?.uid;
   let participants = Array.isArray(convoData.participants) ? [...convoData.participants] : [];
   if (currentUid && !participants.includes(currentUid)) {
     participants.push(currentUid);
@@ -168,7 +187,8 @@ export async function saveConversationFirebase(convoData) {
 /** Save the first message and its conversation metadata as one atomic operation. */
 export async function saveConversationMessageFirebase(convoData, message) {
   if (isMockFirebase() || !db || !convoData?.id || !message) return { isMock: true };
-  if (!auth?.currentUser) return { error: 'Not authenticated' };
+  const firebaseUser = await getAuthenticatedFirebaseUser();
+  if (!firebaseUser) return { error: 'Not authenticated' };
 
   const type = message.type || 'text';
   const hasContent = type === 'text'
@@ -184,7 +204,7 @@ export async function saveConversationMessageFirebase(convoData, message) {
 
   try {
     const participants = Array.isArray(convoData.participants) ? [...convoData.participants] : [];
-    if (!participants.includes(auth.currentUser.uid)) participants.push(auth.currentUser.uid);
+    if (!participants.includes(firebaseUser.uid)) participants.push(firebaseUser.uid);
     const { messages: _stripped, ...convoMeta } = convoData; // eslint-disable-line no-unused-vars
     const msgId = message.id || `m${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const convoRef = doc(db, CONVERSATIONS_COLLECTION, convoData.id);
