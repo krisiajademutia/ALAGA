@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   TextInput,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Alert,
   Image,
@@ -180,6 +181,17 @@ export default function ChatScreen({ route, navigation }) {
       };
     }
   }, [conversationId, setActiveConversationId]);
+
+  // Keep latest messages visible when keyboard opens on Android/iOS
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const sub = Keyboard.addListener(showEvent, () => {
+      setTimeout(() => {
+        flatRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (convo?.id && markConversationRead) {
@@ -613,7 +625,8 @@ export default function ChatScreen({ route, navigation }) {
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <StatusBar style="dark" />
 
@@ -693,6 +706,7 @@ export default function ChatScreen({ route, navigation }) {
         ref={flatRef}
         data={messages}
         keyExtractor={(item) => item.id}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.msgList,
           messages.length === 0 && { flexGrow: 1, justifyContent: 'center' },
@@ -969,6 +983,9 @@ export default function ChatScreen({ route, navigation }) {
             multiline
             maxHeight={90}
             returnKeyType="default"
+            onFocus={() => {
+              setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 120);
+            }}
           />
         </View>
 
