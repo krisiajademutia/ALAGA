@@ -12,6 +12,7 @@ import {
   Modal,
   Dimensions,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,6 +28,12 @@ import { ANIMAL_SPECIES, FOSTER_DURATIONS } from '../../data/mockData';
 import { uploadImageToImgBB } from '../../services/storageService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const AGE_UNITS = [
+  { key: 'year/s', label: 'year/s' },
+  { key: 'month/s', label: 'month/s' },
+  { key: 'week/s', label: 'week/s' },
+];
 
 const GENDERS = ['Male', 'Female', 'Unknown'];
 const LISTING_TYPES = [
@@ -50,7 +57,9 @@ export default function AddAnimalScreen({ route, navigation }) {
   const [species, setSpecies] = useState('');
   const [otherSpecies, setOtherSpecies] = useState('');
   const [breed, setBreed] = useState('');
-  const [age, setAge] = useState('');
+  const [ageNumber, setAgeNumber] = useState('1');
+  const [ageUnit, setAgeUnit] = useState('year/s');
+  const [showAgeUnitModal, setShowAgeUnitModal] = useState(false);
   const [size, setSize] = useState('');
   const [gender, setGender] = useState('');
   const [color, setColor] = useState('');
@@ -84,6 +93,38 @@ export default function AddAnimalScreen({ route, navigation }) {
       : insets.top > 24
         ? insets.top + 6
         : 14;
+
+  const handleIncrementAge = () => {
+    const current = parseInt(ageNumber, 10);
+    const nextVal = isNaN(current) ? 1 : Math.min(current + 1, 30);
+    setAgeNumber(String(nextVal));
+    if (errors.age) setErrors((e) => ({ ...e, age: null }));
+  };
+
+  const handleDecrementAge = () => {
+    const current = parseInt(ageNumber, 10);
+    const nextVal = isNaN(current) ? 1 : Math.max(current - 1, 1);
+    setAgeNumber(String(nextVal));
+    if (errors.age) setErrors((e) => ({ ...e, age: null }));
+  };
+
+  const handleAgeTextChange = (text) => {
+    const cleaned = text.replace(/[^0-9]/g, '');
+    setAgeNumber(cleaned);
+    if (errors.age) setErrors((e) => ({ ...e, age: null }));
+  };
+
+  const getFormattedAge = () => {
+    const num = parseInt(ageNumber, 10);
+    if (!num || isNaN(num) || num <= 0) return '';
+    if (ageUnit === 'week/s') {
+      return num === 1 ? '1 week' : `${num} weeks`;
+    }
+    if (ageUnit === 'month/s') {
+      return num === 1 ? '1 month' : `${num} months`;
+    }
+    return num === 1 ? '1 year' : `${num} years`;
+  };
 
   const needsFosterDuration = listingType === 'Foster' || listingType === 'Both';
 
@@ -244,6 +285,8 @@ export default function AddAnimalScreen({ route, navigation }) {
     if (!location.trim()) e.location = 'Please specify the animal location or city.';
     if (!species) e.species = 'Select the species.';
     else if (species === 'Other' && !otherSpecies.trim()) e.species = 'Please specify the species.';
+    const parsedAge = parseInt(ageNumber, 10);
+    if (!ageNumber || isNaN(parsedAge) || parsedAge <= 0) e.age = 'Estimated age is required.';
     if (!gender) e.gender = 'Select gender.';
     if (!size) e.size = 'Select size.';
     if (!description.trim()) e.desc = 'Add a description.';
@@ -277,13 +320,15 @@ export default function AddAnimalScreen({ route, navigation }) {
         uploadedUrls.push(primaryPhoto);
       }
 
+      const formattedAge = getFormattedAge();
       const tags = tagsText.split(',').map((t) => t.trim()).filter(Boolean);
       addAnimal({
         name: name.trim(),
         location: location.trim() || currentUser?.location || 'Pasig City',
         species: species === 'Other' ? otherSpecies.trim() : species,
         breed: breed.trim(),
-        age: age.trim(),
+        age: formattedAge,
+        ageTag: formattedAge,
         size,
         gender,
         color: color.trim(),
@@ -514,7 +559,54 @@ export default function AddAnimalScreen({ route, navigation }) {
         )}
 
         <Input label="Breed (optional)" placeholder="e.g. Aspin, Puspin" value={breed} onChangeText={setBreed} autoCapitalize="words" />
-        <Input label="Estimated Age" placeholder="e.g. 2 years, 3 months" value={age} onChangeText={setAge} />
+
+        {/* ── Estimated Age Stepper & Unit Dropdown ─────────── */}
+        <View style={styles.ageSectionWrapper}>
+          <Label text="ESTIMATED AGE" error={errors.age} />
+          <View style={styles.ageInputRow}>
+            {/* Stepper container with Minus, Number TextInput, Plus */}
+            <View style={[styles.ageStepperBox, !!errors.age && styles.ageBoxError]}>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={handleDecrementAge}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="remove" size={18} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+
+              <TextInput
+                style={styles.ageNumberInput}
+                value={ageNumber}
+                onChangeText={handleAgeTextChange}
+                keyboardType="number-pad"
+                maxLength={3}
+                placeholder="1"
+                placeholderTextColor={COLORS.textMuted}
+                textAlign="center"
+              />
+
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={handleIncrementAge}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="add" size={18} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Dropdown Selector for Year/s, Month/s, Week/s */}
+            <TouchableOpacity
+              style={[styles.ageUnitDropdown, !!errors.age && styles.ageBoxError]}
+              onPress={() => setShowAgeUnitModal(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.ageUnitText}>{ageUnit}</Text>
+              <Ionicons name="chevron-down" size={18} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <Label text="GENDER" error={errors.gender} />
         <View style={styles.scrollRow}>
@@ -709,6 +801,54 @@ export default function AddAnimalScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* Age Unit Selection Modal */}
+      <Modal
+        visible={showAgeUnitModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAgeUnitModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.ageUnitModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowAgeUnitModal(false)}
+        >
+          <View style={styles.ageUnitModalCard}>
+            <View style={styles.ageUnitModalHeader}>
+              <Text style={styles.ageUnitModalTitle}>Select Age Unit</Text>
+              <TouchableOpacity
+                onPress={() => setShowAgeUnitModal(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={20} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {AGE_UNITS.map((u) => {
+              const selected = ageUnit === u.key;
+              return (
+                <TouchableOpacity
+                  key={u.key}
+                  style={[styles.ageUnitOption, selected && styles.ageUnitOptionSelected]}
+                  onPress={() => {
+                    setAgeUnit(u.key);
+                    setShowAgeUnitModal(false);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.ageUnitOptionText, selected && styles.ageUnitOptionTextSelected]}>
+                    {u.label}
+                  </Text>
+                  {selected && (
+                    <Ionicons name="checkmark-circle" size={20} color={COLORS.primaryDeep} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </TouchableOpacity>
       </Modal>
     </KeyboardAvoidingView>
   );
@@ -1302,6 +1442,130 @@ const styles = StyleSheet.create({
     fontSize: SIZES.body,
     fontWeight: '700',
     color: '#FF6B6B',
+  },
+
+  // ── Estimated Age Stepper & Unit Selector ─────────────────
+  ageSectionWrapper: {
+    marginBottom: SIZES.md16,
+  },
+  ageInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  ageStepperBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.inputBg,
+    borderRadius: SIZES.r12,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    minHeight: 50,
+    paddingHorizontal: 6,
+  },
+  ageBoxError: {
+    borderColor: COLORS.danger,
+  },
+  stepperBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.card,
+    shadowOpacity: 0.04,
+    elevation: 1,
+  },
+  ageNumberInput: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    textAlign: 'center',
+    paddingVertical: 6,
+  },
+  ageUnitDropdown: {
+    width: 128,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.inputBg,
+    borderRadius: SIZES.r12,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    minHeight: 50,
+    paddingHorizontal: 14,
+  },
+  ageUnitText: {
+    fontSize: SIZES.body,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+
+  // ── Age Unit Modal ────────────────────────────────────────
+  ageUnitModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  ageUnitModalCard: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    ...SHADOWS.lg,
+  },
+  ageUnitModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
+  },
+  ageUnitModalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+  },
+  ageUnitOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: COLORS.inputBg,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  ageUnitOptionSelected: {
+    backgroundColor: '#EBF4F7',
+    borderColor: COLORS.primaryDeep,
+  },
+  ageUnitOptionText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+  },
+  ageUnitOptionTextSelected: {
+    fontWeight: '800',
+    color: COLORS.primaryDeep,
+    fontFamily: 'PlusJakartaSans_700Bold',
   },
 });
 

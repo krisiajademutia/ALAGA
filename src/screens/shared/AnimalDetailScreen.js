@@ -390,7 +390,7 @@ export default function AnimalDetailScreen({ route, navigation }) {
             {/* Age Card */}
             <View style={[styles.specCard, styles.specCardAge]}>
               <Text style={styles.specCardLabel}>Age</Text>
-              <Text style={styles.specCardValue}>{ageVal}</Text>
+              <Text style={styles.specCardValue}>{ageVal || 'Not specified'}</Text>
             </View>
 
             {/* Size Card */}

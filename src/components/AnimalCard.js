@@ -66,7 +66,9 @@ export default function AnimalCard({ animal, onPress, style, horizontal = false 
             {animal.name}
           </Text>
           <Text style={styles.petBreed} numberOfLines={1}>
-            {animal.species} · {animal.breed} · {animal.ageTag || animal.age}
+            {[animal.species, animal.breed, animal.ageTag || animal.age]
+              .filter((x) => x && typeof x === 'string' && x.trim().length > 0)
+              .join(' · ')}
           </Text>
           <View style={styles.locRow}>
             <Ionicons name="location-outline" size={11} color="#8C7D6A" style={{ marginRight: 2 }} />
@@ -105,7 +107,10 @@ export default function AnimalCard({ animal, onPress, style, horizontal = false 
 
   // Full-width card matching HomeScreen design
   const isFoster = animal.fosterNeeded || animal.listingType === 'Foster';
-  const badges = animal.personalityBadges || [animal.gender, animal.ageTag || animal.age];
+  const rawBadges = animal.personalityBadges && animal.personalityBadges.length > 0
+    ? animal.personalityBadges
+    : [animal.gender, animal.ageTag || animal.age];
+  const badges = rawBadges.filter((b) => b && typeof b === 'string' && b.trim().length > 0);
 
   return (
     <TouchableOpacity style={[styles.petCard, style]} onPress={onPress} activeOpacity={0.9}>
