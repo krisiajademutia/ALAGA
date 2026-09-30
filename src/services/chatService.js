@@ -164,10 +164,12 @@ export async function saveConversationFirebase(convoData, activeUserId = null) {
     return { isMock: true };
   }
 
-  const currentUid = activeUserId || convoData.lastSenderId || auth?.currentUser?.uid;
   let participants = Array.isArray(convoData.participants) ? [...convoData.participants] : [];
-  if (currentUid && !participants.includes(currentUid)) {
-    participants.push(currentUid);
+  if (participants.length === 0) {
+    const currentUid = activeUserId || convoData.lastSenderId || auth?.currentUser?.uid;
+    if (currentUid) {
+      participants.push(currentUid);
+    }
   }
 
   // Strip messages array — individual messages belong in the subcollection

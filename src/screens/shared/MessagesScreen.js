@@ -57,7 +57,8 @@ export default function MessagesScreen({ navigation }) {
         (item.lastMessage || '').toLowerCase().includes(q)
       );
     }
-    const otherId = item.participants?.find((p) => p !== currentUser?.id);
+    const myId = currentUser?.id || currentUser?.uid;
+    const otherId = item.participants?.find((p) => p !== myId && p !== currentUser?.id && p !== currentUser?.uid);
     const otherName = (item.participantNames?.[otherId] || '').toLowerCase();
     const lastMsg = (item.lastMessage || '').toLowerCase();
     return otherName.includes(q) || lastMsg.includes(q);
@@ -86,7 +87,8 @@ export default function MessagesScreen({ navigation }) {
     if (c.isGroup) {
       return { id: c.id, name: c.groupName || 'Group', isGroup: true };
     }
-    const otherId = c.participants?.find((p) => p !== currentUser?.id);
+    const myId = currentUser?.id || currentUser?.uid;
+    const otherId = c.participants?.find((p) => p !== myId && p !== currentUser?.id && p !== currentUser?.uid);
     const otherUser = otherId ? getUserById(otherId) : null;
     return {
       id: c.id,
@@ -317,7 +319,10 @@ export default function MessagesScreen({ navigation }) {
         }
         renderItem={({ item }) => {
           const isGroup = item.isGroup;
-          const otherId = !isGroup ? item.participants?.find((p) => p !== currentUser?.id) : null;
+          const myId = currentUser?.id || currentUser?.uid;
+          const otherId = !isGroup
+            ? item.participants?.find((p) => p !== myId && p !== currentUser?.id && p !== currentUser?.uid)
+            : null;
           const otherUser = otherId ? getUserById(otherId) : null;
           const displayName = isGroup
             ? item.groupName || 'Group Chat'
@@ -327,7 +332,7 @@ export default function MessagesScreen({ navigation }) {
           const groupPhoto = isGroup ? item.groupPhoto || null : null;
           const lastMsg = item.lastMessage || (isGroup ? 'Group created' : 'Sent a message');
           const time = formatTime(item.lastMessageTime);
-          const uId = currentUser?.id;
+          const uId = myId;
           const isFromOther = item.lastSenderId && item.lastSenderId !== uId;
           const userUnreadCount =
             item.unreadCounts && typeof item.unreadCounts[uId] === 'number'

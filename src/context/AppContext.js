@@ -106,6 +106,8 @@ const defaultContext = {
   startConversation: () => '',
   startGroupConversation: () => '',
   updateGroupInfo: () => {},
+  removeMemberFromGroup: () => {},
+  leaveGroupConversation: () => {},
   clearConversation: () => {},
   deleteConversation: () => {},
   setActiveConversationId: () => {},
@@ -999,7 +1001,7 @@ export function AppProvider({ children }) {
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed)) {
-            setConversations(parsed.filter((c) => String(c?.lastMessage || '').trim()));
+            setConversations(parsed.filter((c) => c.isGroup || String(c?.lastMessage || '').trim()));
           }
         }
       } catch (e) {}
@@ -1029,7 +1031,7 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     if (Array.isArray(conversations)) {
-      const activeConversations = conversations.filter((c) => String(c?.lastMessage || '').trim());
+      const activeConversations = conversations.filter((c) => c.isGroup || String(c?.lastMessage || '').trim());
       AsyncStorage.setItem('@alaga_conversations_v2', JSON.stringify(activeConversations)).catch(() => {});
     }
   }, [conversations]);
@@ -2236,17 +2238,18 @@ export function AppProvider({ children }) {
   };
 
   const startGroupConversation = (memberIds, groupName) => {
-    if (!memberIds || memberIds.length < 2 || !currentUser?.id) return '';
-    const allIds = [currentUser.id, ...memberIds.filter((id) => id !== currentUser.id)];
+    const myId = currentUser?.id || currentUser?.uid;
+    if (!memberIds || memberIds.length < 1 || !myId) return '';
+    const allIds = [myId, ...memberIds.filter((id) => id !== myId)];
     const names = {};
     const avatars = {};
     const unreadCounts = {};
     allIds.forEach((id) => {
-      if (id === currentUser.id) {
+      if (id === myId) {
         names[id] = currentUser.name || 'You';
         avatars[id] = currentUser.avatar || null;
       } else {
-        const found = getAllKnownUsers().find((u) => u.id === id);
+        const found = getAllKnownUsers().find((u) => u.id === id || u.uid === id);
         names[id] = found?.name || 'Member';
         avatars[id] = found?.avatar || null;
       }
@@ -2255,18 +2258,100 @@ export function AppProvider({ children }) {
     const newConv = {
       id: `grp${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       isGroup: true,
+      adminId: myId,
+      creatorId: myId,
       groupName: groupName || allIds.map((id) => names[id].split(' ')[0]).join(', '),
       participants: allIds,
       participantNames: names,
       participantAvatars: avatars,
-      lastMessage: '',
+      lastMessage: 'Group created',
       lastMessageTime: new Date().toISOString(),
-      lastSenderId: '',
+      lastSenderId: myId,
       unreadCounts,
       unread: false,
     };
     setConversations((prev) => [newConv, ...prev]);
+    saveConversationFirebase(newConv, myId);
     return newConv.id;
+  };
+
+  const removeMemberFromGroup = (conversationId, memberId) => {
+    if (!conversationId || !memberId) return;
+    setConversations((prev) =>
+      prev.map((c) => {
+        if (c.id !== conversationId || !c.isGroup) return c;
+        const participants = (c.participants || []).filter((id) => id !== memberId);
+        const participantNames = { ...(c.participantNames || {}) };
+        const participantAvatars = { ...(c.participantAvatars || {}) };
+        delete participantNames[memberId];
+        delete participantAvatars[memberId];
+
+        const updated = {
+          ...c,
+          participants,
+          participantNames,
+          participantAvatars,
+        };
+        saveConversationFirebase(updated);
+        return updated;
+      })
+    );
+  };
+
+  const leaveGroupConversation = async (conversationId, explicitNewAdminId = null) => {
+    const activeUser = currentUserRef.current || currentUser;
+    const currentUid = activeUser?.id || activeUser?.uid;
+    if (!conversationId || !currentUid) return;
+
+    // Immediately remove from local user's conversation list
+    setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+
+    const convo = conversations.find((c) => c.id === conversationId);
+    if (!convo) return;
+
+    const remainingParticipants = (convo.participants || []).filter(
+      (id) => id !== currentUid && id !== currentUser?.id && id !== currentUser?.uid
+    );
+
+    // If nobody left in group, delete entire conversation
+    if (remainingParticipants.length === 0) {
+      deleteConversation(conversationId);
+      return;
+    }
+
+    // Determine new admin: explicitly appointed member, or existing admin if not leaving, or next remaining member
+    let newAdminId = convo.adminId || convo.creatorId;
+    const isCurrentAdmin =
+      newAdminId === currentUid ||
+      newAdminId === currentUser?.id ||
+      newAdminId === currentUser?.uid;
+
+    if (isCurrentAdmin || explicitNewAdminId) {
+      newAdminId =
+        explicitNewAdminId && remainingParticipants.includes(explicitNewAdminId)
+          ? explicitNewAdminId
+          : remainingParticipants[0];
+    }
+
+    const participantNames = { ...(convo.participantNames || {}) };
+    const participantAvatars = { ...(convo.participantAvatars || {}) };
+    delete participantNames[currentUid];
+    if (currentUser?.id) delete participantNames[currentUser.id];
+    if (currentUser?.uid) delete participantNames[currentUser.uid];
+
+    delete participantAvatars[currentUid];
+    if (currentUser?.id) delete participantAvatars[currentUser.id];
+    if (currentUser?.uid) delete participantAvatars[currentUser.uid];
+
+    const updated = {
+      ...convo,
+      adminId: newAdminId,
+      creatorId: newAdminId,
+      participants: remainingParticipants,
+      participantNames,
+      participantAvatars,
+    };
+    saveConversationFirebase(updated);
   };
 
   const clearConversation = async (conversationId) => {
@@ -2291,7 +2376,7 @@ export function AppProvider({ children }) {
     }
   };
 
-  const updateGroupInfo = (conversationId, { groupName, groupPhoto, addParticipants } = {}) => {
+  const updateGroupInfo = (conversationId, { groupName, groupPhoto, addParticipants, removeParticipantId } = {}) => {
     if (!conversationId) return;
     setConversations((prev) =>
       prev.map((c) => {
@@ -2299,6 +2384,12 @@ export function AppProvider({ children }) {
         let participants = c.participants ? [...c.participants] : [];
         let participantNames = { ...(c.participantNames || {}) };
         let participantAvatars = { ...(c.participantAvatars || {}) };
+
+        if (removeParticipantId) {
+          participants = participants.filter((id) => id !== removeParticipantId);
+          delete participantNames[removeParticipantId];
+          delete participantAvatars[removeParticipantId];
+        }
 
         // Merge in new participants (avoid duplicates)
         if (Array.isArray(addParticipants) && addParticipants.length > 0) {
@@ -2435,13 +2526,23 @@ export function AppProvider({ children }) {
   };
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  const getUserConversations = () =>
-    conversations.filter((c) => Array.isArray(c.participants) && c.participants.includes(currentUser?.id) && String(c?.lastMessage || '').trim());
+  const getUserConversations = () => {
+    const uid = currentUser?.id || currentUser?.uid;
+    if (!uid) return [];
+    return conversations.filter(
+      (c) =>
+        Array.isArray(c.participants) &&
+        (c.participants.includes(uid) ||
+          (currentUser?.id && c.participants.includes(currentUser.id)) ||
+          (currentUser?.uid && c.participants.includes(currentUser.uid))) &&
+        (c.isGroup || Boolean(String(c?.lastMessage || '').trim()))
+    );
+  };
 
   const getUnreadMessagesCount = () => {
     const activeUser = currentUserRef.current || currentUser;
-    if (!activeUser?.id) return 0;
-    const uId = activeUser.id;
+    if (!activeUser?.id && !activeUser?.uid) return 0;
+    const uId = activeUser.id || activeUser.uid;
 
     return getUserConversations().reduce((sum, c) => {
       if (c.unreadCounts && typeof c.unreadCounts[uId] === 'number') {
@@ -2458,11 +2559,11 @@ export function AppProvider({ children }) {
   const markConversationRead = useCallback((conversationId) => {
     if (!conversationId) return;
     const targetConversation = conversations.find((c) => c.id === conversationId);
-    // New chats exist only in memory until their first message is sent.
-    if (!targetConversation || !String(targetConversation.lastMessage || '').trim()) return;
+    // New 1-on-1 chats exist only in memory until their first message is sent.
+    if (!targetConversation || (!targetConversation.isGroup && !String(targetConversation.lastMessage || '').trim())) return;
     const activeUser = currentUserRef.current || currentUser;
-    if (!activeUser?.id) return;
-    const uId = activeUser.id;
+    if (!activeUser?.id && !activeUser?.uid) return;
+    const uId = activeUser.id || activeUser.uid;
 
     setConversations((prev) => {
       const target = prev.find((c) => c.id === conversationId);
@@ -2744,6 +2845,8 @@ export function AppProvider({ children }) {
         startConversation,
         startGroupConversation,
         updateGroupInfo,
+        removeMemberFromGroup,
+        leaveGroupConversation,
         clearConversation,
         deleteConversation,
         setActiveConversationId,

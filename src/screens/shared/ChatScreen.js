@@ -49,7 +49,7 @@ export default function ChatScreen({ route, navigation }) {
   } = route.params || {};
   const resolvedOtherName = otherName || routeUserName;
   const { conversations, currentUser, sendMessage, clearConversation, markConversationRead,
-    setActiveConversationId, showAlert, updateGroupInfo, getAllKnownUsers, getUserById } = useApp();
+    setActiveConversationId, showAlert, updateGroupInfo, removeMemberFromGroup, leaveGroupConversation, getAllKnownUsers, getUserById } = useApp();
   const messagesCacheKey = `@alaga_chat_messages_v1_${currentUser?.id || 'guest'}_${conversationId || 'none'}`;
   const [text, setText] = useState(initialDraft || '');
   const [messages, setMessages] = useState([]);
@@ -69,6 +69,9 @@ export default function ChatScreen({ route, navigation }) {
   // Media gallery state
   const [mediaGalleryVisible, setMediaGalleryVisible] = useState(false);
   const [galleryPreview, setGalleryPreview] = useState(null);
+  // Assign new admin modal state (when admin leaves)
+  const [assignAdminModalVisible, setAssignAdminModalVisible] = useState(false);
+  const [selectedNextAdminId, setSelectedNextAdminId] = useState(null);
 
   const flatRef = useRef(null);
   const inputRef = useRef(null);
@@ -173,14 +176,20 @@ export default function ChatScreen({ route, navigation }) {
       (convo?.participant1 === currentUser?.id ? convo?.participant2Name : convo?.participant1Name) ||
       'Chat');
 
+  const myId = currentUser?.id || currentUser?.uid;
+  const adminId = convo?.adminId || convo?.creatorId || convo?.participants?.[0] || null;
+  const isCurrentUserAdmin = Boolean(myId && adminId && (myId === adminId || currentUser?.id === adminId || currentUser?.uid === adminId));
+
   const groupMembers = isGroup && convo?.participants
     ? convo.participants.map((pid) => {
       const u = getUserById(pid);
+      const isAdm = pid === adminId;
       return {
         id: pid,
         name: u?.name || convo.participantNames?.[pid] || 'Member',
         avatar: u?.avatar || convo.participantAvatars?.[pid] || null,
-        isMe: pid === currentUser?.id,
+        isMe: pid === myId || pid === currentUser?.id || pid === currentUser?.uid,
+        isAdmin: isAdm,
       };
     })
     : [];
@@ -189,7 +198,7 @@ export default function ChatScreen({ route, navigation }) {
 
   const nonMembers = isGroup
     ? (getAllKnownUsers?.() || []).filter(
-      (u) => u.id !== currentUser?.id && !(convo?.participants || []).includes(u.id)
+      (u) => u.id !== myId && u.id !== currentUser?.id && u.id !== currentUser?.uid && !(convo?.participants || []).includes(u.id)
     )
     : [];
 
@@ -580,6 +589,71 @@ export default function ChatScreen({ route, navigation }) {
     });
   };
 
+  const handleRemoveMember = (member) => {
+    if (!convo?.id || !member?.id) return;
+    showAlert({
+      title: 'Remove Member',
+      message: `Are you sure you want to remove ${member.name} from "${name}"?`,
+      type: 'warning',
+      customIcon: 'person-remove-outline',
+      secondaryText: 'Cancel',
+      primaryText: 'Remove',
+      onPrimaryPress: () => {
+        removeMemberFromGroup(convo.id, member.id);
+      },
+    });
+  };
+
+  const handleLeaveGroup = () => {
+    if (!convo?.id) return;
+    const otherMembers = groupMembers.filter((m) => !m.isMe);
+
+    // If admin is leaving and other members exist, prompt admin selection modal
+    if (isCurrentUserAdmin && otherMembers.length > 0) {
+      setSelectedNextAdminId(otherMembers[0]?.id || null);
+      setAssignAdminModalVisible(true);
+      return;
+    }
+
+    // Regular member or admin leaving empty group
+    showAlert({
+      title: 'Leave Group Chat',
+      message: otherMembers.length === 0
+        ? 'You are the only member left. Leaving will delete this group chat.'
+        : `Are you sure you want to leave "${name}"? You will no longer receive new messages from this group.`,
+      type: 'warning',
+      customIcon: 'log-out-outline',
+      secondaryText: 'Cancel',
+      primaryText: 'Leave Group',
+      onPrimaryPress: () => {
+        setGroupInfoVisible(false);
+        chatMessagesCache.delete(messagesCacheKey);
+        leaveGroupConversation(convo.id);
+        navigation.goBack();
+      },
+    });
+  };
+
+  const handleConfirmAdminAndLeave = () => {
+    if (!convo?.id || !selectedNextAdminId) return;
+    const chosenMember = groupMembers.find((m) => m.id === selectedNextAdminId);
+    showAlert({
+      title: 'Assign Admin & Leave',
+      message: `Appoint ${chosenMember?.name || 'this member'} as the new group admin and leave "${name}"?`,
+      type: 'warning',
+      customIcon: 'shield-checkmark',
+      secondaryText: 'Cancel',
+      primaryText: 'Confirm & Leave',
+      onPrimaryPress: () => {
+        setAssignAdminModalVisible(false);
+        setGroupInfoVisible(false);
+        chatMessagesCache.delete(messagesCacheKey);
+        leaveGroupConversation(convo.id, selectedNextAdminId);
+        navigation.goBack();
+      },
+    });
+  };
+
   const renderEmptyState = () => {
     if (isGroup) {
       return (
@@ -612,7 +686,20 @@ export default function ChatScreen({ route, navigation }) {
             {groupMembers.map((m) => (
               <View key={m.id} style={styles.memberRow}>
                 <Avatar name={m.name} userId={m.id} uri={m.avatar} size={36} />
-                <Text style={styles.memberName}>{m.name}{m.isMe ? ' (You)' : ''}</Text>
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', marginLeft: 10, gap: 6, flexWrap: 'wrap' }}>
+                  <Text style={styles.memberName}>{m.name}</Text>
+                  {m.isMe && (
+                    <View style={styles.youBadge}>
+                      <Text style={styles.youBadgeText}>You</Text>
+                    </View>
+                  )}
+                  {m.isAdmin && (
+                    <View style={styles.adminBadge}>
+                      <Ionicons name="shield-checkmark" size={10} color="#1E7E34" style={{ marginRight: 2 }} />
+                      <Text style={styles.adminBadgeText}>Admin</Text>
+                    </View>
+                  )}
+                </View>
               </View>
             ))}
           </View>
@@ -1232,11 +1319,32 @@ export default function ChatScreen({ route, navigation }) {
                 <View key={m.id} style={styles.groupInfoMemberRow}>
                   <Avatar name={m.name} userId={m.id} uri={m.avatar} size={42} />
                   <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={styles.groupInfoMemberName}>{m.name}</Text>
-                    {m.isMe && (
-                      <Text style={styles.groupInfoMemberYou}>You</Text>
-                    )}
+                    <View style={styles.memberInfoNameRow}>
+                      <Text style={styles.groupInfoMemberName}>{m.name}</Text>
+                      {m.isMe && (
+                        <View style={styles.youBadge}>
+                          <Text style={styles.youBadgeText}>You</Text>
+                        </View>
+                      )}
+                      {m.isAdmin && (
+                        <View style={styles.adminBadge}>
+                          <Ionicons name="shield-checkmark" size={10} color="#1E7E34" style={{ marginRight: 2 }} />
+                          <Text style={styles.adminBadgeText}>Admin</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
+                  {isCurrentUserAdmin && !m.isMe && (
+                    <TouchableOpacity
+                      style={styles.removeMemberBtn}
+                      onPress={() => handleRemoveMember(m)}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="person-remove-outline" size={13} color="#D94F4F" style={{ marginRight: 3 }} />
+                      <Text style={styles.removeMemberBtnTxt}>Remove</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               ))}
             </View>
@@ -1277,6 +1385,17 @@ export default function ChatScreen({ route, navigation }) {
               </View>
             )}
 
+            {/* Leave Group Chat Button */}
+            <TouchableOpacity
+              style={styles.groupInfoLeaveBtn}
+              activeOpacity={0.8}
+              onPress={handleLeaveGroup}
+            >
+              <Ionicons name="log-out-outline" size={18} color="#D97706" />
+              <Text style={styles.groupInfoLeaveTxt}>Leave Group Chat</Text>
+            </TouchableOpacity>
+
+            {/* Clear / Delete Group Button */}
             <TouchableOpacity
               style={styles.groupInfoDangerBtn}
               activeOpacity={0.8}
@@ -1284,12 +1403,14 @@ export default function ChatScreen({ route, navigation }) {
                 setGroupInfoVisible(false);
                 setTimeout(() => {
                   showAlert({
-                    title: 'Clear Group Messages',
-                    message: 'Remove all messages and delete this group chat?',
+                    title: isCurrentUserAdmin ? 'Delete Group Chat' : 'Clear Group Messages',
+                    message: isCurrentUserAdmin
+                      ? 'Delete this group chat and remove all messages for everyone?'
+                      : 'Remove all messages and delete this group chat from your list?',
                     type: 'warning',
                     customIcon: 'trash-outline',
                     secondaryText: 'Cancel',
-                    primaryText: 'Clear All',
+                    primaryText: isCurrentUserAdmin ? 'Delete All' : 'Clear All',
                     onPrimaryPress: () => {
                       const targetId = convo?.id || conversationId;
                       setMessages([]);
@@ -1302,7 +1423,9 @@ export default function ChatScreen({ route, navigation }) {
               }}
             >
               <Ionicons name="trash-outline" size={18} color="#C0392B" />
-              <Text style={styles.groupInfoDangerTxt}>Clear Chat History</Text>
+              <Text style={styles.groupInfoDangerTxt}>
+                {isCurrentUserAdmin ? 'Delete Group Chat' : 'Clear Chat History'}
+              </Text>
             </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
@@ -1403,6 +1526,75 @@ export default function ChatScreen({ route, navigation }) {
                 );
               });
             })()}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ── Assign New Admin Modal (Admin Leaving) ─────────────── */}
+      <Modal
+        visible={assignAdminModalVisible}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setAssignAdminModalVisible(false)}
+      >
+        <SafeAreaView style={styles.groupInfoContainer}>
+          <View style={styles.groupInfoHeader}>
+            <TouchableOpacity
+              style={styles.groupInfoCloseBtn}
+              onPress={() => setAssignAdminModalVisible(false)}
+            >
+              <Ionicons name="close" size={22} color="#473018" />
+            </TouchableOpacity>
+            <Text style={styles.groupInfoTitle}>Assign Next Admin</Text>
+            <TouchableOpacity
+              style={[
+                styles.groupInfoSaveBtn,
+                !selectedNextAdminId && { backgroundColor: '#C9B99A' },
+              ]}
+              onPress={handleConfirmAdminAndLeave}
+              disabled={!selectedNextAdminId}
+            >
+              <Text style={styles.groupInfoSaveTxt}>Done & Leave</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 16 }}>
+            <View style={styles.assignAdminNoticeCard}>
+              <View style={styles.assignAdminNoticeIcon}>
+                <Ionicons name="shield-checkmark" size={24} color="#1E7E34" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.assignAdminNoticeTitle}>Choose the New Admin</Text>
+                <Text style={styles.assignAdminNoticeSub}>
+                  Before leaving the group, you must appoint a new group admin to manage members and group settings.
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.groupInfoFieldLabel}>SELECT NEW ADMIN</Text>
+
+            {groupMembers
+              .filter((m) => !m.isMe)
+              .map((m) => {
+                const isSelected = selectedNextAdminId === m.id;
+                return (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={[styles.assignAdminRow, isSelected && styles.assignAdminRowSelected]}
+                    onPress={() => setSelectedNextAdminId(m.id)}
+                    activeOpacity={0.8}
+                  >
+                    <Avatar name={m.name} userId={m.id} uri={m.avatar} size={46} />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.assignAdminName}>{m.name}</Text>
+                      <Text style={styles.assignAdminSub}>Tap to assign as Admin</Text>
+                    </View>
+                    <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
+                      {isSelected && <View style={styles.radioInnerDot} />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -1984,6 +2176,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 8,
   },
+  memberInfoNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
   groupInfoMemberName: {
     fontSize: 15,
     fontWeight: '600',
@@ -1994,6 +2192,65 @@ const styles = StyleSheet.create({
     color: '#2E7A99',
     fontWeight: '600',
     marginTop: 1,
+  },
+  youBadge: {
+    backgroundColor: '#EBF4F7',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  youBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#2E7A99',
+  },
+  adminBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E6F4EA',
+    borderWidth: 1,
+    borderColor: '#C6ECC9',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  adminBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1E7E34',
+  },
+  removeMemberBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  removeMemberBtnTxt: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#D94F4F',
+  },
+  groupInfoLeaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  groupInfoLeaveTxt: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#D97706',
   },
   groupInfoDangerBtn: {
     flexDirection: 'row',
@@ -2597,4 +2854,79 @@ const styles = StyleSheet.create({
   dismissReportBannerBtn: {
     padding: 4,
   },
+  assignAdminNoticeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EBF7EE',
+    borderWidth: 1,
+    borderColor: '#C3E6CB',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+    marginBottom: 20,
+    gap: 12,
+  },
+  assignAdminNoticeIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#D4EDDA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  assignAdminNoticeTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#155724',
+    marginBottom: 3,
+  },
+  assignAdminNoticeSub: {
+    fontSize: 12,
+    color: '#1E7E34',
+    lineHeight: 16,
+  },
+  assignAdminRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: '#F0E8DC',
+  },
+  assignAdminRowSelected: {
+    borderColor: '#473018',
+    backgroundColor: '#FBF8F4',
+  },
+  assignAdminName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2C1810',
+  },
+  assignAdminSub: {
+    fontSize: 12,
+    color: '#8A7A68',
+    marginTop: 2,
+  },
+  radioCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#C9B99A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioCircleSelected: {
+    borderColor: '#473018',
+  },
+  radioInnerDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#473018',
+  },
 });
+
