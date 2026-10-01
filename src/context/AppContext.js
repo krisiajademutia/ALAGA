@@ -2100,7 +2100,8 @@ export function AppProvider({ children }) {
         location: messageData.location || null,
         duration: messageData.duration || null,
         time: messageData.time || new Date().toISOString(),
-        // Extra fields for special message types (e.g. report_link)
+        // Extra fields for reply and special message types
+        ...(messageData.replyTo ? { replyTo: messageData.replyTo } : {}),
         ...(messageData.reportId ? { reportId: messageData.reportId } : {}),
         ...(messageData.animalType ? { animalType: messageData.animalType } : {}),
         ...(messageData.condition ? { condition: messageData.condition } : {}),
@@ -2112,7 +2113,7 @@ export function AppProvider({ children }) {
 
     const hasContent = newMsg.type === 'text'
       ? Boolean(String(newMsg.text || '').trim())
-      : newMsg.type === 'image' || newMsg.type === 'video'
+      : newMsg.type === 'image' || newMsg.type === 'video' || newMsg.type === 'gif'
         ? Boolean(newMsg.mediaUri)
         : newMsg.type === 'location'
           ? Boolean(newMsg.location)
@@ -2139,6 +2140,8 @@ export function AppProvider({ children }) {
         ? '📷 Photo'
         : newMsg.type === 'video'
         ? '🎥 Video'
+        : newMsg.type === 'gif'
+        ? '👾 GIF'
         : newMsg.type === 'location'
         ? '📍 Location'
         : newMsg.text;

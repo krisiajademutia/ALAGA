@@ -27,6 +27,7 @@ export default function MessagesScreen({ navigation }) {
     startGroupConversation,
     markConversationRead,
     clearConversation,
+    leaveGroupConversation,
     getUserById,
     showAlert,
   } = useApp();
@@ -356,17 +357,52 @@ export default function MessagesScreen({ navigation }) {
                 });
               }}
               onLongPress={() => {
-                showAlert({
-                  title: displayName,
-                  message: 'Do you want to delete this conversation and clear all its messages?',
-                  type: 'warning',
-                  customIcon: 'trash-outline',
-                  secondaryText: 'Cancel',
-                  primaryText: 'Delete Chat',
-                  onPrimaryPress: () => {
-                    clearConversation(item.id);
-                  },
-                });
+                if (isGroup) {
+                  const myId = currentUser?.id || currentUser?.uid;
+                  const adminId = item.adminId || item.creatorId;
+                  const isAdmin = Boolean(myId && adminId && (myId === adminId || currentUser?.id === adminId || currentUser?.uid === adminId));
+
+                  if (isAdmin) {
+                    showAlert({
+                      title: displayName,
+                      message: 'As the group admin, would you like to delete this group chat for everyone or leave the group?',
+                      type: 'warning',
+                      customIcon: 'shield-checkmark-outline',
+                      secondaryText: 'Leave Group',
+                      onSecondaryPress: () => {
+                        leaveGroupConversation(item.id);
+                      },
+                      primaryText: 'Delete Group',
+                      onPrimaryPress: () => {
+                        clearConversation(item.id);
+                      },
+                    });
+                  } else {
+                    showAlert({
+                      title: displayName,
+                      message: 'Do you want to leave this group chat?',
+                      type: 'warning',
+                      customIcon: 'log-out-outline',
+                      secondaryText: 'Cancel',
+                      primaryText: 'Leave Group',
+                      onPrimaryPress: () => {
+                        leaveGroupConversation(item.id);
+                      },
+                    });
+                  }
+                } else {
+                  showAlert({
+                    title: displayName,
+                    message: 'Do you want to delete this conversation and clear all its messages?',
+                    type: 'warning',
+                    customIcon: 'trash-outline',
+                    secondaryText: 'Cancel',
+                    primaryText: 'Delete Chat',
+                    onPrimaryPress: () => {
+                      clearConversation(item.id);
+                    },
+                  });
+                }
               }}
               activeOpacity={0.72}
             >

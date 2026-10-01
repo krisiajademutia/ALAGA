@@ -15,12 +15,15 @@ import {
   Modal,
   ActivityIndicator,
   Linking,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import * as Clipboard from 'expo-clipboard';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useApp } from '../../context/AppContext';
 import { subscribeToMessages } from '../../services/chatService';
@@ -35,6 +38,126 @@ const QUICK_PROMPTS = [
   { icon: 'car-outline', text: 'I am on my way to help with the rescue!' },
   { icon: 'help-circle-outline', text: 'Is rescue assistance still needed?' },
 ];
+
+const GIF_CATEGORIES = [
+  { id: 'all', label: '✨ All' },
+  { id: 'animals', label: '🐾 Animals' },
+  { id: 'dogs', label: '🐶 Dogs' },
+  { id: 'cats', label: '🐱 Cats' },
+  { id: 'love', label: '❤️ Love' },
+  { id: 'celebrate', label: '🎉 Celebrate' },
+  { id: 'thumbsup', label: '👍 Reactions' },
+  { id: 'funny', label: '😂 Funny' },
+];
+
+const CURATED_GIFS = [
+  // Animals / Dogs
+  { id: 'g_dog1', title: 'Happy Golden', category: 'dogs', tags: ['dog', 'happy', 'excited', 'wag', 'cute', 'animal', 'pet'], url: 'https://media.giphy.com/media/4Zo41lhzKt6iZ8xff9/giphy.gif' },
+  { id: 'g_dog2', title: 'Puppy Wink', category: 'dogs', tags: ['dog', 'puppy', 'wink', 'cute', 'animal', 'love', 'hi', 'hello'], url: 'https://media.giphy.com/media/bbshzgyFQDqPHXBo4c/giphy.gif' },
+  { id: 'g_dog3', title: 'Dog High Five', category: 'dogs', tags: ['dog', 'high five', 'paw', 'good', 'approved', 'yes', 'thanks'], url: 'https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif' },
+  { id: 'g_dog4', title: 'Happy Dance Dog', category: 'dogs', tags: ['dog', 'dance', 'happy', 'celebrate', 'yay'], url: 'https://media.giphy.com/media/13CoXDiaCcCoyk/giphy.gif' },
+  { id: 'g_dog5', title: 'Curious Puppy', category: 'dogs', tags: ['dog', 'puppy', 'head tilt', 'cute', 'question'], url: 'https://media.giphy.com/media/26xBI73gWquCBBCDe/giphy.gif' },
+  { id: 'g_dog6', title: 'Dog Hug', category: 'dogs', tags: ['dog', 'hug', 'love', 'cuddle', 'care', 'friends'], url: 'https://media.giphy.com/media/MDJ9IbxxvDUQM/giphy.gif' },
+  // Animals / Cats
+  { id: 'g_cat1', title: 'Cat Vibing', category: 'cats', tags: ['cat', 'vibing', 'nod', 'music', 'cool', 'yes'], url: 'https://media.giphy.com/media/jpbnoe3UIa8TU8LM13/giphy.gif' },
+  { id: 'g_cat2', title: 'Cute Kitten Hug', category: 'cats', tags: ['cat', 'kitten', 'hug', 'love', 'cuddle', 'cute', 'sweet'], url: 'https://media.giphy.com/media/ICOgUNjpvO0PC/giphy.gif' },
+  { id: 'g_cat3', title: 'Cat High Five', category: 'cats', tags: ['cat', 'high five', 'paw', 'yes', 'cool', 'nice'], url: 'https://media.giphy.com/media/Lq0h93752f6J9tijrh/giphy.gif' },
+  { id: 'g_cat4', title: 'Sleepy Cat', category: 'cats', tags: ['cat', 'sleepy', 'tired', 'nap', 'bed', 'rest'], url: 'https://media.giphy.com/media/mlvseq9yvZhba/giphy.gif' },
+  { id: 'g_cat5', title: 'Surprised Cat', category: 'cats', tags: ['cat', 'surprised', 'wow', 'shocked', 'omg'], url: 'https://media.giphy.com/media/unQ3IJU2RG7DO/giphy.gif' },
+  { id: 'g_cat6', title: 'Purring Cat Heart', category: 'cats', tags: ['cat', 'heart', 'love', 'purr', 'thank you'], url: 'https://media.giphy.com/media/C9x8gX02SnMIoAClXA/giphy.gif' },
+  // Animals General
+  { id: 'g_anim1', title: 'Cute Bunny', category: 'animals', tags: ['bunny', 'rabbit', 'cute', 'animal', 'eat'], url: 'https://media.giphy.com/media/10hzvF9FTeJaLK/giphy.gif' },
+  { id: 'g_anim2', title: 'Puppy & Kitten', category: 'animals', tags: ['animals', 'friends', 'puppy', 'kitten', 'cute', 'rescue'], url: 'https://media.giphy.com/media/3oEduV4SOS9mmmIOkw/giphy.gif' },
+  // Love & Care
+  { id: 'g_love1', title: 'Heart Paw', category: 'love', tags: ['heart', 'love', 'paw', 'animal', 'care', 'sweet'], url: 'https://media.giphy.com/media/M90mJvfWfd5mbUuULX/giphy.gif' },
+  { id: 'g_love2', title: 'Sending Love', category: 'love', tags: ['love', 'hug', 'warm', 'thanks', 'caring', 'alaga'], url: 'https://media.giphy.com/media/xT0xeJpnrWC4XWblEk/giphy.gif' },
+  { id: 'g_love3', title: 'Big Hugs', category: 'love', tags: ['hug', 'hugs', 'love', 'bear', 'support', 'comfort'], url: 'https://media.giphy.com/media/5OqXb948EBkyUcnwHt/giphy.gif' },
+  { id: 'g_love4', title: 'Thank You so Much', category: 'love', tags: ['thanks', 'thank you', 'grateful', 'appreciate'], url: 'https://media.giphy.com/media/osjgQPWRx3cac/giphy.gif' },
+  // Celebrate / Adopted / Rescued
+  { id: 'g_cel1', title: 'Celebration Confetti', category: 'celebrate', tags: ['celebrate', 'party', 'confetti', 'yay', 'adopted', 'rescued', 'win'], url: 'https://media.giphy.com/media/artj92V8o75VPL7AeQ/giphy.gif' },
+  { id: 'g_cel2', title: 'Happy Dance', category: 'celebrate', tags: ['happy', 'dance', 'yay', 'excited', 'success'], url: 'https://media.giphy.com/media/blSTtZehjAZ8I/giphy.gif' },
+  { id: 'g_cel3', title: 'Clapping Hands', category: 'celebrate', tags: ['applause', 'clapping', 'good job', 'bravo', 'hero'], url: 'https://media.giphy.com/media/l4q8cJzGdR9J8w3hS/giphy.gif' },
+  { id: 'g_cel4', title: 'Woohoo Yay', category: 'celebrate', tags: ['woohoo', 'yay', 'hooray', 'awesome', 'great'], url: 'https://media.giphy.com/media/artj92V8o75VPL7AeQ/giphy.gif' },
+  // Thumbs Up & Reactions
+  { id: 'g_thu1', title: 'Thumbs Up Dog', category: 'thumbsup', tags: ['thumbs up', 'good', 'agree', 'ok', 'yes', 'approved'], url: 'https://media.giphy.com/media/111ebonMs90YLu/giphy.gif' },
+  { id: 'g_thu2', title: 'Double Thumbs Up', category: 'thumbsup', tags: ['thumbs up', 'cool', 'awesome', 'nice', 'perfect'], url: 'https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif' },
+  { id: 'g_thu3', title: 'On My Way', category: 'thumbsup', tags: ['on my way', 'omw', 'running', 'rescue', 'coming', 'fast'], url: 'https://media.giphy.com/media/3o7Z4tNxQK3ocsBRx6/giphy.gif' },
+  { id: 'g_thu4', title: 'Stay Safe', category: 'thumbsup', tags: ['safe', 'care', 'bless', 'prayers', 'rescue'], url: 'https://media.giphy.com/media/l3q2wJsC23ikJg9xe/giphy.gif' },
+  // Funny
+  { id: 'g_fun1', title: 'Smiling Dog', category: 'funny', tags: ['smile', 'dog', 'funny', 'laugh', 'happy', 'grin'], url: 'https://media.giphy.com/media/3ndAvMC5lfPNMCzq7m/giphy.gif' },
+  { id: 'g_fun2', title: 'Shocked Pet', category: 'funny', tags: ['shocked', 'funny', 'what', 'omg', 'eyes'], url: 'https://media.giphy.com/media/vQqeT3AYg8S5O/giphy.gif' },
+  { id: 'g_fun3', title: 'Sneaky Cat', category: 'funny', tags: ['sneaky', 'cat', 'funny', 'peek', 'hello'], url: 'https://media.giphy.com/media/BzyTuYCmvSORqs1ABM/giphy.gif' },
+  { id: 'g_fun4', title: 'Puppy Zoomies', category: 'funny', tags: ['zoomies', 'puppy', 'fast', 'excited', 'funny'], url: 'https://media.giphy.com/media/mCRJDo24UvJMA/giphy.gif' },
+];
+
+function SwipeableMessageRow({ children, isMine, onSwipeReply, onLongPress }) {
+  const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 15 && Math.abs(gestureState.dy) < 12;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        let dx = gestureState.dx;
+        const maxOffset = 55;
+        if (dx < -maxOffset) dx = -maxOffset;
+        if (dx > maxOffset) dx = maxOffset;
+        pan.setValue({ x: dx, y: 0 });
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (Math.abs(gestureState.dx) > 32) {
+          onSwipeReply?.();
+        }
+        Animated.spring(pan, {
+          toValue: { x: 0, y: 0 },
+          friction: 6,
+          tension: 40,
+          useNativeDriver: true,
+        }).start();
+      },
+    })
+  ).current;
+
+  return (
+    <View style={styles.swipeContainer}>
+      <Animated.View
+        style={[
+          styles.swipeReplyIconWrap,
+          isMine ? styles.swipeReplyIconLeft : styles.swipeReplyIconRight,
+          {
+            opacity: pan.x.interpolate({
+              inputRange: [-45, -15, 0, 15, 45],
+              outputRange: [1, 0.4, 0, 0.4, 1],
+            }),
+            transform: [
+              {
+                scale: pan.x.interpolate({
+                  inputRange: [-45, -15, 0, 15, 45],
+                  outputRange: [1.05, 0.7, 0.3, 0.7, 1.05],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <Ionicons name="arrow-undo" size={15} color="#2E7A99" />
+      </Animated.View>
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={{ transform: [{ translateX: pan.x }] }}
+      >
+        <TouchableOpacity
+          onLongPress={onLongPress}
+          delayLongPress={280}
+          activeOpacity={0.92}
+        >
+          {children}
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+}
 
 export default function ChatScreen({ route, navigation }) {
   const {
@@ -72,6 +195,14 @@ export default function ChatScreen({ route, navigation }) {
   // Assign new admin modal state (when admin leaves)
   const [assignAdminModalVisible, setAssignAdminModalVisible] = useState(false);
   const [selectedNextAdminId, setSelectedNextAdminId] = useState(null);
+
+  // Reply and GIF feature states
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [gifModalVisible, setGifModalVisible] = useState(false);
+  const [gifSearch, setGifSearch] = useState('');
+  const [selectedGifCategory, setSelectedGifCategory] = useState('all');
+  const [msgActionModalVisible, setMsgActionModalVisible] = useState(false);
+  const [selectedMsgAction, setSelectedMsgAction] = useState(null);
 
   const flatRef = useRef(null);
   const inputRef = useRef(null);
@@ -296,6 +427,111 @@ export default function ChatScreen({ route, navigation }) {
     }, 400);
   };
 
+  const handleStartReply = (msg) => {
+    if (!msg) return;
+    const currentUid = currentUser?.id || currentUser?.uid;
+    const isMine = msg.senderId === currentUid || msg.senderId === currentUser?.id || msg.senderId === currentUser?.uid;
+    const senderUser = !isMine && msg.senderId ? getUserById(msg.senderId) : null;
+    const senderName = isMine
+      ? 'yourself'
+      : senderUser?.name || convo?.participantNames?.[msg.senderId] || name || 'Member';
+
+    let snippet = msg.text || '';
+    if (msg.type === 'image') snippet = '📷 Photo';
+    else if (msg.type === 'gif') snippet = '👾 GIF';
+    else if (msg.type === 'video') snippet = '🎥 Video';
+    else if (msg.type === 'location') snippet = '📍 Rescue Location';
+    else if (msg.type === 'report_link') snippet = '📋 Rescue Report';
+
+    setReplyingTo({
+      id: msg.id,
+      senderId: msg.senderId,
+      senderName,
+      text: snippet,
+      type: msg.type || 'text',
+      mediaUri: msg.mediaUri || null,
+      isMine,
+    });
+    setMsgActionModalVisible(false);
+    setTimeout(() => inputRef.current?.focus(), 80);
+  };
+
+  const handleOpenMsgAction = (msg) => {
+    if (!msg) return;
+    setSelectedMsgAction(msg);
+    setMsgActionModalVisible(true);
+  };
+
+  const handleCopyText = async () => {
+    if (selectedMsgAction?.text) {
+      await Clipboard.setStringAsync(selectedMsgAction.text);
+      setMsgActionModalVisible(false);
+      showAlert({
+        title: 'Copied',
+        message: 'Message text copied to clipboard.',
+        type: 'success',
+        customIcon: 'copy-outline',
+      });
+    }
+  };
+
+  const handleScrollToMessage = (messageId) => {
+    if (!messageId) return;
+    const idx = messages.findIndex((m) => m.id === messageId);
+    if (idx >= 0 && flatRef.current) {
+      try {
+        flatRef.current.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+      } catch (e) {
+        flatRef.current.scrollToEnd({ animated: true });
+      }
+    }
+  };
+
+  const handleSendGif = (gifUrl) => {
+    setGifModalVisible(false);
+    if (!convo?.id || !gifUrl) return;
+    const currentUid = currentUser?.id || currentUser?.uid;
+    const gifMsg = {
+      id: `m_gif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      _pending: true,
+      senderId: currentUid,
+      senderName: currentUser?.name || 'User',
+      senderAvatar: currentUser?.avatar || null,
+      type: 'gif',
+      mediaUri: gifUrl,
+      text: '',
+      time: new Date().toISOString(),
+      ...(replyingTo ? {
+        replyTo: {
+          id: replyingTo.id,
+          senderId: replyingTo.senderId,
+          senderName: replyingTo.senderName,
+          text: replyingTo.text,
+          type: replyingTo.type,
+        }
+      } : {}),
+    };
+    setReplyingTo(null);
+    setMessages((prev) => [...prev, gifMsg]);
+    sendMessage(convo.id, gifMsg).then((saved) => {
+      if (!saved) setMessages((prev) => prev.filter((m) => m.id !== gifMsg.id));
+    });
+    setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
+  };
+
+  const filteredGifs = CURATED_GIFS.filter((g) => {
+    if (selectedGifCategory !== 'all' && g.category !== selectedGifCategory) {
+      return false;
+    }
+    if (!gifSearch.trim()) return true;
+    const q = gifSearch.toLowerCase().trim();
+    return (
+      g.title.toLowerCase().includes(q) ||
+      g.category.toLowerCase().includes(q) ||
+      (g.tags || []).some((t) => t.toLowerCase().includes(q))
+    );
+  });
+
   const handleSend = () => {
     const trimmed = text.trim();
     if (!trimmed || !convo) return;
@@ -303,16 +539,27 @@ export default function ChatScreen({ route, navigation }) {
     isSendingTextRef.current = true;
     setTimeout(() => { isSendingTextRef.current = false; }, 350);
 
+    const currentUid = currentUser?.id || currentUser?.uid;
     const userMsg = {
       id: `m_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       _pending: true,
-      senderId: currentUser?.id,
+      senderId: currentUid,
       senderName: currentUser?.name || 'User',
       senderAvatar: currentUser?.avatar || null,
       type: 'text',
       text: trimmed,
       time: new Date().toISOString(),
+      ...(replyingTo ? {
+        replyTo: {
+          id: replyingTo.id,
+          senderId: replyingTo.senderId,
+          senderName: replyingTo.senderName,
+          text: replyingTo.text,
+          type: replyingTo.type,
+        }
+      } : {}),
     };
+    setReplyingTo(null);
     setText('');
     setMessages((prev) => [...prev, userMsg]);
     sendMessage(convo.id, userMsg).then((saved) => {
@@ -344,11 +591,23 @@ export default function ChatScreen({ route, navigation }) {
         quality: 0.8,
       });
       if (!result.canceled && result.assets?.[0]?.uri && convo?.id) {
+        const pickedUri = result.assets[0].uri;
+        const isGifFile = pickedUri.toLowerCase().endsWith('.gif') || result.assets[0].mimeType === 'image/gif';
         sendMessage(convo.id, {
-          type: 'image',
-          mediaUri: result.assets[0].uri,
+          type: isGifFile ? 'gif' : 'image',
+          mediaUri: pickedUri,
           text: text.trim(),
+          ...(replyingTo ? {
+            replyTo: {
+              id: replyingTo.id,
+              senderId: replyingTo.senderId,
+              senderName: replyingTo.senderName,
+              text: replyingTo.text,
+              type: replyingTo.type,
+            }
+          } : {}),
         });
+        setReplyingTo(null);
         setText('');
         setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
       }
@@ -382,7 +641,17 @@ export default function ChatScreen({ route, navigation }) {
           type: 'image',
           mediaUri: result.assets[0].uri,
           text: text.trim(),
+          ...(replyingTo ? {
+            replyTo: {
+              id: replyingTo.id,
+              senderId: replyingTo.senderId,
+              senderName: replyingTo.senderName,
+              text: replyingTo.text,
+              type: replyingTo.type,
+            }
+          } : {}),
         });
+        setReplyingTo(null);
         setText('');
         setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
       }
@@ -417,7 +686,17 @@ export default function ChatScreen({ route, navigation }) {
           mediaUri: result.assets[0].uri,
           duration: result.assets[0].duration,
           text: text.trim(),
+          ...(replyingTo ? {
+            replyTo: {
+              id: replyingTo.id,
+              senderId: replyingTo.senderId,
+              senderName: replyingTo.senderName,
+              text: replyingTo.text,
+              type: replyingTo.type,
+            }
+          } : {}),
         });
+        setReplyingTo(null);
         setText('');
         setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
       }
@@ -472,7 +751,17 @@ export default function ChatScreen({ route, navigation }) {
             address,
           },
           text: text.trim() || '📍 Shared live rescue location',
+          ...(replyingTo ? {
+            replyTo: {
+              id: replyingTo.id,
+              senderId: replyingTo.senderId,
+              senderName: replyingTo.senderName,
+              text: replyingTo.text,
+              type: replyingTo.type,
+            }
+          } : {}),
         });
+        setReplyingTo(null);
         setText('');
         setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
       }
@@ -844,7 +1133,8 @@ export default function ChatScreen({ route, navigation }) {
           ) : null
         }
         renderItem={({ item, index }) => {
-          const isMine = item.senderId === currentUser?.id;
+          const currentUid = currentUser?.id || currentUser?.uid;
+          const isMine = item.senderId === currentUid || item.senderId === currentUser?.id || item.senderId === currentUser?.uid;
           const prevMsg = index > 0 ? messages[index - 1] : null;
           const isSameSenderAsPrev = prevMsg?.senderId === item.senderId;
 
@@ -854,187 +1144,242 @@ export default function ChatScreen({ route, navigation }) {
             : null;
 
           return (
-            <View
-              style={[
-                styles.msgRow,
-                isMine ? styles.msgRowMine : styles.msgRowTheirs,
-                isSameSenderAsPrev && { marginTop: -6 },
-              ]}
+            <SwipeableMessageRow
+              key={item.id}
+              isMine={isMine}
+              onSwipeReply={() => handleStartReply(item)}
+              onLongPress={() => handleOpenMsgAction(item)}
             >
-              {!isMine && (
-                !isSameSenderAsPrev ? (
-                  <Avatar
-                    name={senderUser?.name || convo?.participantNames?.[item.senderId] || name}
-                    userId={item.senderId || otherId}
-                    avatar={senderUser?.avatar}
-                    size={30}
-                    style={styles.senderAvatar}
-                  />
-                ) : (
-                  <View style={styles.senderAvatarSpacer} />
-                )
-              )}
-
-              <View style={[styles.bubbleColumn, isMine && styles.bubbleColumnMine]}>
-                {senderName && (
-                  <Text style={styles.groupSenderName}>{senderName}</Text>
+              <View
+                style={[
+                  styles.msgRow,
+                  isMine ? styles.msgRowMine : styles.msgRowTheirs,
+                  isSameSenderAsPrev && { marginTop: -6 },
+                ]}
+              >
+                {!isMine && (
+                  !isSameSenderAsPrev ? (
+                    <Avatar
+                      name={senderUser?.name || convo?.participantNames?.[item.senderId] || name}
+                      userId={item.senderId || otherId}
+                      avatar={senderUser?.avatar}
+                      size={30}
+                      style={styles.senderAvatar}
+                    />
+                  ) : (
+                    <View style={styles.senderAvatarSpacer} />
+                  )
                 )}
-                <View
-                  style={[
-                    styles.bubble,
-                    isMine ? styles.bubbleMine : styles.bubbleTheirs,
-                    item.type === 'image' && styles.bubbleImageContainer,
-                    item.type === 'location' && styles.bubbleLocationContainer,
-                    item.type === 'report_link' && { backgroundColor: 'transparent', padding: 0, shadowOpacity: 0, elevation: 0 },
-                  ]}
-                >
-                  {item.type === 'image' && (
-                    <TouchableOpacity
-                      onPress={() => setPreviewImage(item.mediaUri)}
-                      activeOpacity={0.9}
-                    >
-                      <Image
-                        source={{ uri: item.mediaUri }}
-                        style={styles.msgImage}
-                        resizeMode="cover"
-                      />
-                      {Boolean(item.text) && (
-                        <Text
-                          style={[
-                            styles.bubbleText,
-                            isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
-                            { marginTop: 6, marginHorizontal: 4 },
-                          ]}
-                        >
-                          {item.text}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  )}
 
-                  {item.type === 'video' && (
-                    <TouchableOpacity
-                      style={styles.msgVideoCard}
-                      onPress={() => setActiveVideo(item.mediaUri)}
-                      activeOpacity={0.88}
-                    >
-                      <View style={styles.videoThumbnailPlaceholder}>
-                        <View style={styles.playButtonCircle}>
-                          <Ionicons name="play" size={26} color="#FFFFFF" style={{ marginLeft: 3 }} />
-                        </View>
-                        <View style={styles.videoBadge}>
-                          <Ionicons name="videocam" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
-                          <Text style={styles.videoBadgeText}>
-                            {item.duration ? `${Math.round(item.duration)}s` : 'Video Clip'}
-                          </Text>
-                        </View>
-                      </View>
-                      {Boolean(item.text) && (
-                        <Text
-                          style={[
-                            styles.bubbleText,
-                            isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
-                            { marginTop: 6, marginHorizontal: 4 },
-                          ]}
-                        >
-                          {item.text}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
+                <View style={[styles.bubbleColumn, isMine && styles.bubbleColumnMine]}>
+                  {senderName && (
+                    <Text style={styles.groupSenderName}>{senderName}</Text>
                   )}
-
-                  {item.type === 'location' && (
-                    <View style={styles.msgLocationCard}>
-                      <View style={styles.locationHeaderRow}>
-                        <View style={styles.locationIconBadge}>
-                          <Ionicons name="location" size={20} color="#2E7A99" />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.locationTitle}>Rescue Location</Text>
-                          <Text style={styles.locationAddr} numberOfLines={2}>
-                            {item.location?.address || 'Pinned GPS Position'}
-                          </Text>
-                          {item.location?.latitude && (
-                            <Text style={styles.locationCoords}>
-                              {item.location.latitude.toFixed(5)}, {item.location.longitude.toFixed(5)}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
+                  <View
+                    style={[
+                      styles.bubble,
+                      isMine ? styles.bubbleMine : styles.bubbleTheirs,
+                      (item.type === 'image' || item.type === 'gif') && styles.bubbleImageContainer,
+                      item.type === 'location' && styles.bubbleLocationContainer,
+                      item.type === 'report_link' && { backgroundColor: 'transparent', padding: 0, shadowOpacity: 0, elevation: 0 },
+                    ]}
+                  >
+                    {/* Quoted Reply Header */}
+                    {Boolean(item.replyTo) && (
                       <TouchableOpacity
-                        style={styles.openMapBtn}
-                        onPress={() => openExternalLocation(item.location)}
-                        activeOpacity={0.85}
+                        style={[
+                          styles.replyQuoteWrap,
+                          isMine ? styles.replyQuoteWrapMine : styles.replyQuoteWrapTheirs,
+                        ]}
+                        onPress={() => handleScrollToMessage(item.replyTo.id)}
+                        activeOpacity={0.8}
                       >
-                        <Ionicons name="navigate" size={14} color="#FFFFFF" />
-                        <Text style={styles.openMapBtnText}>Open in Maps</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {item.type === 'report_link' && (
-                    <TouchableOpacity
-                      style={styles.reportLinkCard}
-                      onPress={() =>
-                        navigation.navigate(
-                          currentUser?.role === 'advocate' ? 'RescueAlertDetail' : 'ReportDetail',
-                          { reportId: item.reportId || item.reportId }
-                        )
-                      }
-                      activeOpacity={0.82}
-                    >
-                      <View style={styles.reportLinkHeader}>
-                        <Ionicons name="alert-circle" size={18} color="#2E7A99" style={{ marginRight: 6 }} />
-                        <Text style={styles.reportLinkTitle} numberOfLines={1}>
-                          Rescue Report Linked
-                        </Text>
-                      </View>
-                      <Text style={styles.reportLinkAnimal}>
-                        {item.animalType || 'Animal'} · {item.condition || 'Rescue'}
-                      </Text>
-                      {Boolean(item.address) && (
-                        <Text style={styles.reportLinkAddr} numberOfLines={2}>
-                          📍 {item.address}
-                        </Text>
-                      )}
-                      <View style={styles.reportLinkFooter}>
-                        <View style={[styles.reportLinkStatusBadge, item.status === 'Rescued' && { backgroundColor: '#D1FAE5' }, item.status === 'Responded' && { backgroundColor: '#FEF3E2' }]}>
-                          <Text style={[styles.reportLinkStatusText, item.status === 'Rescued' && { color: '#065F46' }, item.status === 'Responded' && { color: '#92400E' }]}>
-                            {item.status || 'Open'}
+                        <View style={[styles.replyQuoteBar, isMine && { backgroundColor: '#A4E6FA' }]} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.replyQuoteAuthor, isMine && styles.replyQuoteAuthorMine]} numberOfLines={1}>
+                            {item.replyTo.senderId === currentUid || item.replyTo.senderId === currentUser?.id || item.replyTo.senderId === currentUser?.uid ? 'You' : item.replyTo.senderName || 'Member'}
+                          </Text>
+                          <Text style={[styles.replyQuoteText, isMine && styles.replyQuoteTextMine]} numberOfLines={2}>
+                            {item.replyTo.text || 'Original Message'}
                           </Text>
                         </View>
-                        <Text style={styles.reportLinkTap}>Tap to view →</Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-
-                  {(!item.type || item.type === 'text') && (
-                    <Text
-                      style={[
-                        styles.bubbleText,
-                        isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
-                      ]}
-                    >
-                      {item.text}
-                    </Text>
-                  )}
-
-                  <View style={styles.timeRow}>
-                    <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>
-                      {formatMessageTime(item.time)}
-                    </Text>
-                    {isMine && (
-                      <Ionicons
-                        name="checkmark-done"
-                        size={13}
-                        color="#A4E6FA"
-                        style={{ marginLeft: 4 }}
-                      />
+                      </TouchableOpacity>
                     )}
+
+                    {/* GIF Message Rendering */}
+                    {item.type === 'gif' && (
+                      <TouchableOpacity
+                        onPress={() => setPreviewImage(item.mediaUri)}
+                        activeOpacity={0.9}
+                      >
+                        <Image
+                          source={{ uri: item.mediaUri }}
+                          style={styles.msgGif}
+                          resizeMode="cover"
+                        />
+                        {Boolean(item.text) && (
+                          <Text
+                            style={[
+                              styles.bubbleText,
+                              isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
+                              { marginTop: 6, marginHorizontal: 4 },
+                            ]}
+                          >
+                            {item.text}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Image Message Rendering */}
+                    {item.type === 'image' && (
+                      <TouchableOpacity
+                        onPress={() => setPreviewImage(item.mediaUri)}
+                        activeOpacity={0.9}
+                      >
+                        <Image
+                          source={{ uri: item.mediaUri }}
+                          style={styles.msgImage}
+                          resizeMode="cover"
+                        />
+                        {Boolean(item.text) && (
+                          <Text
+                            style={[
+                              styles.bubbleText,
+                              isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
+                              { marginTop: 6, marginHorizontal: 4 },
+                            ]}
+                          >
+                            {item.text}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    )}
+
+                    {item.type === 'video' && (
+                      <TouchableOpacity
+                        style={styles.msgVideoCard}
+                        onPress={() => setActiveVideo(item.mediaUri)}
+                        activeOpacity={0.88}
+                      >
+                        <View style={styles.videoThumbnailPlaceholder}>
+                          <View style={styles.playButtonCircle}>
+                            <Ionicons name="play" size={26} color="#FFFFFF" style={{ marginLeft: 3 }} />
+                          </View>
+                          <View style={styles.videoBadge}>
+                            <Ionicons name="videocam" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+                            <Text style={styles.videoBadgeText}>
+                              {item.duration ? `${Math.round(item.duration)}s` : 'Video Clip'}
+                            </Text>
+                          </View>
+                        </View>
+                        {Boolean(item.text) && (
+                          <Text
+                            style={[
+                              styles.bubbleText,
+                              isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
+                              { marginTop: 6, marginHorizontal: 4 },
+                            ]}
+                          >
+                            {item.text}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    )}
+
+                    {item.type === 'location' && (
+                      <View style={styles.msgLocationCard}>
+                        <View style={styles.locationHeaderRow}>
+                          <View style={styles.locationIconBadge}>
+                            <Ionicons name="location" size={20} color="#2E7A99" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.locationTitle}>Rescue Location</Text>
+                            <Text style={styles.locationAddr} numberOfLines={2}>
+                              {item.location?.address || 'Pinned GPS Position'}
+                            </Text>
+                            {item.location?.latitude && (
+                              <Text style={styles.locationCoords}>
+                                {item.location.latitude.toFixed(5)}, {item.location.longitude.toFixed(5)}
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.openMapBtn}
+                          onPress={() => openExternalLocation(item.location)}
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons name="navigate" size={14} color="#FFFFFF" />
+                          <Text style={styles.openMapBtnText}>Open in Maps</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {item.type === 'report_link' && (
+                      <TouchableOpacity
+                        style={styles.reportLinkCard}
+                        onPress={() =>
+                          navigation.navigate(
+                            currentUser?.role === 'advocate' ? 'RescueAlertDetail' : 'ReportDetail',
+                            { reportId: item.reportId || item.reportId }
+                          )
+                        }
+                        activeOpacity={0.82}
+                      >
+                        <View style={styles.reportLinkHeader}>
+                          <Ionicons name="alert-circle" size={18} color="#2E7A99" style={{ marginRight: 6 }} />
+                          <Text style={styles.reportLinkTitle} numberOfLines={1}>
+                            Rescue Report Linked
+                          </Text>
+                        </View>
+                        <Text style={styles.reportLinkAnimal}>
+                          {item.animalType || 'Animal'} · {item.condition || 'Rescue'}
+                        </Text>
+                        {Boolean(item.address) && (
+                          <Text style={styles.reportLinkAddr} numberOfLines={2}>
+                            📍 {item.address}
+                          </Text>
+                        )}
+                        <View style={styles.reportLinkFooter}>
+                          <View style={[styles.reportLinkStatusBadge, item.status === 'Rescued' && { backgroundColor: '#D1FAE5' }, item.status === 'Responded' && { backgroundColor: '#FEF3E2' }]}>
+                            <Text style={[styles.reportLinkStatusText, item.status === 'Rescued' && { color: '#065F46' }, item.status === 'Responded' && { color: '#92400E' }]}>
+                              {item.status || 'Open'}
+                            </Text>
+                          </View>
+                          <Text style={styles.reportLinkTap}>Tap to view →</Text>
+                        </View>
+                      </TouchableOpacity>
+                    )}
+
+                    {(!item.type || item.type === 'text') && (
+                      <Text
+                        style={[
+                          styles.bubbleText,
+                          isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
+                        ]}
+                      >
+                        {item.text}
+                      </Text>
+                    )}
+
+                    <View style={styles.timeRow}>
+                      <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>
+                        {formatMessageTime(item.time)}
+                      </Text>
+                      {isMine && (
+                        <Ionicons
+                          name="checkmark-done"
+                          size={13}
+                          color="#A4E6FA"
+                          style={{ marginLeft: 4 }}
+                        />
+                      )}
+                    </View>
                   </View>
                 </View>
               </View>
-            </View>
+            </SwipeableMessageRow>
           );
         }}
       />
@@ -1073,6 +1418,31 @@ export default function ChatScreen({ route, navigation }) {
         </View>
       )}
 
+      {/* ── Reply Preview Banner ────────────────────────────────── */}
+      {Boolean(replyingTo) && (
+        <View style={styles.replyBanner}>
+          <View style={styles.replyBannerAccent} />
+          <View style={styles.replyBannerContent}>
+            <View style={styles.replyBannerHeader}>
+              <Ionicons name="arrow-undo" size={13} color="#2E7A99" style={{ marginRight: 4 }} />
+              <Text style={styles.replyBannerAuthor} numberOfLines={1}>
+                Replying to {replyingTo.isMine ? 'yourself' : replyingTo.senderName || 'Member'}
+              </Text>
+            </View>
+            <Text style={styles.replyBannerSnippet} numberOfLines={1}>
+              {replyingTo.text || 'Message'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.replyBannerCloseBtn}
+            onPress={() => setReplyingTo(null)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="close" size={18} color="#8C7D6A" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* ── Input Bar ─────────────────────────────────────────── */}
       <View style={styles.inputBar}>
         <TouchableOpacity
@@ -1081,6 +1451,14 @@ export default function ChatScreen({ route, navigation }) {
           activeOpacity={0.75}
         >
           <Ionicons name="add" size={22} color="#2E7A99" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.gifBtn}
+          onPress={() => setGifModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.gifBtnText}>GIF</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -1395,38 +1773,36 @@ export default function ChatScreen({ route, navigation }) {
               <Text style={styles.groupInfoLeaveTxt}>Leave Group Chat</Text>
             </TouchableOpacity>
 
-            {/* Clear / Delete Group Button */}
-            <TouchableOpacity
-              style={styles.groupInfoDangerBtn}
-              activeOpacity={0.8}
-              onPress={() => {
-                setGroupInfoVisible(false);
-                setTimeout(() => {
-                  showAlert({
-                    title: isCurrentUserAdmin ? 'Delete Group Chat' : 'Clear Group Messages',
-                    message: isCurrentUserAdmin
-                      ? 'Delete this group chat and remove all messages for everyone?'
-                      : 'Remove all messages and delete this group chat from your list?',
-                    type: 'warning',
-                    customIcon: 'trash-outline',
-                    secondaryText: 'Cancel',
-                    primaryText: isCurrentUserAdmin ? 'Delete All' : 'Clear All',
-                    onPrimaryPress: () => {
-                      const targetId = convo?.id || conversationId;
-                      setMessages([]);
-                      chatMessagesCache.delete(messagesCacheKey);
-                      if (targetId) clearConversation(targetId);
-                      navigation.goBack();
-                    },
-                  });
-                }, 200);
-              }}
-            >
-              <Ionicons name="trash-outline" size={18} color="#C0392B" />
-              <Text style={styles.groupInfoDangerTxt}>
-                {isCurrentUserAdmin ? 'Delete Group Chat' : 'Clear Chat History'}
-              </Text>
-            </TouchableOpacity>
+            {/* Delete Group Button (Admin Only) */}
+            {isCurrentUserAdmin && (
+              <TouchableOpacity
+                style={styles.groupInfoDangerBtn}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setGroupInfoVisible(false);
+                  setTimeout(() => {
+                    showAlert({
+                      title: 'Delete Group Chat',
+                      message: 'Delete this group chat and remove all messages for everyone?',
+                      type: 'warning',
+                      customIcon: 'trash-outline',
+                      secondaryText: 'Cancel',
+                      primaryText: 'Delete Group',
+                      onPrimaryPress: () => {
+                        const targetId = convo?.id || conversationId;
+                        setMessages([]);
+                        chatMessagesCache.delete(messagesCacheKey);
+                        if (targetId) clearConversation(targetId);
+                        navigation.goBack();
+                      },
+                    });
+                  }, 200);
+                }}
+              >
+                <Ionicons name="trash-outline" size={18} color="#C0392B" />
+                <Text style={styles.groupInfoDangerTxt}>Delete Group Chat</Text>
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -1654,6 +2030,129 @@ export default function ChatScreen({ route, navigation }) {
             </ScrollView>
           )}
         </SafeAreaView>
+      </Modal>
+
+      {/* ── GIF Picker Modal ────────────────────────────────────── */}
+      <Modal
+        visible={gifModalVisible}
+        animationType="slide"
+        onRequestClose={() => setGifModalVisible(false)}
+      >
+        <SafeAreaView style={styles.gifModalContainer}>
+          <View style={styles.gifModalHeader}>
+            <TouchableOpacity
+              style={styles.groupInfoCloseBtn}
+              onPress={() => setGifModalVisible(false)}
+            >
+              <Ionicons name="close" size={22} color="#473018" />
+            </TouchableOpacity>
+            <Text style={styles.groupInfoTitle}>Choose GIF</Text>
+            <View style={{ width: 36 }} />
+          </View>
+
+          <View style={styles.gifSearchWrap}>
+            <Ionicons name="search" size={16} color="#8C7D6A" style={{ marginRight: 8 }} />
+            <TextInput
+              style={styles.gifSearchInput}
+              value={gifSearch}
+              onChangeText={setGifSearch}
+              placeholder="Search GIFs..."
+              placeholderTextColor="#8C7D6A"
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+            />
+            {gifSearch.length > 0 && (
+              <TouchableOpacity onPress={() => setGifSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close-circle" size={16} color="#8C7D6A" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={{ maxHeight: 44, marginBottom: 8 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.gifCategoryScroll}>
+              {GIF_CATEGORIES.map((cat) => {
+                const isActive = selectedGifCategory === cat.id;
+                return (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[styles.gifCategoryChip, isActive && styles.gifCategoryChipActive]}
+                    onPress={() => setSelectedGifCategory(cat.id)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.gifCategoryText, isActive && styles.gifCategoryTextActive]}>
+                      {cat.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.gifGrid} keyboardShouldPersistTaps="handled">
+            {filteredGifs.length === 0 ? (
+              <View style={styles.noMembersWrap}>
+                <Ionicons name="search-outline" size={40} color="#C9B99A" />
+                <Text style={styles.noMembersTxt}>No GIFs match your search</Text>
+              </View>
+            ) : (
+              filteredGifs.map((g) => (
+                <TouchableOpacity
+                  key={g.id}
+                  style={styles.gifCard}
+                  onPress={() => handleSendGif(g.url)}
+                  activeOpacity={0.85}
+                >
+                  <Image source={{ uri: g.url }} style={styles.gifCardImg} resizeMode="cover" />
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ── Message Action Modal (Long-Press Action Sheet) ───────── */}
+      <Modal
+        visible={msgActionModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMsgActionModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.msgActionOverlay}
+          activeOpacity={1}
+          onPress={() => setMsgActionModalVisible(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.msgActionSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.attachHandle} />
+            <Text style={styles.msgActionHeader}>Message Options</Text>
+
+            {selectedMsgAction?.text ? (
+              <Text style={styles.msgActionPreview} numberOfLines={2}>
+                "{selectedMsgAction.text}"
+              </Text>
+            ) : null}
+
+            <TouchableOpacity
+              style={styles.msgActionItem}
+              onPress={() => handleStartReply(selectedMsgAction)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-undo-outline" size={20} color="#2E7A99" />
+              <Text style={styles.msgActionItemText}>Reply to Message</Text>
+            </TouchableOpacity>
+
+            {selectedMsgAction?.text ? (
+              <TouchableOpacity
+                style={styles.msgActionItem}
+                onPress={handleCopyText}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="copy-outline" size={20} color="#473018" />
+                <Text style={styles.msgActionItemText}>Copy Text</Text>
+              </TouchableOpacity>
+            ) : null}
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </KeyboardAvoidingView>
   );
@@ -2927,6 +3426,242 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     backgroundColor: '#473018',
+  },
+
+  // Swipe to reply & quote preview styles
+  swipeContainer: {
+    position: 'relative',
+    width: '100%',
+  },
+  swipeReplyIconWrap: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -14,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#EBF7FA',
+    borderWidth: 1,
+    borderColor: '#B8E4E5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  swipeReplyIconLeft: {
+    right: 6,
+  },
+  swipeReplyIconRight: {
+    left: 6,
+  },
+  replyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F4F9FA',
+    borderTopWidth: 1,
+    borderTopColor: '#E2EEF2',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  replyBannerAccent: {
+    width: 3,
+    height: '100%',
+    backgroundColor: '#2E7A99',
+    borderRadius: 2,
+    marginRight: 10,
+  },
+  replyBannerContent: {
+    flex: 1,
+    marginRight: 8,
+  },
+  replyBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  replyBannerAuthor: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2E7A99',
+  },
+  replyBannerSnippet: {
+    fontSize: 12,
+    color: '#473018',
+    marginTop: 2,
+  },
+  replyBannerCloseBtn: {
+    padding: 4,
+  },
+  replyQuoteWrap: {
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  replyQuoteWrapMine: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  replyQuoteWrapTheirs: {
+    backgroundColor: '#F4F0E8',
+  },
+  replyQuoteBar: {
+    width: 3,
+    height: '100%',
+    backgroundColor: '#2E7A99',
+    borderRadius: 2,
+    marginRight: 8,
+  },
+  replyQuoteAuthor: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#2E7A99',
+    marginBottom: 1,
+  },
+  replyQuoteText: {
+    fontSize: 11.5,
+    color: '#473018',
+  },
+  replyQuoteTextMine: {
+    color: '#FFFFFF',
+  },
+  msgGif: {
+    width: 220,
+    height: 160,
+    borderRadius: 14,
+    backgroundColor: '#E8DFC8',
+  },
+  gifBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#EBF7FA',
+    borderWidth: 1,
+    borderColor: '#C6E7F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gifBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#2E7A99',
+  },
+  gifModalContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  gifModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8DFC8',
+  },
+  gifSearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3EDE0',
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
+  },
+  gifSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#473018',
+    paddingVertical: 0,
+  },
+  gifCategoryScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+    alignItems: 'center',
+  },
+  gifCategoryChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F5F0E6',
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
+  },
+  gifCategoryChipActive: {
+    backgroundColor: '#2E7A99',
+    borderColor: '#2E7A99',
+  },
+  gifCategoryText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#685038',
+  },
+  gifCategoryTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  gifGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    padding: 16,
+  },
+  gifCard: {
+    width: '48%',
+    aspectRatio: 1.3,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#F5F0E6',
+  },
+  gifCardImg: {
+    width: '100%',
+    height: '100%',
+  },
+  msgActionOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  msgActionSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    ...SHADOWS.card,
+  },
+  msgActionHeader: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#473018',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  msgActionPreview: {
+    fontSize: 13,
+    color: '#685038',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    lineHeight: 18,
+  },
+  msgActionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F4F0E8',
+  },
+  msgActionItemText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#473018',
   },
 });
 

@@ -127,7 +127,7 @@ export async function saveMessageFirebase(conversationId, message, activeUserId 
   const type = message.type || 'text';
   const hasContent = type === 'text'
     ? Boolean(String(message.text || '').trim())
-    : type === 'image' || type === 'video'
+    : type === 'image' || type === 'video' || type === 'gif'
       ? Boolean(message.mediaUri)
       : type === 'location'
         ? Boolean(message.location)
@@ -193,7 +193,7 @@ export async function saveConversationMessageFirebase(convoData, message, active
   const type = message.type || 'text';
   const hasContent = type === 'text'
     ? Boolean(String(message.text || '').trim())
-    : type === 'image' || type === 'video'
+    : type === 'image' || type === 'video' || type === 'gif'
       ? Boolean(message.mediaUri)
       : type === 'location'
         ? Boolean(message.location)
