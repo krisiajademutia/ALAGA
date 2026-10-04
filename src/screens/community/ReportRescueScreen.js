@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -99,7 +99,16 @@ export default function ReportRescueScreen({ navigation }) {
   const [gpsStatus, setGpsStatus] = useState('fetching'); // 'fetching' | 'success' | 'error' | 'denied'
   const [coords, setCoords] = useState(null);
   const [address, setAddress] = useState('');
-  const [addressError, setAddressError] = useState(null);
+  const [errors, setErrors] = useState({});
+  const scrollViewRef = useRef(null);
+
+  // Form is complete when all critical rescue details are provided
+  const isFormComplete = Boolean(
+    address.trim() &&
+    landmark.trim() &&
+    photos.length > 0 &&
+    description.trim().length >= 5
+  );
 
   useEffect(() => {
     fetchRealtimeLocation();
@@ -152,13 +161,15 @@ export default function ReportRescueScreen({ navigation }) {
         // If manual retry or if user hasn't typed an address yet, populate address
         if (isManualRetry || !address.trim()) {
           setAddress(fullAddr);
+          setErrors((prev) => ({ ...prev, address: null }));
         }
       } else if (isManualRetry || !address.trim()) {
         setAddress(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
+        setErrors((prev) => ({ ...prev, address: null }));
       }
 
       setGpsStatus('success');
-      setAddressError(null);
+      setErrors((prev) => ({ ...prev, address: null }));
     } catch (error) {
       console.warn('Real-time GPS error:', error);
       setGpsStatus('error');
@@ -183,6 +194,7 @@ export default function ReportRescueScreen({ navigation }) {
       if (!result.canceled && result.assets?.[0]) {
         const asset = result.assets[0];
         setPhotos((prev) => [...prev, { uri: asset.uri, base64: asset.base64 }]);
+        setErrors((prev) => ({ ...prev, photos: null }));
       }
     } catch (err) {
       console.warn('Camera error:', err);
@@ -207,24 +219,63 @@ export default function ReportRescueScreen({ navigation }) {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const newAssets = result.assets.map((a) => ({ uri: a.uri, base64: a.base64 }));
         setPhotos((prev) => [...prev, ...newAssets]);
+        setErrors((prev) => ({ ...prev, photos: null }));
       }
     } catch (err) {
       console.warn('Gallery error:', err);
     }
   };
 
-  const handleSubmit = async () => {
+  const validate = () => {
+    const newErrors = {};
     const finalAddress = address.trim();
     const finalLandmark = landmark.trim();
-    if (!finalAddress && !finalLandmark) {
-      setAddressError('Please provide an address or landmark');
+    const finalDescription = description.trim();
+
+    if (!finalAddress) {
+      newErrors.address = 'Street address or area is required so advocates can locate the animal.';
+    }
+
+    if (!finalLandmark) {
+      newErrors.landmark = 'Please provide a landmark or exact spot (e.g., near store, gate, tree).';
+    }
+
+    if (photos.length === 0) {
+      newErrors.photos = 'At least 1 photo of the animal is required for identification.';
+    }
+
+    if (!finalDescription) {
+      newErrors.description = 'Please describe the animal, visible condition, or urgent notes.';
+    } else if (finalDescription.length < 5) {
+      newErrors.description = 'Please provide a bit more detail (at least 5 characters).';
+    }
+
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length > 0) {
+      const missingList = [];
+      if (newErrors.photos) missingList.push('• Photo Evidence (at least 1 photo)');
+      if (newErrors.address) missingList.push('• Street address or area');
+      if (newErrors.landmark) missingList.push('• Specific landmark or spot');
+      if (newErrors.description) missingList.push('• Animal details / condition description');
+
       showAlert(
         'warning',
-        'Location Required',
-        'Please enter the street address, area, or landmark description so advocates can find the animal.'
+        'Incomplete Rescue Details',
+        `Please complete the following required details before broadcasting:\n\n${missingList.join('\n')}`
       );
-      return;
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      return false;
     }
+
+    return true;
+  };
+
+  const handleSubmit = async () => {
+    if (!validate()) return;
+
+    const finalAddress = address.trim();
+    const finalLandmark = landmark.trim();
 
     setLoading(true);
 
@@ -330,12 +381,22 @@ export default function ReportRescueScreen({ navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
+          ref={scrollViewRef}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
           {/* ── 1. Integrated Location Card (Single Clean Surface) ── */}
-          <View style={styles.locationCard}>
+          <View style={styles.labelRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.sectionHeading}>LOCATION & LANDMARK</Text>
+              <View style={styles.requiredBadge}>
+                <Text style={styles.requiredText}>Required</Text>
+              </View>
+            </View>
+            <Text style={styles.optionalText}>Exact area for rescuers</Text>
+          </View>
+          <View style={[styles.locationCard, (errors.address || errors.landmark) && styles.inputErrorBorder]}>
             <View style={styles.locTopRow}>
               <View style={styles.gpsLiveBadge}>
                 <View
@@ -386,29 +447,29 @@ export default function ReportRescueScreen({ navigation }) {
               <Ionicons
                 name="location-sharp"
                 size={18}
-                color={addressError ? '#D94F4F' : '#D94F4F'}
+                color={errors.address ? '#D94F4F' : '#D94F4F'}
                 style={{ marginRight: 6, marginTop: Platform.OS === 'ios' ? 2 : 4 }}
               />
               <TextInput
-                style={[styles.locAddressInput, addressError ? styles.locInputError : null]}
+                style={[styles.locAddressInput, errors.address ? styles.locInputError : null]}
                 placeholder={
                   gpsLoading
                     ? 'Detecting GPS location...'
-                    : 'Street address, barangay, or city (tap to edit)...'
+                    : 'Street address, barangay, or city (tap to edit) *'
                 }
                 placeholderTextColor="#947E68"
                 value={address}
                 onChangeText={(t) => {
                   setAddress(t);
-                  if (addressError) setAddressError(null);
+                  if (errors.address) setErrors((prev) => ({ ...prev, address: null }));
                 }}
                 multiline
                 numberOfLines={2}
               />
             </View>
 
-            {addressError ? (
-              <Text style={styles.locErrorText}>{addressError}</Text>
+            {errors.address ? (
+              <Text style={styles.locErrorText}>{errors.address}</Text>
             ) : coords ? (
               <Text style={styles.locCoordsText}>
                 GPS: {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}
@@ -426,12 +487,18 @@ export default function ReportRescueScreen({ navigation }) {
             <View style={styles.locDivider} />
 
             <TextInput
-              style={styles.landmarkInput}
-              placeholder="Add specific landmark or spot (e.g., near gate, under tree)"
+              style={[styles.landmarkInput, errors.landmark ? styles.locInputError : null]}
+              placeholder="Add specific landmark or spot (e.g., near gate, store, tree) *"
               placeholderTextColor="#947E68"
               value={landmark}
-              onChangeText={setLandmark}
+              onChangeText={(t) => {
+                setLandmark(t);
+                if (errors.landmark) setErrors((prev) => ({ ...prev, landmark: null }));
+              }}
             />
+            {errors.landmark ? (
+              <Text style={styles.locErrorText}>{errors.landmark}</Text>
+            ) : null}
           </View>
 
           {/* ── 2. Animal Type (Clean Segmented Row) ──────────── */}
@@ -529,8 +596,15 @@ export default function ReportRescueScreen({ navigation }) {
 
           {/* ── 4. Photo Evidence (Modern Multi-Photo Gallery) ── */}
           <View style={styles.labelRow}>
-            <Text style={styles.sectionHeading}>PHOTO EVIDENCE</Text>
-            <Text style={styles.optionalText}>Recommended</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.sectionHeading}>PHOTO EVIDENCE</Text>
+              <View style={styles.requiredBadge}>
+                <Text style={styles.requiredText}>Required</Text>
+              </View>
+            </View>
+            <Text style={styles.optionalText}>
+              {photos.length > 0 ? `${photos.length} attached` : 'At least 1 photo'}
+            </Text>
           </View>
 
           {photos.length > 0 ? (
@@ -576,37 +650,77 @@ export default function ReportRescueScreen({ navigation }) {
               </Text>
             </View>
           ) : (
-            <TouchableOpacity
-              style={styles.addPhotoBar}
-              onPress={() => setPhotoPickerVisible(true)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="camera-outline" size={20} color="#2E7A99" style={{ marginRight: 8 }} />
-              <Text style={styles.addPhotoText}>Attach Photos</Text>
-              <Text style={styles.addPhotoSubText}>Multiple photos allowed</Text>
-            </TouchableOpacity>
+            <View style={{ marginBottom: 16 }}>
+              <TouchableOpacity
+                style={[
+                  styles.addPhotoBar,
+                  errors.photos && styles.inputErrorBorder,
+                ]}
+                onPress={() => setPhotoPickerVisible(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="camera-outline"
+                  size={20}
+                  color={errors.photos ? '#D94F4F' : '#2E7A99'}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={[styles.addPhotoText, errors.photos && { color: '#D94F4F' }]}>
+                  Attach Photos *
+                </Text>
+                <Text style={styles.addPhotoSubText}>Photo required for rescue alerts</Text>
+              </TouchableOpacity>
+              {errors.photos ? (
+                <Text style={styles.fieldErrorText}>{errors.photos}</Text>
+              ) : null}
+            </View>
           )}
 
           {/* ── 5. Additional Details ──────────────────────────── */}
           <View style={styles.labelRow}>
-            <Text style={styles.sectionHeading}>ADDITIONAL DETAILS</Text>
-            <Text style={styles.optionalText}>Optional</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.sectionHeading}>ADDITIONAL DETAILS</Text>
+              <View style={styles.requiredBadge}>
+                <Text style={styles.requiredText}>Required</Text>
+              </View>
+            </View>
+            <Text style={styles.optionalText}>Condition & notes</Text>
           </View>
 
           <TextInput
-            style={styles.notesArea}
-            placeholder="Describe visible injuries, collar, temperament, or safety notes..."
+            style={[styles.notesArea, errors.description && styles.inputErrorBorder]}
+            placeholder="Describe visible injuries, collar, temperament, or safety notes (min 5 characters) *"
             placeholderTextColor="#947E68"
             value={description}
-            onChangeText={setDescription}
+            onChangeText={(t) => {
+              setDescription(t);
+              if (errors.description) setErrors((prev) => ({ ...prev, description: null }));
+            }}
             multiline
             numberOfLines={3}
             textAlignVertical="top"
           />
+          {errors.description ? (
+            <Text style={styles.fieldErrorText}>{errors.description}</Text>
+          ) : null}
+
+          {/* ── Incomplete Details Guidance Banner ─────────────── */}
+          {!isFormComplete && (
+            <View style={styles.incompleteBanner}>
+              <Ionicons name="information-circle" size={16} color="#B45309" />
+              <Text style={styles.incompleteBannerText}>
+                Complete all required details (photos, address, landmark, and description) to broadcast this rescue alert.
+              </Text>
+            </View>
+          )}
 
           {/* ── Submit Broadcast Button ───────────────────────── */}
           <TouchableOpacity
-            style={[styles.submitButton, loading && { opacity: 0.7 }]}
+            style={[
+              styles.submitButton,
+              !isFormComplete && styles.submitButtonDisabled,
+              loading && { opacity: 0.7 },
+            ]}
             onPress={handleSubmit}
             disabled={loading}
             activeOpacity={0.85}
@@ -614,7 +728,21 @@ export default function ReportRescueScreen({ navigation }) {
             {loading ? (
               <ActivityIndicator size="small" color="#473018" />
             ) : (
-              <Text style={styles.submitButtonText}>Broadcast Rescue Alert</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons
+                  name={isFormComplete ? "radio-outline" : "alert-circle-outline"}
+                  size={18}
+                  color={isFormComplete ? "#473018" : "#8C7D6A"}
+                />
+                <Text
+                  style={[
+                    styles.submitButtonText,
+                    !isFormComplete && styles.submitButtonTextDisabled,
+                  ]}
+                >
+                  Broadcast Rescue Alert
+                </Text>
+              </View>
             )}
           </TouchableOpacity>
 
@@ -888,6 +1016,33 @@ const styles = StyleSheet.create({
     color: '#947E68',
     fontWeight: '500',
   },
+  requiredBadge: {
+    backgroundColor: '#FDE8E8',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#F8B4B4',
+  },
+  requiredText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#D94F4F',
+    letterSpacing: 0.2,
+  },
+  inputErrorBorder: {
+    borderColor: '#D94F4F',
+    borderWidth: 1.5,
+    backgroundColor: '#FFF8F8',
+  },
+  fieldErrorText: {
+    fontSize: 11,
+    color: '#D94F4F',
+    fontWeight: '700',
+    marginTop: -8,
+    marginBottom: 12,
+    marginLeft: 4,
+  },
 
   // 2. Animal Type Segmented Row
   typeSegment: {
@@ -1107,7 +1262,26 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 
-  // Submit Button
+  // Submit Button & Guidance
+  incompleteBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+  },
+  incompleteBannerText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#92400E',
+    fontWeight: '600',
+    lineHeight: 15,
+  },
   submitButton: {
     backgroundColor: '#92CDE5',
     borderRadius: 14,
@@ -1118,10 +1292,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     ...SHADOWS.sm,
   },
+  submitButtonDisabled: {
+    backgroundColor: '#D9E5EB',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   submitButtonText: {
     fontSize: 15,
     fontWeight: '800',
     color: '#473018',
+  },
+  submitButtonTextDisabled: {
+    color: '#8C7D6A',
   },
   footerCaption: {
     fontSize: 11,
